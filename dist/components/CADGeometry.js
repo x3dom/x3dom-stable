@@ -1,4 +1,4 @@
-/** X3DOM Runtime, http://www.x3dom.org/ 1.7.0 - f33e92d248a2f25d52fa63ede8ffee570c8a6304 - Wed Jun 17 09:49:25 2015 +0200 */
+/** X3DOM Runtime, http://www.x3dom.org/ 1.7.1 - 27d2b19b572f365b32d12cd9883e4bf894e60cef - Tue Jan 5 13:25:24 2016 +0100 */
 x3dom.registerNodeType("IndexedQuadSet","CADGeometry",defineClass(x3dom.nodeTypes.X3DComposedGeometryNode,function(ctx){x3dom.nodeTypes.IndexedQuadSet.superClass.call(this,ctx);this.addField_MFInt32(ctx,'index',[]);},{nodeChanged:function()
 {var time0=new Date().getTime();this.handleAttribs();var colPerVert=this._vf.colorPerVertex;var normPerVert=this._vf.normalPerVertex;var indexes=this._vf.index;var hasNormal=false,hasTexCoord=false,hasColor=false;var positions,normals,texCoords,colors;var coordNode=this._cf.coord.node;x3dom.debug.assert(coordNode);positions=coordNode._vf.point;var normalNode=this._cf.normal.node;if(normalNode){hasNormal=true;normals=normalNode._vf.vector;}
 else{hasNormal=false;}
@@ -89,7 +89,7 @@ vol.extendBounds(childVol.min,childVol.max);}
 return vol;},collectDrawableObjects:function(transform,drawableCollection,singlePath,invalidateCache,planeMask,clipPlanes)
 {if(singlePath&&(this._parentNodes.length>1))
 singlePath=false;if(singlePath&&(invalidateCache=invalidateCache||this.cacheInvalid()))
-this.invalidateCache();if(!this._cf.shape.node||(planeMask=drawableCollection.cull(transform,this.graphState(),singlePath,planeMask))<=0){return;}
+this.invalidateCache();if(!this._cf.shape.node||(planeMask=drawableCollection.cull(transform,this.graphState(),singlePath,planeMask))<0){return;}
 var cnode,childTransform;if(singlePath){if(!this._graph.globalMatrix){this._graph.globalMatrix=this.transformMatrix(transform);}
 childTransform=this._graph.globalMatrix;}
 else{childTransform=this.transformMatrix(transform);}

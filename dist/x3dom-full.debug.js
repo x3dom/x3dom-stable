@@ -1,4 +1,4 @@
-/** X3DOM Runtime, http://www.x3dom.org/ 1.7.0 - f33e92d248a2f25d52fa63ede8ffee570c8a6304 - Wed Jun 17 09:49:25 2015 +0200 *//*
+/** X3DOM Runtime, http://www.x3dom.org/ 1.7.1 - 27d2b19b572f365b32d12cd9883e4bf894e60cef - Tue Jan 5 13:25:24 2016 +0100 *//*
  * X3DOM JavaScript Library
  * http://www.x3dom.org
  *
@@ -1477,7 +1477,7 @@ x3dom.Parts = function(multiPart, ids, colorMap, emissiveMap, specularMap, visib
                     pixelBack.b = color.b;
 
                     parts.emissiveMap.setPixel(xFront, yFront, pixelFront);
-                    parts.emissiveMap.setPixel(xback, yBack, pixelBack);
+                    parts.emissiveMap.setPixel(xBack, yBack, pixelBack);
                 }
             }
         }
@@ -2805,213 +2805,74 @@ x3dom.DoublyLinkedList.prototype.invert = function() {
  * Philip Taylor: http://philip.html5.org
  */
 
-
 x3dom.EarClipping = {
 	
-	reversePointDirection: function (linklist, plane) {
-			var l, k;
-			var count = 0;
-			var z = 0;
-			var nodei, nodel, nodek;
-			
-			if (linklist.length < 3) {
-				return false;
-			}
-			
-			for (var i = 0; i < linklist.length; i++) {
-				l = (i + 1) % linklist.length;
-				k = (i + 2) % linklist.length;
-				
-				nodei = linklist.getNode(i);
-				nodel = linklist.getNode(l);
-				nodek = linklist.getNode(k); 
-							
-				if(plane == 'YZ') {
-					z  = (nodel.point.y - nodei.point.y) * (nodek.point.z - nodel.point.z);
-					z -= (nodel.point.z - nodei.point.z) * (nodek.point.y - nodel.point.y);
-				} else if(plane == 'XZ') {
-					z  = (nodel.point.z - nodei.point.z) * (nodek.point.x - nodel.point.x);
-					z -= (nodel.point.x - nodei.point.x) * (nodek.point.z - nodel.point.z);
-				} else {
-					z  = (nodel.point.x - nodei.point.x) * (nodek.point.y - nodel.point.y);
-					z -= (nodel.point.y - nodei.point.y) * (nodek.point.x - nodel.point.x);
-				}
-				
-				if (z < 0) {
-					count--;
-				} else {
-					count++;
-				}
-			}
-			
-			if (count < 0) {
-				linklist.invert();
-				return true;
-			}	
-			return false;
-	}, 
-
 	getIndexes: function (linklist) {
+		
 		var node = linklist.first.next;
 		var plane = this.identifyPlane(node.prev.point, node.point, node.next.point);
+		var i, points, x, y;
+		points = [];
+		point_indexes = [];
 		
-		var invers = this.reversePointDirection(linklist, plane);
-		var indexes = [];
-		node = linklist.first.next;
-		var next = null;
-		var count = 0;	
-			
-		var isEar = true;
-		
-		while(linklist.length >= 3 && count < 15) {
-			next = node.next;
-			for(var i = 0; i < linklist.length; i++) {
-				if(this.isNotEar(linklist.getNode(i).point, node.prev.point, node.point, node.next.point, plane)) {
-					isEar = false;
-				}
+		for (i = 0; i < linklist.length; i++) {
+			node = linklist.getNode(i);
+			switch (plane) {
+				case "XY": { x = node.point.x; y = node.point.y; break; }
+				case "XZ": { x = node.point.z; y = node.point.x; break; }
+				default: { x = node.point.y; y = node.point.z; }
 			}
-			
-			if(isEar) {
-				if(this.isKonvex(node.prev.point, node.point, node.next.point, plane)) {
-					indexes.push(node.prev.point_index, node.point_index, node.next.point_index);
-					linklist.deleteNode(node);
-				} else {
-					count++;
-				}
-			}
-
-			node = next;
-			isEar = true;
+			points.push(y);
+			points.push(x);
+			point_indexes.push(node.point_index);
 		}
-		if(invers){
-			return indexes.reverse();
-		} else {
-			return indexes;
-		}
+		var triangles = x3dom.EarCut.triangulate(points, null, 2);
+		triangles = triangles.map(function(m) {return point_indexes[m];}) ;
+		return triangles;
 	},
 
 	getMultiIndexes: function (linklist) {
 		var node = linklist.first.next;
 		var plane = this.identifyPlane(node.prev.point, node.point, node.next.point);
-		var invers = this.reversePointDirection(linklist, plane);
-		
 		var data = {};
 		data.indices = [];
 		data.point = [];
 		data.normals = [];
 		data.colors = [];
 		data.texCoords = [];
-		node = linklist.first.next;
-		var next = null;
-		var count = 0;
-			
-		var isEar = true;
-		while(linklist.length >= 3  && count < 15) {
-			
-			next = node.next;
-			for(var i = 0; i < linklist.length; i++) {
-				
-			if(this.isNotEar(linklist.getNode(i).point, node.prev.point, node.point, node.next.point, plane)) {
-					isEar = false;
-				}
+		var mapped = {};
+		mapped.indices = [];
+		mapped.point = [];
+		mapped.normals = [];
+		mapped.colors = [];
+		mapped.texCoords = [];
+		
+		points = [];
+		
+		for (i = 0; i < linklist.length; i++) {
+			node = linklist.getNode(i);
+			switch (plane) {
+				case "XY": { x = node.point.x; y = node.point.y; break; }
+				case "XZ": { x = node.point.z; y = node.point.x; break; }
+				default: { x = node.point.y; y = node.point.z; }
 			}
-			if(isEar) {
-				
-				if(this.isKonvex(node.prev.point, node.point, node.next.point, plane)) {				
-					data.indices.push(node.prev.point_index, node.point_index, node.next.point_index);
-					data.point.push(node.prev.point,
-									node.point,
-									node.next.point);
-					if(node.normals) {					
-						data.normals.push(node.prev.normals,
-										  node.normals,
-										  node.next.normals);
-					
-					}
-					if(node.colors){
-						data.colors.push(node.prev.colors,
-										node.colors,
-										node.next.colors);
-					}
-					if(node.texCoords){
-						data.texCoords.push(node.prev.texCoords,
-											node.texCoords,
-											node.next.texCoords); 
-					}
-					linklist.deleteNode(node);
-				}  else {
-					count++;
-				}
-			}
-
-			node = next;
-			isEar = true;
+			points.push(y);
+			points.push(x);
+			mapped.indices.push(node.point_index);
+			mapped.point.push(node.point);
+			if (node.normals) mapped.normals.push(node.normals);
+			if (node.colors) mapped.colors.push(node.colors);
+			if (node.texCoords) mapped.texCoords.push(node.texCoords);
 		}
 		
-		if(invers){	
-			data.indices = data.indices.reverse();
-			data.point = data.point.reverse();
-			data.normals = data.normals.reverse();
-			data.colors = data.colors.reverse();
-			data.texCoords = data.texCoords.reverse();
-		}
-
+		var triangles = x3dom.EarCut.triangulate(points, null, 2);
+		data.indices = triangles.map(function(m) {return mapped.indices[m];}) ;
+		data.point = triangles.map(function(m) {return mapped.point[m];}) ;
+		if (node.normals) data.normals = triangles.map(function(m) {return mapped.normals[m];}) ;
+		if (node.colors) data.colors = triangles.map(function(m) {return mapped.colors[m];}) ;
+		if (node.texCoords) data.texCoords = triangles.map(function(m) {return mapped.texCoords[m];}) ;
 		return data;
 	}, 
-	
-	isNotEar: function (ap1, tp1, tp2, tp3, plane) {
-		var b0, b1, b2, b3;
-		var ap1a, ap1b, tp1a, tp1b, tp2a, tp2b, tp3a, tp3b;
-		
-		if(plane == 'YZ') {
-			ap1a = ap1.y; ap1b = ap1.z;
-			tp1a = tp1.y; tp1b = tp1.z;
-			tp2a = tp2.y; tp2b = tp2.z;
-			tp3a = tp3.y; tp3b = tp3.z;
-		} else if(plane == 'XZ') {
-			ap1a = ap1.z; ap1b = ap1.x;
-			tp1a = tp1.z; tp1b = tp1.x;
-			tp2a = tp2.z; tp2b = tp2.x;
-			tp3a = tp3.z; tp3b = tp3.x;
-		} else {
-			ap1a = ap1.x; ap1b = ap1.y;
-			tp1a = tp1.x; tp1b = tp1.y;
-			tp2a = tp2.x; tp2b = tp2.y;
-			tp3a = tp3.x; tp3b = tp3.y;
-		}
-
-        b0 = ((tp2a - tp1a) * (tp3b - tp1b) - (tp3a - tp1a) * (tp2b - tp1b));
-        if (b0 != 0) {
-            b1 = (((tp2a - ap1a) * (tp3b - ap1b) - (tp3a - ap1a) * (tp2b - ap1b)) / b0);
-            b2 = (((tp3a - ap1a) * (tp1b - ap1b) - (tp1a - ap1a) * (tp3b - ap1b)) / b0);
-            b3 = 1 - b1 - b2;
-
-            return ((b1 > 0) && (b2 > 0) && (b3 > 0));
-        }
-        else {
-            return false;
-        }
-    },
-
-	isKonvex: function (p, p1, p2, plane) {
-		var pa, pb, p1a, p1b, p2a, p2b;
-		if(plane == 'YZ') {
-			pa = p.y; pb = p.z;
-			p1a = p1.y; p1b = p1.z;
-			p2a = p2.y; p2b = p2.z;
-		} else if(plane == 'XZ') {
-			pa = p.z; pb = p.x;
-			p1a = p1.z; p1b = p1.x;
-			p2a = p2.z; p2b = p2.x;
-		} else {
-			pa = p.x; pb = p.y;
-			p1a = p1.x; p1b = p1.y;
-			p2a = p2.x; p2b = p2.y;
-		}
-		
-		var l = ((p1a - pa) * (p2b - pb) - (p1b - pb) * (p2a - pa));
-        return (l >= 0);
-	},
 	
 	identifyPlane: function(p1, p2, p3) {
 		var v1x, v1y, v1z;
@@ -3038,6 +2899,613 @@ x3dom.EarClipping = {
 		}
 	}
 };
+
+//TODO: adjust to directly use x3dom linked list
+//      move to separate file
+x3dom.EarCut = {
+
+	triangulate: function mapEarcut (data, holes, dim) {
+		return earcut(data, holes, dim);
+
+/*
+The following code is
+Copyright (c) 2015, Mapbox
+
+Permission to use, copy, modify, and/or distribute this software for any purpose
+with or without fee is hereby granted, provided that the above copyright notice
+and this permission notice appear in all copies.
+*/
+
+function earcut(data, holeIndices, dim) {
+
+    dim = dim || 2;
+
+    var hasHoles = holeIndices && holeIndices.length,
+        outerLen = hasHoles ? holeIndices[0] * dim : data.length,
+        //outerNode = filterPoints(linkedList(data, 0, outerLen, dim, true, clockwise)),
+        //AP: remember winding order
+        clockwise = windingOrder(data, 0, outerLen, dim),
+        outerNode = linkedList(data, 0, outerLen, dim, true, clockwise),
+        triangles = [];
+        
+	if (!outerNode) return triangles;
+
+    var minX, minY, maxX, maxY, x, y, size;
+
+    if (hasHoles) outerNode = eliminateHoles(data, holeIndices, outerNode, dim);
+
+    // if the shape is not too simple, we'll use z-order curve hash later; calculate polygon bbox
+    if (data.length > 80 * dim) {
+        minX = maxX = data[0];
+        minY = maxY = data[1];
+
+        for (var i = dim; i < outerLen; i += dim) {
+            x = data[i];
+            y = data[i + 1];
+            if (x < minX) minX = x;
+            if (y < minY) minY = y;
+            if (x > maxX) maxX = x;
+            if (y > maxY) maxY = y;
+        }
+
+        // minX, minY and size are later used to transform coords into integers for z-order calculation
+        size = Math.max(maxX - minX, maxY - minY);
+    }
+	earcutLinked(outerNode, triangles, dim, minX, minY, size);
+	//AP: preserve winding order
+	if (clockwise === false) {triangles.reverse();}
+	return triangles;
+}
+
+// calculate original winding order of a polygon ring
+// AP: separated to get original winding order
+function windingOrder(data, start, end, dim) {
+	var sum = 0;
+    for (i = start, j = end - dim; i < end; i += dim) {
+        sum += (data[j] - data[i]) * (data[i + 1] + data[j + 1]);
+        j = i;
+    }
+	//true for clockwise
+	return sum > 0;
+}
+
+// create a circular doubly linked list from polygon points in the specified winding order
+// AP: oclockwise = original winding order
+function linkedList(data, start, end, dim, clockwise, oclockwise) {
+    var i, j, last;
+
+    // link points into circular doubly-linked list in the specified winding order
+    if (clockwise === oclockwise) {
+        for (i = start; i < end; i += dim) last = insertNode(i, data[i], data[i + 1], last);
+    } else {
+        for (i = end - dim; i >= start; i -= dim) last = insertNode(i, data[i], data[i + 1], last);
+    }
+
+    return last;
+}
+// eliminate colinear or duplicate points
+function filterPoints(start, end) {
+    if (!start) return start;
+    if (!end) end = start;
+
+    var p = start,
+        again;
+    do {
+        again = false;
+
+        if (!p.steiner && (equals(p, p.next) || area(p.prev, p, p.next) === 0)) {
+            removeNode(p);
+            p = end = p.prev;
+            if (p === p.next) return null;
+            again = true;
+
+        } else {
+            p = p.next;
+        }
+    } while (again || p !== end);
+
+    return end;
+}
+
+// main ear slicing loop which triangulates a polygon (given as a linked list)
+function earcutLinked(ear, triangles, dim, minX, minY, size, pass) {
+    if (!ear) return;
+
+    // interlink polygon nodes in z-order
+    if (!pass && size) indexCurve(ear, minX, minY, size);
+
+    var stop = ear,
+        prev, next;
+
+    // iterate through ears, slicing them one by one
+    while (ear.prev !== ear.next) {
+        prev = ear.prev;
+        next = ear.next;
+
+        if (size ? isEarHashed(ear, minX, minY, size) : isEar(ear)) {
+            // cut off the triangle
+            triangles.push(prev.i / dim);
+            triangles.push(ear.i / dim);
+            triangles.push(next.i / dim);
+
+            removeNode(ear);
+
+            // skipping the next vertice leads to less sliver triangles
+            ear = next.next;
+            stop = next.next;
+
+            continue;
+        }
+
+        ear = next;
+
+        // if we looped through the whole remaining polygon and can't find any more ears
+        if (ear === stop) {
+            // try filtering points and slicing again
+            if (!pass) {
+                earcutLinked(filterPoints(ear), triangles, dim, minX, minY, size, 1);
+
+            // if this didn't work, try curing all small self-intersections locally
+            } else if (pass === 1) {
+                ear = cureLocalIntersections(ear, triangles, dim);
+                earcutLinked(ear, triangles, dim, minX, minY, size, 2);
+
+            // as a last resort, try splitting the remaining polygon into two
+            } else if (pass === 2) {
+                splitEarcut(ear, triangles, dim, minX, minY, size);
+            }
+
+            break;
+        }
+    }
+}
+
+// check whether a polygon node forms a valid ear with adjacent nodes
+function isEar(ear) {
+    var a = ear.prev,
+        b = ear,
+        c = ear.next;
+
+    if (area(a, b, c) >= 0) return false; // reflex, can't be an ear
+
+    // now make sure we don't have other points inside the potential ear
+    var p = ear.next.next;
+
+    while (p !== ear.prev) {
+        if (pointInTriangle(a.x, a.y, b.x, b.y, c.x, c.y, p.x, p.y) &&
+            area(p.prev, p, p.next) >= 0) return false;
+        p = p.next;
+    }
+
+    return true;
+}
+
+function isEarHashed(ear, minX, minY, size) {
+    var a = ear.prev,
+        b = ear,
+        c = ear.next;
+
+    if (area(a, b, c) >= 0) return false; // reflex, can't be an ear
+
+    // triangle bbox; min & max are calculated like this for speed
+    var minTX = a.x < b.x ? (a.x < c.x ? a.x : c.x) : (b.x < c.x ? b.x : c.x),
+        minTY = a.y < b.y ? (a.y < c.y ? a.y : c.y) : (b.y < c.y ? b.y : c.y),
+        maxTX = a.x > b.x ? (a.x > c.x ? a.x : c.x) : (b.x > c.x ? b.x : c.x),
+        maxTY = a.y > b.y ? (a.y > c.y ? a.y : c.y) : (b.y > c.y ? b.y : c.y);
+
+    // z-order range for the current triangle bbox;
+    var minZ = zOrder(minTX, minTY, minX, minY, size),
+        maxZ = zOrder(maxTX, maxTY, minX, minY, size);
+
+    // first look for points inside the triangle in increasing z-order
+    var p = ear.nextZ;
+
+    while (p && p.z <= maxZ) {
+        if (p !== ear.prev && p !== ear.next &&
+            pointInTriangle(a.x, a.y, b.x, b.y, c.x, c.y, p.x, p.y) &&
+            area(p.prev, p, p.next) >= 0) return false;
+        p = p.nextZ;
+    }
+
+    // then look for points in decreasing z-order
+    p = ear.prevZ;
+
+    while (p && p.z >= minZ) {
+        if (p !== ear.prev && p !== ear.next &&
+            pointInTriangle(a.x, a.y, b.x, b.y, c.x, c.y, p.x, p.y) &&
+            area(p.prev, p, p.next) >= 0) return false;
+        p = p.prevZ;
+    }
+
+    return true;
+}
+
+// go through all polygon nodes and cure small local self-intersections
+function cureLocalIntersections(start, triangles, dim) {
+    var p = start;
+    do {
+        var a = p.prev,
+            b = p.next.next;
+
+        // a self-intersection where edge (v[i-1],v[i]) intersects (v[i+1],v[i+2])
+        if (intersects(a, p, p.next, b) && locallyInside(a, b) && locallyInside(b, a)) {
+
+            triangles.push(a.i / dim);
+            triangles.push(p.i / dim);
+            triangles.push(b.i / dim);
+
+            // remove two nodes involved
+            removeNode(p);
+            removeNode(p.next);
+
+            p = start = b;
+        }
+        p = p.next;
+    } while (p !== start);
+
+    return p;
+}
+
+// try splitting polygon into two and triangulate them independently
+function splitEarcut(start, triangles, dim, minX, minY, size) {
+    // look for a valid diagonal that divides the polygon into two
+    var a = start;
+    do {
+        var b = a.next.next;
+        while (b !== a.prev) {
+            if (a.i !== b.i && isValidDiagonal(a, b)) {
+                // split the polygon in two by the diagonal
+                var c = splitPolygon(a, b);
+
+                // filter colinear points around the cuts
+                a = filterPoints(a, a.next);
+                c = filterPoints(c, c.next);
+
+                // run earcut on each half
+                earcutLinked(a, triangles, dim, minX, minY, size);
+                earcutLinked(c, triangles, dim, minX, minY, size);
+                return;
+            }
+            b = b.next;
+        }
+        a = a.next;
+    } while (a !== start);
+}
+
+// link every hole into the outer loop, producing a single-ring polygon without holes
+function eliminateHoles(data, holeIndices, outerNode, dim) {
+    var queue = [],
+        i, len, start, end, list;
+
+    for (i = 0, len = holeIndices.length; i < len; i++) {
+        start = holeIndices[i] * dim;
+        end = i < len - 1 ? holeIndices[i + 1] * dim : data.length;
+        list = linkedList(data, start, end, dim, false);
+        if (list === list.next) list.steiner = true;
+        //list = filterPoints(list);
+        //if (list)
+        queue.push(getLeftmost(list));
+    }
+
+    queue.sort(compareX);
+
+    // process holes from left to right
+    for (i = 0; i < queue.length; i++) {
+        eliminateHole(queue[i], outerNode);
+        outerNode = filterPoints(outerNode, outerNode.next);
+    }
+
+    return outerNode;
+}
+
+function compareX(a, b) {
+    return a.x - b.x;
+}
+
+// find a bridge between vertices that connects hole with an outer ring and and link it
+function eliminateHole(hole, outerNode) {
+    outerNode = findHoleBridge(hole, outerNode);
+    if (outerNode) {
+        var b = splitPolygon(outerNode, hole);
+        filterPoints(b, b.next);
+    }
+}
+
+// David Eberly's algorithm for finding a bridge between hole and outer polygon
+function findHoleBridge(hole, outerNode) {
+    var p = outerNode,
+        hx = hole.x,
+        hy = hole.y,
+        qx = -Infinity,
+        m;
+
+    // find a segment intersected by a ray from the hole's leftmost point to the left;
+    // segment's endpoint with lesser x will be potential connection point
+    do {
+        if (hy <= p.y && hy >= p.next.y) {
+            var x = p.x + (hy - p.y) * (p.next.x - p.x) / (p.next.y - p.y);
+            if (x <= hx && x > qx) {
+                qx = x;
+                m = p.x < p.next.x ? p : p.next;
+            }
+        }
+        p = p.next;
+    } while (p !== outerNode);
+
+    if (!m) return null;
+
+    // look for points inside the triangle of hole point, segment intersection and endpoint;
+    // if there are no points found, we have a valid connection;
+    // otherwise choose the point of the minimum angle with the ray as connection point
+
+    var stop = m,
+        tanMin = Infinity,
+        tan;
+
+    p = m.next;
+
+    while (p !== stop) {
+        if (hx >= p.x && p.x >= m.x &&
+                pointInTriangle(hy < m.y ? hx : qx, hy, m.x, m.y, hy < m.y ? qx : hx, hy, p.x, p.y)) {
+
+            tan = Math.abs(hy - p.y) / (hx - p.x); // tangential
+
+            if ((tan < tanMin || (tan === tanMin && p.x > m.x)) && locallyInside(p, hole)) {
+                m = p;
+                tanMin = tan;
+            }
+        }
+
+        p = p.next;
+    }
+
+    return m;
+}
+
+// interlink polygon nodes in z-order
+function indexCurve(start, minX, minY, size) {
+    var p = start;
+    do {
+        if (p.z === null) p.z = zOrder(p.x, p.y, minX, minY, size);
+        p.prevZ = p.prev;
+        p.nextZ = p.next;
+        p = p.next;
+    } while (p !== start);
+
+    p.prevZ.nextZ = null;
+    p.prevZ = null;
+
+    sortLinked(p);
+}
+
+// Simon Tatham's linked list merge sort algorithm
+// http://www.chiark.greenend.org.uk/~sgtatham/algorithms/listsort.html
+function sortLinked(list) {
+    var i, p, q, e, tail, numMerges, pSize, qSize,
+        inSize = 1;
+
+    do {
+        p = list;
+        list = null;
+        tail = null;
+        numMerges = 0;
+
+        while (p) {
+            numMerges++;
+            q = p;
+            pSize = 0;
+            for (i = 0; i < inSize; i++) {
+                pSize++;
+                q = q.nextZ;
+                if (!q) break;
+            }
+
+            qSize = inSize;
+
+            while (pSize > 0 || (qSize > 0 && q)) {
+
+                if (pSize === 0) {
+                    e = q;
+                    q = q.nextZ;
+                    qSize--;
+                } else if (qSize === 0 || !q) {
+                    e = p;
+                    p = p.nextZ;
+                    pSize--;
+                } else if (p.z <= q.z) {
+                    e = p;
+                    p = p.nextZ;
+                    pSize--;
+                } else {
+                    e = q;
+                    q = q.nextZ;
+                    qSize--;
+                }
+
+                if (tail) tail.nextZ = e;
+                else list = e;
+
+                e.prevZ = tail;
+                tail = e;
+            }
+
+            p = q;
+        }
+
+        tail.nextZ = null;
+        inSize *= 2;
+
+    } while (numMerges > 1);
+
+    return list;
+}
+
+// z-order of a point given coords and size of the data bounding box
+function zOrder(x, y, minX, minY, size) {
+    // coords are transformed into non-negative 15-bit integer range
+    x = 32767 * (x - minX) / size;
+    y = 32767 * (y - minY) / size;
+
+    x = (x | (x << 8)) & 0x00FF00FF;
+    x = (x | (x << 4)) & 0x0F0F0F0F;
+    x = (x | (x << 2)) & 0x33333333;
+    x = (x | (x << 1)) & 0x55555555;
+
+    y = (y | (y << 8)) & 0x00FF00FF;
+    y = (y | (y << 4)) & 0x0F0F0F0F;
+    y = (y | (y << 2)) & 0x33333333;
+    y = (y | (y << 1)) & 0x55555555;
+
+    return x | (y << 1);
+}
+
+// find the leftmost node of a polygon ring
+function getLeftmost(start) {
+    var p = start,
+        leftmost = start;
+    do {
+        if (p.x < leftmost.x) leftmost = p;
+        p = p.next;
+    } while (p !== start);
+
+    return leftmost;
+}
+
+// check if a point lies within a convex triangle
+function pointInTriangle(ax, ay, bx, by, cx, cy, px, py) {
+    return (cx - px) * (ay - py) - (ax - px) * (cy - py) >= 0 &&
+           (ax - px) * (by - py) - (bx - px) * (ay - py) >= 0 &&
+           (bx - px) * (cy - py) - (cx - px) * (by - py) >= 0;
+}
+
+// check if a diagonal between two polygon nodes is valid (lies in polygon interior)
+function isValidDiagonal(a, b) {
+    return equals(a, b) || a.next.i !== b.i && a.prev.i !== b.i && !intersectsPolygon(a, b) &&
+           locallyInside(a, b) && locallyInside(b, a) && middleInside(a, b);
+}
+
+// signed area of a triangle
+function area(p, q, r) {
+    return (q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y);
+}
+
+// check if two points are equal
+function equals(p1, p2) {
+    return p1.x === p2.x && p1.y === p2.y;
+}
+
+// check if two segments intersect
+function intersects(p1, q1, p2, q2) {
+    return area(p1, q1, p2) > 0 !== area(p1, q1, q2) > 0 &&
+           area(p2, q2, p1) > 0 !== area(p2, q2, q1) > 0;
+}
+
+// check if a polygon diagonal intersects any polygon segments
+function intersectsPolygon(a, b) {
+    var p = a;
+    do {
+        if (p.i !== a.i && p.next.i !== a.i && p.i !== b.i && p.next.i !== b.i &&
+                intersects(p, p.next, a, b)) return true;
+        p = p.next;
+    } while (p !== a);
+
+    return false;
+}
+
+// check if a polygon diagonal is locally inside the polygon
+function locallyInside(a, b) {
+    return area(a.prev, a, a.next) < 0 ?
+        area(a, b, a.next) >= 0 && area(a, a.prev, b) >= 0 :
+        area(a, b, a.prev) < 0 || area(a, a.next, b) < 0;
+}
+
+// check if the middle point of a polygon diagonal is inside the polygon
+function middleInside(a, b) {
+    var p = a,
+        inside = false,
+        px = (a.x + b.x) / 2,
+        py = (a.y + b.y) / 2;
+    do {
+        if (((p.y > py) !== (p.next.y > py)) && (px < (p.next.x - p.x) * (py - p.y) / (p.next.y - p.y) + p.x))
+            inside = !inside;
+        p = p.next;
+    } while (p !== a);
+
+    return inside;
+}
+
+// link two polygon vertices with a bridge; if the vertices belong to the same ring, it splits polygon into two;
+// if one belongs to the outer ring and another to a hole, it merges it into a single ring
+function splitPolygon(a, b) {
+    var a2 = new Node(a.i, a.x, a.y),
+        b2 = new Node(b.i, b.x, b.y),
+        an = a.next,
+        bp = b.prev;
+
+    a.next = b;
+    b.prev = a;
+
+    a2.next = an;
+    an.prev = a2;
+
+    b2.next = a2;
+    a2.prev = b2;
+
+    bp.next = b2;
+    b2.prev = bp;
+
+    return b2;
+}
+
+// create a node and optionally link it with previous one (in a circular doubly linked list)
+function insertNode(i, x, y, last) {
+    var p = new Node(i, x, y);
+
+    if (!last) {
+        p.prev = p;
+        p.next = p;
+
+    } else {
+        p.next = last.next;
+        p.prev = last;
+        last.next.prev = p;
+        last.next = p;
+    }
+    return p;
+}
+
+function removeNode(p) {
+    p.next.prev = p.prev;
+    p.prev.next = p.next;
+
+    if (p.prevZ) p.prevZ.nextZ = p.nextZ;
+    if (p.nextZ) p.nextZ.prevZ = p.prevZ;
+}
+
+function Node(i, x, y) {
+    // vertice index in coordinates array
+    this.i = i;
+
+    // vertex coordinates
+    this.x = x;
+    this.y = y;
+
+    // previous and next vertice nodes in a polygon ring
+    this.prev = null;
+    this.next = null;
+
+    // z-order curve value
+    this.z = null;
+
+    // previous and next nodes in z-order
+    this.prevZ = null;
+    this.nextZ = null;
+
+    // indicates whether this is a steiner point
+    this.steiner = false;
+}
+}
+}
 
 /*
  * X3DOM JavaScript Library
@@ -3106,7 +3574,7 @@ x3dom.Utils.isNumber = function(n) {
 };
 
 /*****************************************************************************
-* 
+*
 *****************************************************************************/
 x3dom.Utils.createTexture2D = function(gl, doc, src, bgnd, crossOrigin, scale, genMipMaps)
 {
@@ -3122,10 +3590,10 @@ x3dom.Utils.createTexture2D = function(gl, doc, src, bgnd, crossOrigin, scale, g
     gl.bindTexture(gl.TEXTURE_2D, null);
 
     texture.ready = false;
-	
+
 	if (src == null || src == '')
 	    return texture;
-	
+
 	var image = new Image();
 
     switch(crossOrigin.toLowerCase()) {
@@ -3146,13 +3614,13 @@ x3dom.Utils.createTexture2D = function(gl, doc, src, bgnd, crossOrigin, scale, g
     }
 
 	image.src = src;
-	
-	doc.downloadCount++;	
-	
+
+	doc.downloadCount++;
+
 	image.onload = function() {
         if (scale)
 		    image = x3dom.Utils.scaleImage( image );
-		
+
 		if(bgnd == true) {
 			gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 		}
@@ -3166,26 +3634,253 @@ x3dom.Utils.createTexture2D = function(gl, doc, src, bgnd, crossOrigin, scale, g
 		if(bgnd == true) {
 			gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
 		}
-		
+
 		//Save image size
 		texture.width  = image.width;
 		texture.height = image.height;
 		texture.ready = true;
-		
+
 		doc.downloadCount--;
 		doc.needRender = true;
 	};
-	
-	image.onerror = function() {
-		x3dom.debug.logError("[Utils|createTexture2D] Can't load Image: " + src);
-		doc.downloadCount--;
+
+	image.onerror = function(error) {
+    // Try loading the image as a compressed texture, if the extension is provided
+    // by the platform.
+    // Copyrigth (C) 2014 TOSHIBA
+    // Dual licensed under the MIT and GPL licenses.
+    // Based on code originally provided by　http://www.x3dom.org
+
+   if(x3dom.caps.EXTENSIONS.indexOf('WEBGL_compressed_texture_s3tc') !== -1){
+  		x3dom.Utils.tryCompressedTexture2D(texture, gl, doc, src, bgnd,
+  		    crossOrigin, genMipMaps, function(success){
+  		  if(success){
+	      }else{
+          x3dom.debug.logError("[Utils|createTexture2D] Can't load Image: " + src);
+		    }
+        doc.downloadCount--;
+		  });
+	  }else{
+      x3dom.debug.logError("[Utils|createTexture2D] Can't load Image: " + src);
+	    doc.downloadCount--;
+    }
 	};
-	
+
 	return texture;
 };
 
 /*****************************************************************************
-* 
+*  Creating textures from S3TC compressed files.
+*  Copyrigth (C) 2014 TOSHIBA
+*  Dual licensed under the MIT and GPL licenses.
+*  Based on code originally provided by
+*  http://www.x3dom.org
+*
+*  S3TC file reading code originaly provided by Brandon Jones
+*  (http://media.tojicode.com/)
+*****************************************************************************/
+
+x3dom.Utils.createCompressedTexture2D = function(gl, doc, src, bgnd, crossOrigin, genMipMaps)
+{
+  var texture = gl.createTexture();
+
+    //Create a black 4 pixel texture to prevent 'texture not complete' warning
+    var data = new Uint8Array([0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255]);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 2, 2, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
+    if (genMipMaps) {
+        gl.generateMipmap(gl.TEXTURE_2D);
+    }
+    gl.bindTexture(gl.TEXTURE_2D, null);
+
+    texture.ready = false;
+
+  if (src == null || src == '')
+      return texture;
+
+  //start loading
+
+  ddsXhr = new XMLHttpRequest();
+
+  var ext = gl.getExtension('WEBGL_compressed_texture_s3tc');
+
+  ddsXhr.open('GET', src, true);
+  ddsXhr.responseType = "arraybuffer";
+  ddsXhr.onload = function() {
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      var mipmaps = uploadDDSLevels(gl, ext, this.response);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, mipmaps > 1 ? gl.LINEAR_MIPMAP_LINEAR : gl.LINEAR);
+
+      texture.ready = true;
+
+      doc.downloadCount--;
+      doc.needRender = true;
+  };
+
+  doc.downloadCount++;
+  ddsXhr.send(null);
+
+  return texture;
+};
+
+x3dom.Utils.tryCompressedTexture2D = function(texture, gl, doc, src, bgnd, crossOrigin, genMipMaps, cb)
+{
+  //start loading
+
+  ddsXhr = new XMLHttpRequest();
+
+  var ext = gl.getExtension('WEBGL_compressed_texture_s3tc');
+
+  ddsXhr.open('GET', src, true);
+  ddsXhr.responseType = "arraybuffer";
+  ddsXhr.onload = function() {
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      var mipmaps = uploadDDSLevels(gl, ext, this.response);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, mipmaps > 1 ? gl.LINEAR_MIPMAP_LINEAR : gl.LINEAR);
+
+      texture.ready = true;
+
+      doc.needRender = true;
+
+      cb(true);
+  };
+
+  ddsXhr.onerror = function() {
+      cb(false);
+  };
+
+  ddsXhr.send(null);
+};
+
+
+/*****************************************************************************
+*  Original code by  Brandon Jones
+* http://media.tojicode.com/
+*****************************************************************************/
+function uploadDDSLevels(gl, ext, arrayBuffer, loadMipmaps) {
+    var DDS_MAGIC = 0x20534444;
+
+    var DDSD_CAPS = 0x1,
+        DDSD_HEIGHT = 0x2,
+        DDSD_WIDTH = 0x4,
+        DDSD_PITCH = 0x8,
+        DDSD_PIXELFORMAT = 0x1000,
+        DDSD_MIPMAPCOUNT = 0x20000,
+        DDSD_LINEARSIZE = 0x80000,
+        DDSD_DEPTH = 0x800000;
+
+    var DDSCAPS_COMPLEX = 0x8,
+        DDSCAPS_MIPMAP = 0x400000,
+        DDSCAPS_TEXTURE = 0x1000;
+
+    var DDSCAPS2_CUBEMAP = 0x200,
+        DDSCAPS2_CUBEMAP_POSITIVEX = 0x400,
+        DDSCAPS2_CUBEMAP_NEGATIVEX = 0x800,
+        DDSCAPS2_CUBEMAP_POSITIVEY = 0x1000,
+        DDSCAPS2_CUBEMAP_NEGATIVEY = 0x2000,
+        DDSCAPS2_CUBEMAP_POSITIVEZ = 0x4000,
+        DDSCAPS2_CUBEMAP_NEGATIVEZ = 0x8000,
+        DDSCAPS2_VOLUME = 0x200000;
+
+    var DDPF_ALPHAPIXELS = 0x1,
+        DDPF_ALPHA = 0x2,
+        DDPF_FOURCC = 0x4,
+        DDPF_RGB = 0x40,
+        DDPF_YUV = 0x200,
+        DDPF_LUMINANCE = 0x20000;
+
+    function FourCCToInt32(value) {
+        return value.charCodeAt(0) +
+            (value.charCodeAt(1) << 8) +
+            (value.charCodeAt(2) << 16) +
+            (value.charCodeAt(3) << 24);
+    }
+
+    function Int32ToFourCC(value) {
+        return String.fromCharCode(
+            value & 0xff,
+            (value >> 8) & 0xff,
+            (value >> 16) & 0xff,
+            (value >> 24) & 0xff
+        );
+    }
+
+    var FOURCC_DXT1 = FourCCToInt32("DXT1");
+    var FOURCC_DXT5 = FourCCToInt32("DXT5");
+
+    var headerLengthInt = 31; // The header length in 32 bit ints
+
+    // Offsets into the header array
+    var off_magic = 0;
+
+    var off_size = 1;
+    var off_flags = 2;
+    var off_height = 3;
+    var off_width = 4;
+
+    var off_mipmapCount = 7;
+
+    var off_pfFlags = 20;
+    var off_pfFourCC = 21;
+
+    var header = new Int32Array(arrayBuffer, 0, headerLengthInt),
+        fourCC, blockBytes, internalFormat,
+        width, height, dataLength, dataOffset,
+        byteArray, mipmapCount, i;
+
+    if(header[off_magic] != DDS_MAGIC) {
+        console.error("Invalid magic number in DDS header");
+        return 0;
+    }
+
+    if(!header[off_pfFlags] & DDPF_FOURCC) {
+        console.error("Unsupported format, must contain a FourCC code");
+        return 0;
+    }
+
+    fourCC = header[off_pfFourCC];
+    switch(fourCC) {
+        case FOURCC_DXT1:
+            blockBytes = 8;
+            internalFormat = ext.COMPRESSED_RGBA_S3TC_DXT1_EXT;
+            break;
+
+        case FOURCC_DXT5:
+            blockBytes = 16;
+            internalFormat = ext.COMPRESSED_RGBA_S3TC_DXT5_EXT;
+            break;
+
+        default:
+            console.error("Unsupported FourCC code:", Int32ToFourCC(fourCC));
+            return null;
+    }
+
+    mipmapCount = 1;
+    if(header[off_flags] & DDSD_MIPMAPCOUNT && loadMipmaps !== false) {
+        mipmapCount = Math.max(1, header[off_mipmapCount]);
+    }
+
+    width = header[off_width];
+    height = header[off_height];
+    dataOffset = header[off_size] + 4;
+
+    for(i = 0; i < mipmapCount; ++i) {
+        dataLength = Math.max( 4, width )/4 * Math.max( 4, height )/4 * blockBytes;
+        byteArray = new Uint8Array(arrayBuffer, dataOffset, dataLength);
+        gl.compressedTexImage2D(gl.TEXTURE_2D, i, internalFormat, width, height, 0, byteArray);
+        dataOffset += dataLength;
+        width *= 0.5;
+        height *= 0.5;
+    }
+
+    return mipmapCount;
+};
+
+
+/*****************************************************************************
+*
 *****************************************************************************/
 x3dom.Utils.createTextureCube = function(gl, doc, src, bgnd, crossOrigin, scale, genMipMaps)
 {
@@ -3193,8 +3888,8 @@ x3dom.Utils.createTextureCube = function(gl, doc, src, bgnd, crossOrigin, scale,
 
 	var faces;
 	if (bgnd) {
-		faces = [gl.TEXTURE_CUBE_MAP_POSITIVE_Z, gl.TEXTURE_CUBE_MAP_NEGATIVE_Z, 
-				 gl.TEXTURE_CUBE_MAP_POSITIVE_Y, gl.TEXTURE_CUBE_MAP_NEGATIVE_Y, 
+		faces = [gl.TEXTURE_CUBE_MAP_POSITIVE_Z, gl.TEXTURE_CUBE_MAP_NEGATIVE_Z,
+				 gl.TEXTURE_CUBE_MAP_POSITIVE_Y, gl.TEXTURE_CUBE_MAP_NEGATIVE_Y,
 				 gl.TEXTURE_CUBE_MAP_POSITIVE_X, gl.TEXTURE_CUBE_MAP_NEGATIVE_X];
 	}
 	else
@@ -3235,7 +3930,7 @@ x3dom.Utils.createTextureCube = function(gl, doc, src, bgnd, crossOrigin, scale,
 
 		texture.pendingTextureLoads++;
 		doc.downloadCount++;
-		
+
 		image.onload = (function(texture, face, image, swap) {
 			return function() {
 				if (width == 0 && height == 0) {
@@ -3246,13 +3941,13 @@ x3dom.Utils.createTextureCube = function(gl, doc, src, bgnd, crossOrigin, scale,
 					x3dom.debug.logWarning("[Utils|createTextureCube] Rescaling CubeMap images, which are of different size!");
 					image = x3dom.Utils.rescaleImage(image, width, height);
 				}
-				
+
 				gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, swap);
 				gl.bindTexture(gl.TEXTURE_CUBE_MAP, texture);
 				gl.texImage2D(face, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
 				gl.bindTexture(gl.TEXTURE_CUBE_MAP, null);
 				gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
-				
+
 				texture.pendingTextureLoads--;
 				doc.downloadCount--;
 
@@ -3280,18 +3975,18 @@ x3dom.Utils.createTextureCube = function(gl, doc, src, bgnd, crossOrigin, scale,
 
 			x3dom.debug.logError("[Utils|createTextureCube] Can't load CubeMap!");
 		};
-		
+
 		// backUrl, frontUrl, bottomUrl, topUrl, leftUrl, rightUrl (for bgnd)
 		image.src = src[i];
 	}
-	
+
 	return texture;
 };
 
 /*****************************************************************************
  * Initialize framebuffer object and associated texture(s)
  *****************************************************************************/
-x3dom.Utils.initFBO = function(gl, w, h, type, mipMap, needRenderBuf, numMrt) {
+x3dom.Utils.initFBO = function(gl, w, h, type, mipMap, needDepthBuf, numMrt) {
     var tex = gl.createTexture();
     tex.width  = w;
     tex.height = h;
@@ -3321,14 +4016,27 @@ x3dom.Utils.initFBO = function(gl, w, h, type, mipMap, needRenderBuf, numMrt) {
     }
 
     var fbo = gl.createFramebuffer();
+    var dtex = null;
     var rb = null;
 
-    if (needRenderBuf) {
-        rb = gl.createRenderbuffer();
-
-        gl.bindRenderbuffer(gl.RENDERBUFFER, rb);
-        gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, w, h);
-        gl.bindRenderbuffer(gl.RENDERBUFFER, null);
+    if (needDepthBuf) {
+        if(x3dom.caps.DEPTH_TEXTURE !== null) {
+            dtex = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, dtex);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT, w, h, 0, gl.DEPTH_COMPONENT, gl.UNSIGNED_SHORT, null);
+            if(mipMap)
+                gl.generateMipmap(gl.TEXTURE_2D);
+            gl.bindTexture(gl.TEXTURE_2D, null);
+            dtex.width = w;
+            dtex.height = h;
+        }
+        else {
+            rb = gl.createRenderbuffer();
+            
+            gl.bindRenderbuffer(gl.RENDERBUFFER, rb);
+            gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, w, h);
+            gl.bindRenderbuffer(gl.RENDERBUFFER, null);
+        }
     }
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
@@ -3339,7 +4047,13 @@ x3dom.Utils.initFBO = function(gl, w, h, type, mipMap, needRenderBuf, numMrt) {
             gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0 + i, gl.TEXTURE_2D, mrts[i], 0);
         }
     }
-    gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, rb);
+    
+    if(needDepthBuf && x3dom.caps.DEPTH_TEXTURE !== null) {
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, dtex, 0);
+    }
+    else {
+        gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, rb);
+    }
 
     var status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
     if (status != gl.FRAMEBUFFER_COMPLETE) {
@@ -3349,7 +4063,7 @@ x3dom.Utils.initFBO = function(gl, w, h, type, mipMap, needRenderBuf, numMrt) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
     return {
-        fbo: fbo, rbo: rb,
+        fbo: fbo, dtex: dtex, rbo: rb,
         tex: tex, texTargets: mrts,
         width: w, height: h,
         type: type, mipMap: mipMap
@@ -3357,12 +4071,12 @@ x3dom.Utils.initFBO = function(gl, w, h, type, mipMap, needRenderBuf, numMrt) {
 };
 
 /*****************************************************************************
-* 
+*
 *****************************************************************************/
 x3dom.Utils.getFileName = function(url)
 {
 	var filename;
-	
+
 	if( url.lastIndexOf("/") > -1 ) {
 		filename = url.substr( url.lastIndexOf("/") + 1 );
 	}
@@ -3377,7 +4091,7 @@ x3dom.Utils.getFileName = function(url)
 };
 
 /*****************************************************************************
-* 
+*
 *****************************************************************************/
 x3dom.Utils.findTextureByName = function(texture, name)
 {
@@ -3424,7 +4138,7 @@ x3dom.Utils.scaleImage = function(image)
 /*****************************************************************************
 * Check if value is power of two
 *****************************************************************************/
-x3dom.Utils.isPowerOfTwo = function(x) 
+x3dom.Utils.isPowerOfTwo = function(x)
 {
 	return ((x & (x - 1)) === 0);
 };
@@ -3433,7 +4147,7 @@ x3dom.Utils.isPowerOfTwo = function(x)
 /*****************************************************************************
 * Return next highest power of two
 *****************************************************************************/
-x3dom.Utils.nextHighestPowerOfTwo = function(x) 
+x3dom.Utils.nextHighestPowerOfTwo = function(x)
 {
 	--x;
 	for (var i = 1; i < 32; i <<= 1) {
@@ -3456,7 +4170,7 @@ x3dom.Utils.nextBestPowerOfTwo = function(x)
 /*****************************************************************************
 * Return data type size in byte
 *****************************************************************************/
-x3dom.Utils.getDataTypeSize = function(type) 
+x3dom.Utils.getDataTypeSize = function(type)
 {
 	switch(type)
 	{
@@ -3558,7 +4272,7 @@ x3dom.Utils.getVertexAttribType = function(type, gl)
 x3dom.Utils.getArrayBufferView = function(type, buffer)
 {
 	var array = null;
-	
+
 	switch(type)
 	{
 		case "Int8":
@@ -3668,13 +4382,13 @@ x3dom.Utils.magFilterDic = function(gl, magFilter)
 /*****************************************************************************
 * Get GL boundary mode
 *****************************************************************************/
-x3dom.Utils.boundaryModesDic = function(gl, mode) 
+x3dom.Utils.boundaryModesDic = function(gl, mode)
 {
 	switch(mode.toUpperCase())
 	{
 		case "CLAMP":             return gl.CLAMP_TO_EDGE;
 		case "CLAMP_TO_EDGE":     return gl.CLAMP_TO_EDGE;
-		case "CLAMP_TO_BOUNDARY": return gl.CLAMP_TO_EDGE;       
+		case "CLAMP_TO_BOUNDARY": return gl.CLAMP_TO_EDGE;
 		case "MIRRORED_REPEAT":   return gl.MIRRORED_REPEAT;
 		case "REPEAT":            return gl.REPEAT;
 		default:				  return gl.REPEAT;
@@ -3702,13 +4416,13 @@ x3dom.Utils.primTypeDic = function(gl, type)
 /*****************************************************************************
 * Get GL depth function
 *****************************************************************************/
-x3dom.Utils.depthFunc = function(gl, func) 
+x3dom.Utils.depthFunc = function(gl, func)
 {
 	switch(func.toUpperCase())
-	{ 
+	{
 		case "NEVER":             return gl.NEVER;
 		case "ALWAYS":            return gl.ALWAYS;
-		case "LESS":              return gl.LESS;       
+		case "LESS":              return gl.LESS;
 		case "EQUAL":             return gl.EQUAL;
 		case "LEQUAL":            return gl.LEQUAL;
         case "GREATER":           return gl.GREATER;
@@ -3778,9 +4492,9 @@ x3dom.Utils.gunzip = function (arraybuffer)
 };
 
 /*****************************************************************************
-* 
+*
 *****************************************************************************/
-x3dom.Utils.generateProperties = function (viewarea, shape) 
+x3dom.Utils.generateProperties = function (viewarea, shape)
 {
 	var property = {};
 
@@ -3804,25 +4518,29 @@ x3dom.Utils.generateProperties = function (viewarea, shape)
         property.POPGEOMETRY      = (x3dom.isa(geometry, x3dom.nodeTypes.PopGeometry)) ? 1 : 0;
         property.IMAGEGEOMETRY    = (x3dom.isa(geometry, x3dom.nodeTypes.ImageGeometry))  ? 1 : 0;
         property.BINARYGEOMETRY   = (x3dom.isa(geometry, x3dom.nodeTypes.BinaryGeometry))  ? 1 : 0;
+		property.EXTERNALGEOMETRY = (x3dom.isa(geometry, x3dom.nodeTypes.ExternalGeometry))  ? 1 : 0;
         property.IG_PRECISION     = (property.IMAGEGEOMETRY) ? geometry.numCoordinateTextures() : 0;
         property.IG_INDEXED       = (property.IMAGEGEOMETRY && geometry.getIndexTexture() != null) ? 1 : 0;
         property.POINTLINE2D      = !geometry.needLighting() ? 1 : 0;
-        property.VERTEXID         = (property.BINARYGEOMETRY && geometry._vf.idsPerVertex) ? 1 : 0;
+        property.VERTEXID         = ((property.BINARYGEOMETRY || property.EXTERNALGEOMETRY) && geometry._vf.idsPerVertex) ? 1 : 0;
         property.IS_PARTICLE      = (x3dom.isa(geometry, x3dom.nodeTypes.ParticleSet)) ? 1 : 0;
 
-        property.APPMAT           = (appearance && (material || property.CSSHADER) ) ? 1 : 0;
+
         property.TWOSIDEDMAT      = ( property.APPMAT && x3dom.isa(material, x3dom.nodeTypes.TwoSidedMaterial)) ? 1 : 0;
         property.SEPARATEBACKMAT  = ( property.TWOSIDEDMAT && material._vf.separateBackColor) ? 1 : 0;
         property.SHADOW           = (viewarea.getLightsShadow()) ? 1 : 0;
         property.FOG              = (viewarea._scene.getFog()._vf.visibilityRange > 0) ? 1 : 0;
         property.CSSHADER         = (appearance && appearance._shader &&
                                      x3dom.isa(appearance._shader, x3dom.nodeTypes.CommonSurfaceShader)) ? 1 : 0;
+        property.APPMAT           = (appearance && (material || property.CSSHADER) ) ? 1 : 0;
         property.LIGHTS           = (!property.POINTLINE2D && appearance && shape.isLit() && (material || property.CSSHADER)) ?
                                      viewarea.getLights().length + (viewarea._scene.getNavigationInfo()._vf.headlight) : 0;
-        property.TEXTURED         = (texture || property.TEXT) ? 1 : 0;
+        property.TEXTURED         = (texture || property.TEXT || ( property.CSSHADER && appearance._shader.needTexcoords() ) ) ? 1 : 0;
+        property.CUBEMAP          = (texture && x3dom.isa(texture, x3dom.nodeTypes.X3DEnvironmentTextureNode)) ||
+                                    (property.CSSHADER && appearance._shader.getEnvironmentMap()) ? 1 : 0;
         property.PIXELTEX         = (texture && x3dom.isa(texture, x3dom.nodeTypes.PixelTexture)) ? 1 : 0;
         property.TEXTRAFO         = (appearance && appearance._cf.textureTransform.node) ? 1 : 0;
-        property.DIFFUSEMAP       = (property.CSSHADER && appearance._shader.getDiffuseMap()) ? 1 : 0;
+        property.DIFFUSEMAP       = (texture && !x3dom.isa(texture, x3dom.nodeTypes.X3DEnvironmentTextureNode) ) || (property.CSSHADER && appearance._shader.getDiffuseMap()) ? 1 : 0;
         property.NORMALMAP        = (property.CSSHADER && appearance._shader.getNormalMap()) ? 1 : 0;
 		property.NORMALSPACE      = (property.NORMALMAP) ? appearance._shader._vf.normalSpace.toUpperCase() : "";
         property.SPECMAP          = (property.CSSHADER && appearance._shader.getSpecularMap()) ? 1 : 0;
@@ -3833,12 +4551,12 @@ x3dom.Utils.generateProperties = function (viewarea, shape)
         property.MULTIEMIAMBMAP   = (property.VERTEXID && property.CSSHADER && appearance._shader.getMultiEmissiveAmbientMap()) ? 1 : 0;
         property.MULTISPECSHINMAP = (property.VERTEXID && property.CSSHADER && appearance._shader.getMultiSpecularShininessMap()) ? 1 : 0;
         property.MULTIVISMAP      = (property.VERTEXID && property.CSSHADER && appearance._shader.getMultiVisibilityMap()) ? 1 : 0;
-        property.CUBEMAP          = (texture && x3dom.isa(texture, x3dom.nodeTypes.X3DEnvironmentTextureNode)) ? 1 : 0;
+
         property.BLENDING         = (property.TEXT || property.CUBEMAP || (texture && texture._blending)) ? 1 : 0;
         property.REQUIREBBOX      = (geometry._vf.coordType !== undefined && geometry._vf.coordType != "Float32") ? 1 : 0;
         property.REQUIREBBOXNOR   = (geometry._vf.normalType !== undefined && geometry._vf.normalType != "Float32") ? 1 : 0;
         property.REQUIREBBOXCOL   = (geometry._vf.colorType !== undefined && geometry._vf.colorType != "Float32") ? 1 : 0;
-        property.REQUIREBBOXTEX   = (geometry._vf.texCoordType !== undefined && geometry._vf.texCoordType != "Float32") ? 1 : 0;    
+        property.REQUIREBBOXTEX   = (geometry._vf.texCoordType !== undefined && geometry._vf.texCoordType != "Float32") ? 1 : 0;
         property.COLCOMPONENTS    = geometry._mesh._numColComponents;
         property.NORCOMPONENTS    = geometry._mesh._numNormComponents;
         property.POSCOMPONENTS    = geometry._mesh._numPosComponents;
@@ -3851,13 +4569,15 @@ x3dom.Utils.generateProperties = function (viewarea, shape)
                                      (geometry._vf.color !== undefined && geometry._vf.color.length > 0)) ? 1 : 0;
         property.CLIPPLANES       = shape._clipPlanes.length;
 		property.ALPHATHRESHOLD	  = (appearance) ? appearance._vf.alphaClipThreshold.toFixed(2) : 0.1;
-        
+
         property.GAMMACORRECTION  = environment._vf.gammaCorrectionDefault;
+
+        //console.log(property);
 	}
-	
-	property.toIdentifier = function() { 
+
+	property.toIdentifier = function() {
 		var id = "";
-		for(var p in this) { 
+		for(var p in this) {
 			if(this[p] != this.toIdentifier && this[p] != this.toString) {
 				id += this[p];
 			}
@@ -3865,10 +4585,10 @@ x3dom.Utils.generateProperties = function (viewarea, shape)
         this.id = id;
 		return id;
 	};
-	
-	property.toString = function() { 
+
+	property.toString = function() {
 		var str = "";
-		for(var p in this) { 
+		for(var p in this) {
 			if(this[p] != this.toIdentifier && this[p] != this.toString) {
 				str += p + ": " + this[p] + ", ";
 			}
@@ -3883,7 +4603,7 @@ x3dom.Utils.generateProperties = function (viewarea, shape)
 
 
 /*****************************************************************************
-* Returns "shader" such that "shader.foo = [1,2,3]" magically sets the 
+* Returns "shader" such that "shader.foo = [1,2,3]" magically sets the
 * appropriate uniform
 *****************************************************************************/
 x3dom.Utils.wrapProgram = function (gl, program, shaderID)
@@ -3892,9 +4612,9 @@ x3dom.Utils.wrapProgram = function (gl, program, shaderID)
         shaderID: shaderID,
         program: program
     };
-        
-	shader.bind = function () { 
-		gl.useProgram(program); 
+
+	shader.bind = function () {
+		gl.useProgram(program);
 	};
 
 	var loc = null;
@@ -3903,7 +4623,7 @@ x3dom.Utils.wrapProgram = function (gl, program, shaderID)
 
     // get uniforms
 	var numUniforms = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS);
-	
+
 	for (i=0; i < numUniforms; ++i) {
 		try {
 			obj = gl.getActiveUniform(program, i);
@@ -3917,69 +4637,69 @@ x3dom.Utils.wrapProgram = function (gl, program, shaderID)
             x3dom.debug.logError("GL-Error (on searching uniforms): " + glErr);
         }
 
-		loc = gl.getUniformLocation(program, obj.name);	
-		
+		loc = gl.getUniformLocation(program, obj.name);
+
 		switch (obj.type) {
 			case gl.SAMPLER_2D:
-				shader.__defineSetter__(obj.name, 
+				shader.__defineSetter__(obj.name,
 					(function (loc) { return function (val) { gl.uniform1i(loc, val); }; })(loc));
 				break;
 			case gl.SAMPLER_CUBE:
-				shader.__defineSetter__(obj.name, 
+				shader.__defineSetter__(obj.name,
 					(function (loc) { return function (val) { gl.uniform1i(loc, val); }; })(loc));
 				break;
 			case gl.BOOL:
-				shader.__defineSetter__(obj.name, 
+				shader.__defineSetter__(obj.name,
 					(function (loc) { return function (val) { gl.uniform1i(loc, val); }; })(loc));
 				break;
 			case gl.FLOAT:
                 /*
                  * Passing a MFFloat type into uniform.
                  * by Sofiane Benchaa, 2012.
-                 * 
-                 * Based on OpenGL specification.
-                 * url: http://www.opengl.org/sdk/docs/man/xhtml/glGetUniformLocation.xml 
                  *
-                 * excerpt : Except if the last part of name indicates a uniform variable array, 
-                 * the location of the first element of an array can be retrieved by using the name of the array, 
+                 * Based on OpenGL specification.
+                 * url: http://www.opengl.org/sdk/docs/man/xhtml/glGetUniformLocation.xml
+                 *
+                 * excerpt : Except if the last part of name indicates a uniform variable array,
+                 * the location of the first element of an array can be retrieved by using the name of the array,
                  * or by using the name appended by "[0]".
-                 * 
+                 *
                  * Detecting the float array and extracting its uniform name without the brackets.
                  */
 				if (obj.name.indexOf("[0]") != -1)
-					shader.__defineSetter__(obj.name.substring(0, obj.name.length-3), 
+					shader.__defineSetter__(obj.name.substring(0, obj.name.length-3),
 						(function (loc) { return function (val) { gl.uniform1fv(loc, new Float32Array(val)); }; })(loc));
 				else
-					shader.__defineSetter__(obj.name, 
+					shader.__defineSetter__(obj.name,
 						(function (loc) { return function (val) { gl.uniform1f(loc, val); }; })(loc));
                 break;
 			case gl.FLOAT_VEC2:
-				shader.__defineSetter__(obj.name, 
-					(function (loc) { return function (val) { gl.uniform2f(loc, val[0], val[1]); }; })(loc));           
+				shader.__defineSetter__(obj.name,
+					(function (loc) { return function (val) { gl.uniform2f(loc, val[0], val[1]); }; })(loc));
 				break;
 			case gl.FLOAT_VEC3:
 				/* Passing arrays of vec3. see above.*/
 				if (obj.name.indexOf("[0]") != -1)
-					shader.__defineSetter__(obj.name.substring(0, obj.name.length-3), 
+					shader.__defineSetter__(obj.name.substring(0, obj.name.length-3),
 						(function (loc) { return function (val) { gl.uniform3fv(loc, new Float32Array(val)); }; })(loc));
 				else
-					shader.__defineSetter__(obj.name, 
+					shader.__defineSetter__(obj.name,
 						(function (loc) { return function (val) { gl.uniform3f(loc, val[0], val[1], val[2]); }; })(loc));
 				break;
 			case gl.FLOAT_VEC4:
-				shader.__defineSetter__(obj.name, 
+				shader.__defineSetter__(obj.name,
 					(function (loc) { return function (val) { gl.uniform4f(loc, val[0], val[1], val[2], val[3]); }; })(loc));
 				break;
 			case gl.FLOAT_MAT2:
-				shader.__defineSetter__(obj.name, 
+				shader.__defineSetter__(obj.name,
 					(function (loc) { return function (val) { gl.uniformMatrix2fv(loc, false, new Float32Array(val)); }; })(loc));
 				break;
 			case gl.FLOAT_MAT3:
-				shader.__defineSetter__(obj.name, 
+				shader.__defineSetter__(obj.name,
 					(function (loc) { return function (val) { gl.uniformMatrix3fv(loc, false, new Float32Array(val)); }; })(loc));
 				break;
 			case gl.FLOAT_MAT4:
-				shader.__defineSetter__(obj.name, 
+				shader.__defineSetter__(obj.name,
 					(function (loc) { return function (val) { gl.uniformMatrix4fv(loc, false, new Float32Array(val)); }; })(loc));
 				break;
 			case gl.INT:
@@ -3993,7 +4713,7 @@ x3dom.Utils.wrapProgram = function (gl, program, shaderID)
 
     // get attributes
 	var numAttribs = gl.getProgramParameter(program, gl.ACTIVE_ATTRIBUTES);
-	
+
 	for (i=0; i < numAttribs; ++i) {
 		try {
 			obj = gl.getActiveAttrib(program, i);
@@ -4013,6 +4733,7 @@ x3dom.Utils.wrapProgram = function (gl, program, shaderID)
 
 	return shader;
 };
+
 
 
 /**
@@ -4064,6 +4785,38 @@ x3dom.Utils.forbiddenBySOP = function (uri_string) {
     Scheme = Scheme || document.location.protocol;
     return !(Port === originPort && Host === document.location.host && Scheme === document.location.protocol);
 };
+
+/**
+ * Matches a given URI with document.location. If domain, port and protocol are the same SOP won't forbid access to the resource.
+ * @param {x3dom.fields.SFVec3f}    source
+ * @param {x3dom.fields.SFMatrix4f} projection
+ * @param {x3dom.fields.SFMatrix4f} view
+ * @param {x3dom.fields.SFMatrix4f} model
+ * @returns {x3dom.fields.SFVec3f}
+ */
+/*x3dom.Utils.unproject = function (source, projection, view, model) {
+
+    var result = new x3dom.fields.SFVec4f();
+
+    result.x = ((source.x - this.X) * 2 / this.width) - 1;
+    result.y = 1 - ((source.y - this.Y) * 2 / this.height);
+    result.z = source.z;
+
+    result.w = 1.0;
+
+    var projectionInv = projection.inverse();
+    var viewInv       = view.inverse();
+    var modelInv      = model.inverse();
+
+    result = projectionInv.multMatrixPnt(result);
+    result = viewInv.multMatrixPnt(result);
+    result = modelInv.multMatrixPnt(result);
+
+    result = result.divide(result.w);
+
+    return new x3dom.fields.SFVec3f( result.x, result.y, result.z);
+
+};*/
 
 /*
  * X3DOM JavaScript Library
@@ -4880,6 +5633,8 @@ x3dom.BinaryContainerLoader.setupBinGeo = function(shape, sp, gl, viewarea, curr
     // index
     if (binGeo._vf.index.length > 0)
     {
+        shape._webgl.binaryGeometry = 1;    // indexed BG
+
         var xmlhttp0 = new XMLHttpRequest();
         xmlhttp0.open("GET", shape._nameSpace.getURL(binGeo._vf.index), true);
         xmlhttp0.responseType = "arraybuffer";
@@ -4890,6 +5645,12 @@ x3dom.BinaryContainerLoader.setupBinGeo = function(shape, sp, gl, viewarea, curr
 
         xmlhttp0.onload = function()
         {
+            if (xmlhttp0.status != 200) {
+                shape._nameSpace.doc.downloadCount -= 1;
+                x3dom.debug.logError( "XHR1/ index load failed with status: " + xmlhttp0.status );
+                return;
+            }
+
             if (!shape._webgl)
                 return;
 
@@ -4906,7 +5667,7 @@ x3dom.BinaryContainerLoader.setupBinGeo = function(shape, sp, gl, viewarea, curr
             }
 
             var indicesBuffer = gl.createBuffer();
-            shape._webgl.buffers[0] = indicesBuffer;
+
 
             if (x3dom.caps.INDEX_UINT && attribTypeStr == "Uint32") {
                 //indexArray is Uint32Array
@@ -4919,11 +5680,10 @@ x3dom.BinaryContainerLoader.setupBinGeo = function(shape, sp, gl, viewarea, curr
 
             gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indicesBuffer);
             gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indexArray, gl.STATIC_DRAW);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
 
             // Test reading Data
             //x3dom.debug.logWarning("arraybuffer[0]="+indexArray[0]+"; n="+indexArray.length);
-
-            shape._webgl.binaryGeometry = 1;    // indexed BG
 
             if (geoNode._vf.vertexCount[0] == 0)
                 geoNode._vf.vertexCount[0] = indexArray.length;
@@ -4948,6 +5708,8 @@ x3dom.BinaryContainerLoader.setupBinGeo = function(shape, sp, gl, viewarea, curr
 
             var t11 = new Date().getTime() - t00;
             x3dom.debug.logInfo("XHR0/ index load time: " + t11 + " ms");
+
+            shape._webgl.buffers[0] = indicesBuffer;
         };
     }
 
@@ -4964,6 +5726,12 @@ x3dom.BinaryContainerLoader.setupBinGeo = function(shape, sp, gl, viewarea, curr
 
         xmlhttp.onload = function()
         {
+            if (xmlhttp.status != 200) {
+                shape._nameSpace.doc.downloadCount -= 1;
+                x3dom.debug.logError( "XHR1/ interleaved array load failed with status: " + xmlhttp.status );
+                return;
+            }
+
             if (!shape._webgl)
                 return;
 
@@ -4996,8 +5764,6 @@ x3dom.BinaryContainerLoader.setupBinGeo = function(shape, sp, gl, viewarea, curr
 
             var buffer = gl.createBuffer();
 
-            shape._webgl.buffers[1] = buffer;
-
             gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
             gl.bufferData(gl.ARRAY_BUFFER, attributes, gl.STATIC_DRAW);
 
@@ -5021,8 +5787,6 @@ x3dom.BinaryContainerLoader.setupBinGeo = function(shape, sp, gl, viewarea, curr
 
             if (geoNode._vf.texCoord.length > 0)
             {
-                console.log("YUPPIE");
-
                 shape._webgl.buffers[3] = buffer;
 
                 gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
@@ -5058,6 +5822,9 @@ x3dom.BinaryContainerLoader.setupBinGeo = function(shape, sp, gl, viewarea, curr
 
             var t11 = new Date().getTime() - t00;
             x3dom.debug.logInfo("XHR/ interleaved array load time: " + t11 + " ms");
+
+            shape._webgl.buffers[1] = buffer;
+
         };
     }
 
@@ -5074,6 +5841,12 @@ x3dom.BinaryContainerLoader.setupBinGeo = function(shape, sp, gl, viewarea, curr
 
         xmlhttp1.onload = function()
         {
+            if (xmlhttp1.status != 200) {
+                shape._nameSpace.doc.downloadCount -= 1;
+                x3dom.debug.logError( "XHR1/ coord load failed with status: " + xmlhttp1.status );
+                return;
+            }
+
             if (!shape._webgl)
                 return;
 
@@ -5095,17 +5868,9 @@ x3dom.BinaryContainerLoader.setupBinGeo = function(shape, sp, gl, viewarea, curr
             gl.bindAttribLocation(sp.program, 0, "position");
 
             var positionBuffer = gl.createBuffer();
-            shape._webgl.buffers[1] = positionBuffer;
             gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-
             gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
-            gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-
-            gl.vertexAttribPointer(sp.position,
-                geoNode._mesh._numPosComponents,
-                shape._webgl.coordType, false,
-                shape._coordStrideOffset[0], shape._coordStrideOffset[1]);
-            gl.enableVertexAttribArray(sp.position);
+            gl.bindBuffer(gl.ARRAY_BUFFER, null);
 
             geoNode._mesh._numCoords = vertices.length / geoNode._mesh._numPosComponents;
 
@@ -5154,6 +5919,8 @@ x3dom.BinaryContainerLoader.setupBinGeo = function(shape, sp, gl, viewarea, curr
 
             var t11 = new Date().getTime() - t00;
             x3dom.debug.logInfo("XHR1/ coord load time: " + t11 + " ms");
+
+            shape._webgl.buffers[1] = positionBuffer;
         };
     }
 
@@ -5170,6 +5937,12 @@ x3dom.BinaryContainerLoader.setupBinGeo = function(shape, sp, gl, viewarea, curr
 
         xmlhttp2.onload = function()
         {
+            if (xmlhttp2.status != 200) {
+                shape._nameSpace.doc.downloadCount -= 1;
+                x3dom.debug.logError( "XHR2/ normal load failed with status: " + xmlhttp2.status );
+                return;
+            }
+
             if (!shape._webgl)
                 return;
 
@@ -5186,16 +5959,10 @@ x3dom.BinaryContainerLoader.setupBinGeo = function(shape, sp, gl, viewarea, curr
             }
 
             var normalBuffer = gl.createBuffer();
-            shape._webgl.buffers[2] = normalBuffer;
 
             gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
             gl.bufferData(gl.ARRAY_BUFFER, normals, gl.STATIC_DRAW);
-
-            gl.vertexAttribPointer(sp.normal,
-                binGeo._mesh._numNormComponents,
-                shape._webgl.normalType, false,
-                shape._normalStrideOffset[0], shape._normalStrideOffset[1]);
-            gl.enableVertexAttribArray(sp.normal);
+            gl.bindBuffer(gl.ARRAY_BUFFER, null);
 
             // Test reading Data
             //x3dom.debug.logWarning("arraybuffer[0].nx="+normals[0]);
@@ -5211,6 +5978,8 @@ x3dom.BinaryContainerLoader.setupBinGeo = function(shape, sp, gl, viewarea, curr
 
             var t11 = new Date().getTime() - t00;
             x3dom.debug.logInfo("XHR2/ normal load time: " + t11 + " ms");
+
+            shape._webgl.buffers[2] = normalBuffer;
         };
     }
 
@@ -5229,6 +5998,12 @@ x3dom.BinaryContainerLoader.setupBinGeo = function(shape, sp, gl, viewarea, curr
         {
             var i, j;
             var tmp;
+
+            if (xmlhttp3.status != 200) {
+                shape._nameSpace.doc.downloadCount -= 1;
+                x3dom.debug.logError( "XHR3/ texcoord load failed with status: " + xmlhttp3.status );
+                return;
+            }
 
             if (!shape._webgl)
                 return;
@@ -5251,8 +6026,6 @@ x3dom.BinaryContainerLoader.setupBinGeo = function(shape, sp, gl, viewarea, curr
             {
                 var idBuffer = gl.createBuffer();
 
-                shape._webgl.buffers[5] = idBuffer;
-
                 gl.bindBuffer(gl.ARRAY_BUFFER, idBuffer);
 
                 //Create a buffer for the ids with half size of the texccoord buffer
@@ -5265,26 +6038,19 @@ x3dom.BinaryContainerLoader.setupBinGeo = function(shape, sp, gl, viewarea, curr
                 }
 
                 gl.bufferData(gl.ARRAY_BUFFER, ids, gl.STATIC_DRAW);
+                gl.bindBuffer(gl.ARRAY_BUFFER, null);
 
-                gl.vertexAttribPointer(sp.id,
-                    1,
-                    gl.FLOAT, false,
-                    4, 0);
-                gl.enableVertexAttribArray(sp.id);
+                shape._webgl.buffers[5] = idBuffer;
             }
             else
             {
                 var texcBuffer = gl.createBuffer();
-                shape._webgl.buffers[3] = texcBuffer;
 
                 gl.bindBuffer(gl.ARRAY_BUFFER, texcBuffer);
                 gl.bufferData(gl.ARRAY_BUFFER, texCoords, gl.STATIC_DRAW);
+                gl.bindBuffer(gl.ARRAY_BUFFER, null);
 
-                gl.vertexAttribPointer(sp.texcoord,
-                    binGeo._mesh._numTexComponents,
-                    shape._webgl.texCoordType, false,
-                    shape._texCoordStrideOffset[0], shape._texCoordStrideOffset[1]);
-                gl.enableVertexAttribArray(sp.texcoord);
+                shape._webgl.buffers[3] = texcBuffer;
             }
             // Test reading Data
             //x3dom.debug.logWarning("arraybuffer[0].tx="+texCoords[0]);
@@ -5316,6 +6082,13 @@ x3dom.BinaryContainerLoader.setupBinGeo = function(shape, sp, gl, viewarea, curr
 
         xmlhttp4.onload = function()
         {
+            if (xmlhttp4.status != 200) {
+                shape._nameSpace.doc.downloadCount -= 1;
+                x3dom.debug.logError( "XHR4/ color load failed with status: " + xmlhttp4.status );
+                return;
+            }
+
+
             if (!shape._webgl)
                 return;
 
@@ -5332,16 +6105,10 @@ x3dom.BinaryContainerLoader.setupBinGeo = function(shape, sp, gl, viewarea, curr
             }
 
             var colorBuffer = gl.createBuffer();
-            shape._webgl.buffers[4] = colorBuffer;
 
             gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
             gl.bufferData(gl.ARRAY_BUFFER, colors, gl.STATIC_DRAW);
-
-            gl.vertexAttribPointer(sp.color,
-                binGeo._mesh._numColComponents,
-                shape._webgl.colorType, false,
-                shape._colorStrideOffset[0], shape._colorStrideOffset[1]);
-            gl.enableVertexAttribArray(sp.color);
+            gl.bindBuffer(gl.ARRAY_BUFFER, null);
 
             // Test reading Data
             //x3dom.debug.logWarning("arraybuffer[0].cx="+colors[0]);
@@ -5357,6 +6124,8 @@ x3dom.BinaryContainerLoader.setupBinGeo = function(shape, sp, gl, viewarea, curr
 
             var t11 = new Date().getTime() - t00;
             x3dom.debug.logInfo("XHR4/ color load time: " + t11 + " ms");
+
+            shape._webgl.buffers[4] = colorBuffer;
         };
     }
     // TODO: tangent AND binormal
@@ -5680,6 +6449,10 @@ x3dom.DrawableCollection = function (drawableCollectionConfig) {
 };
 
 /**
+ * Returns the result of the culling process, including view frustum culling and small feature culling.
+ * A value > 0 identifies a plane mask, indicating that the object is inside the frustum with respect to
+ * the respective planes (and large enough), -1 means the object was culled
+ * "0" is a rare case, indicating that the object intersects with all planes of the frustum
  *  graphState = {
  *     boundedNode:  backref to bounded node object
  *     localMatrix:  mostly identity
@@ -5694,7 +6467,7 @@ x3dom.DrawableCollection.prototype.cull = function (transform, graphState, singl
     var node = graphState.boundedNode;  // get ref to SG node
 
     if (!node || !node._vf.render) {
-        return 0;   // <0 outside, >0 inside, but can't tell in this case
+        return -1;
     }
 
     var volume = node.getVolume();      // create on request
@@ -5714,8 +6487,11 @@ x3dom.DrawableCollection.prototype.cull = function (transform, graphState, singl
 
         if (planeMask < MASK_SET)
             planeMask = this.viewFrustum.intersect(wvol, planeMask);
-        if (planeMask <= 0) {
-            return -1;      // if culled return -1; 0 should never happen
+
+        //-1 indicates that the object has been culled
+        if (planeMask == -1)
+        {
+            return -1;
         }
     }
     else {
@@ -5740,14 +6516,14 @@ x3dom.DrawableCollection.prototype.cull = function (transform, graphState, singl
 
         if (this.smallFeatureThreshold > 0 && graphState.coverage < this.smallFeatureThreshold && 
             graphState.needCulling) {
-            return 0;   // differentiate between outside and this case
+            return -1;
         }
     }
 
     // not culled, incr node cnt
     this.numberOfNodes++;
     
-    return planeMask;   // >0, inside
+    return planeMask;   // >= 0 means inside or overlap
 };
 
 /**
@@ -6575,6 +7351,10 @@ x3dom.X3DCanvas = function(x3dElem, canvasIdx)
     {
         this.__setAttribute(attrName, newVal);
 
+        // scale resolution so device pixel are used rather then css pixels
+        if(window.devicePixelRatio)
+            newVal = parseInt(newVal) * window.devicePixelRatio;
+
         switch(attrName) {
 
             case "width":
@@ -6681,6 +7461,18 @@ x3dom.X3DCanvas = function(x3dElem, canvasIdx)
     // disable touch events
     this.disableTouch = x3dElem.getAttribute("disableTouch");
     this.disableTouch = this.disableTouch ? (this.disableTouch.toLowerCase() == "true") : false;
+	
+	this.disableKeys = x3dElem.getAttribute("keysEnabled");
+	this.disableKeys = this.disableKeys ? (this.disableKeys.toLowerCase() == "true") : false;
+	
+	this.disableRightDrag = x3dElem.getAttribute("disableRightDrag");
+	this.disableRightDrag = this.disableRightDrag ? (this.disableRightDrag.toLowerCase() == "true") : false;
+	
+	this.disableLeftDrag = x3dElem.getAttribute("disableLeftDrag");
+	this.disableLeftDrag = this.disableLeftDrag ? (this.disableLeftDrag.toLowerCase() == "true") : false;
+	
+	this.disableMiddleDrag = x3dElem.getAttribute("disableMiddleDrag");
+	this.disableMiddleDrag = this.disableMiddleDrag ? (this.disableMiddleDrag.toLowerCase() == "true") : false;
 
 
     if (this.canvas !== null && this.gl !== null && this.hasRuntime && this.backend !== "flash") {
@@ -6802,7 +7594,13 @@ x3dom.X3DCanvas = function(x3dElem, canvasIdx)
                     this.mouse_drag_y = pos.y;
 
                     if (this.mouse_dragging) {
-                        this.parent.doc.onDrag(that.gl, this.mouse_drag_x, this.mouse_drag_y, this.mouse_button);
+						
+						if ( this.mouse_button == 1 && !this.parent.disableLeftDrag ||
+							 this.mouse_button == 2 && !this.parent.disableRightDrag ||
+							 this.mouse_button == 4 && !this.parent.disableMiddleDrag ) 
+						{
+							this.parent.doc.onDrag(that.gl, this.mouse_drag_x, this.mouse_drag_y, this.mouse_button);
+						}
                     }
                     else {
                         this.parent.doc.onMove(that.gl, this.mouse_drag_x, this.mouse_drag_y, this.mouse_button);
@@ -6852,8 +7650,7 @@ x3dom.X3DCanvas = function(x3dElem, canvasIdx)
 
         // Key Events
         this.canvas.addEventListener('keypress', function (evt) {
-            var keysEnabled = this.parent.x3dElem.getAttribute("keysEnabled");
-            if (!keysEnabled || keysEnabled.toLowerCase() == "true") {
+            if (!this.parent.disableKeys) {
                 this.parent.doc.onKeyPress(evt.charCode);
             }
             this.parent.doc.needRender = true;
@@ -6861,16 +7658,14 @@ x3dom.X3DCanvas = function(x3dElem, canvasIdx)
 
         // in webkit special keys are only handled on key-up
         this.canvas.addEventListener('keyup', function (evt) {
-            var keysEnabled = this.parent.x3dElem.getAttribute("keysEnabled");
-            if (!keysEnabled || keysEnabled.toLowerCase() == "true") {
+            if (!this.parent.disableKeys) {
                 this.parent.doc.onKeyUp(evt.keyCode);
             }
             this.parent.doc.needRender = true;
         }, true);
 
         this.canvas.addEventListener('keydown', function (evt) {
-            var keysEnabled = this.parent.x3dElem.getAttribute("keysEnabled");
-            if (!keysEnabled || keysEnabled.toLowerCase() == "true") {
+            if (!this.parent.disableKeys) {
                 this.parent.doc.onKeyDown(evt.keyCode);
             }
             this.parent.doc.needRender = true;
@@ -7679,6 +8474,24 @@ x3dom.X3DCanvas.prototype._createHTMLCanvas = function(x3dElem)
         };
     }
 
+    //add element-specific (global) events for the X3D tag
+    if (x3dElem.hasAttribute("ondownloadsfinished"))
+    {
+        x3dElem.addEventListener("downloadsfinished",
+            function()
+            {
+                var eventObject = {
+                    target: x3dElem,
+                    type: "downloadsfinished"
+                };
+
+                var funcStr = x3dElem.getAttribute("ondownloadsfinished");
+                var func = new Function('event', funcStr);
+                func.call(x3dElem, eventObject);
+            },
+            true);
+    }
+
     x3dElem.appendChild(canvas);
 
     // If the X3D element has an id attribute, append "_canvas"
@@ -7804,6 +8617,8 @@ x3dom.X3DCanvas.prototype.mousePosition = function(evt)
  */
 x3dom.X3DCanvas.prototype.tick = function()
 {
+    var that = this;
+
     var runtime = this.x3dElem.runtime;
     var d = new Date().getTime();
     var diff = d - this.lastTimeFPSWasTaken;
@@ -7875,6 +8690,23 @@ x3dom.X3DCanvas.prototype.tick = function()
             this.progressDiv.style.display = 'none';
         }
     }
+
+    //fire downloadsfinished event, if necessary
+    if (this.doc.downloadCount == 0 && this.doc.previousDownloadCount > 0)
+    {
+        var evt;
+        if (document.createEvent) {
+            evt = document.createEvent("Events");
+            evt.initEvent("downloadsfinished", true, true);
+            that.x3dElem.dispatchEvent(evt);
+        } else if (document.createEventObject) {
+            evt = document.createEventObject();
+            // http://stackoverflow.com/questions/1874866/how-to-fire-onload-event-on-document-in-ie
+            that.x3dElem.fireEvent("ondownloadsfinished", evt);
+        }
+    }
+
+    this.doc.previousDownloadCount = this.doc.downloadCount;
 };
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -8866,6 +9698,78 @@ x3dom.Runtime.prototype.helicopter = function() {
     viewarea._needNavigationMatrixUpdate = true;
     this.canvas.doc.needRender = true;
  };
+ 
+ /**
+ * APIFunction: disableKeys
+ *
+ * Disable keys
+ */
+x3dom.Runtime.prototype.disableKeys = function() {
+    this.canvas.disableKeys = true;
+};
+
+ /**
+ * APIFunction: enableKeys
+ *
+ * Enable keys
+ */
+x3dom.Runtime.prototype.enableKeys = function() {
+    this.canvas.disableKeys = false;
+};
+
+ /**
+ * APIFunction: disableLeftDrag
+ *
+ * Disable left drag
+ */
+x3dom.Runtime.prototype.disableLeftDrag = function() {
+    this.canvas.disableLeftDrag = true;
+};
+
+ /**
+ * APIFunction: enableLeftDrag
+ *
+ * Enable left drag
+ */
+x3dom.Runtime.prototype.enableLeftDrag = function() {
+    this.canvas.disableLeftDrag = false;
+};
+
+ /**
+ * APIFunction: disableRightDrag
+ *
+ * Disable right drag
+ */
+x3dom.Runtime.prototype.disableRightDrag = function() {
+    this.canvas.disableRightDrag = true;
+};
+
+ /**
+ * APIFunction: enableRightDrag
+ *
+ * Enable right drag
+ */
+x3dom.Runtime.prototype.enableRightDrag = function() {
+    this.canvas.disableRightDrag = false;
+};
+
+ /**
+ * APIFunction: disableMiddleDrag
+ *
+ * Disable middle drag
+ */
+x3dom.Runtime.prototype.disableMiddleDrag = function() {
+    this.canvas.disableMiddleDrag = true;
+};
+
+ /**
+ * APIFunction: enableMiddleDrag
+ *
+ * Enable right drag
+ */
+x3dom.Runtime.prototype.enableMiddleDrag = function() {
+    this.canvas.disableMiddleDrag = false;
+};
 
 /**
  * Function: togglePoints
@@ -9631,7 +10535,7 @@ x3dom.Cache.prototype.getDynamicShader = function (gl, viewarea, shape) {
 /**
  * Returns a dynamic generated shader program by properties
  */
-x3dom.Cache.prototype.getShaderByProperties = function (gl, shape, properties, pickMode) {
+x3dom.Cache.prototype.getShaderByProperties = function (gl, shape, properties, pickMode, shadows) {
 
     //Get shaderID
     var shaderID = properties.id;
@@ -9640,12 +10544,19 @@ x3dom.Cache.prototype.getShaderByProperties = function (gl, shape, properties, p
         shaderID += pickMode;
     }
 
+    if(shadows !== undefined && shadows !== null) {
+        shaderID += "S";
+    }
+
     if (this.shaders[shaderID] === undefined)
     {
         var program = null;
 
         if (pickMode !== undefined && pickMode !== null) {
             program = new x3dom.shader.DynamicShaderPicking(gl, properties, pickMode);
+        }
+        else if (shadows !== undefined && shadows !== null) {
+            program = new x3dom.shader.DynamicShadowShader(gl, properties);
         }
         else if (properties.CSHADER != -1) {
             program = new x3dom.shader.ComposedShader(gl, shape);
@@ -9818,7 +10729,8 @@ x3dom.Texture.dashVideoScriptFile = "dash.all.js";
 x3dom.Texture.loadDashVideos = [];
 x3dom.Texture.textNum = 0;
 x3dom.Texture.clampFontSize = false;
-
+x3dom.Texture.minFontQuality = 0.5;
+x3dom.Texture.maxFontQuality = 10;
 
 x3dom.Texture.prototype.update = function()
 {
@@ -9856,7 +10768,7 @@ x3dom.Texture.prototype.updateTexture = function()
     var gl  = this.gl;
 	var doc = this.doc;
 	var tex = this.node;
-	
+
 	//Set sampler
 	this.samplerName = tex._type;
 
@@ -9866,7 +10778,7 @@ x3dom.Texture.prototype.updateTexture = function()
 	} else {
 		this.type = gl.TEXTURE_2D;
 	}
-	
+
 	//Set texture format
 	if (x3dom.isa(tex, x3dom.nodeTypes.PixelTexture)) {
 		switch (tex._vf.image.comp)
@@ -9964,10 +10876,14 @@ x3dom.Texture.prototype.updateTexture = function()
         }
 		gl.bindTexture(this.type, null);
 	}
+
 	else if (x3dom.isa(tex, x3dom.nodeTypes.RenderedTexture))
     {
         if (tex._webgl && tex._webgl.fbo) {
-		    this.texture = tex._webgl.fbo.tex;
+            if(tex._webgl.fbo.dtex && tex._vf.depthMap)
+                this.texture = tex._webgl.fbo.dtex;
+            else
+                this.texture = tex._webgl.fbo.tex;
         }
         else {
             this.texture = null;
@@ -9989,7 +10905,7 @@ x3dom.Texture.prototype.updateTexture = function()
         this.texture.width  = tex._vf.image.width;
         this.texture.height = tex._vf.image.height;
         this.texture.ready = true;
-		
+
 		var pixelArr = tex._vf.image.array;//.toGL();
 		var pixelArrfont_size = tex._vf.image.width * tex._vf.image.height * tex._vf.image.comp;
 
@@ -10003,11 +10919,11 @@ x3dom.Texture.prototype.updateTexture = function()
         }
 
 		var pixels = new Uint8Array(pixelArr);
-		
+
 		gl.bindTexture(this.type, this.texture);
 		gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-        gl.texImage2D(this.type, 0, this.format, 
-                      tex._vf.image.width, tex._vf.image.height, 0, 
+        gl.texImage2D(this.type, 0, this.format,
+                      tex._vf.image.width, tex._vf.image.height, 0,
                       this.format, gl.UNSIGNED_BYTE, pixels);
         if (this.genMipMaps) {
             gl.generateMipmap(this.type);
@@ -10059,7 +10975,7 @@ x3dom.Texture.prototype.updateTexture = function()
         }
 
 		var updateMovie = function()
-		{	
+		{
 			gl.bindTexture(that.type, that.texture);
 			gl.texImage2D(that.type, 0, that.format, that.format, gl.UNSIGNED_BYTE, tex._video);
             if (that.genMipMaps) {
@@ -10069,39 +10985,39 @@ x3dom.Texture.prototype.updateTexture = function()
             that.texture.ready = true;
 			doc.needRender = true;
 		};
-		
+
 		var startVideo = function()
-		{       	
+		{
 			tex._video.play();
 			tex._intervalID = setInterval(updateMovie, 16);
 		};
-		
+
 		var videoDone = function()
 		{
-			clearInterval(tex._intervalID);		
+			clearInterval(tex._intervalID);
 			if (tex._vf.loop === true)
 			{
 				tex._video.play();
 				tex._intervalID = setInterval(updateMovie, 16);
 			}
 		};
-		
+
 		// Start listening for the canplaythrough event, so we do not
 		// start playing the video until we can do so without stuttering
 		tex._video.addEventListener("canplaythrough", startVideo, true);
 
 		// Start listening for the ended event, so we can stop the
 		// texture update when the video is finished playing
-		tex._video.addEventListener("ended", videoDone, true);	
+		tex._video.addEventListener("ended", videoDone, true);
 	}
-	else if (x3dom.isa(tex, x3dom.nodeTypes.X3DEnvironmentTextureNode)) 
+	else if (x3dom.isa(tex, x3dom.nodeTypes.X3DEnvironmentTextureNode))
 	{
-		this.texture = this.cache.getTextureCube(gl, doc, tex.getTexUrl(), false, 
+		this.texture = this.cache.getTextureCube(gl, doc, tex.getTexUrl(), false,
 		                                         tex._vf.crossOrigin, tex._vf.scale, this.genMipMaps);
 	}
-	else 
+	else
 	{
-		this.texture = this.cache.getTexture2D(gl, doc, tex._nameSpace.getURL(tex._vf.url[0]), 
+		this.texture = this.cache.getTexture2D(gl, doc, tex._nameSpace.getURL(tex._vf.url[0]),
 		                                       false, tex._vf.crossOrigin, tex._vf.scale, this.genMipMaps);
 	}
 };
@@ -10109,19 +11025,25 @@ x3dom.Texture.prototype.updateTexture = function()
 x3dom.Texture.prototype.updateText = function()
 {
 	var gl = this.gl;
-	
+
 	this.wrapS			= gl.CLAMP_TO_EDGE;
 	this.wrapT			= gl.CLAMP_TO_EDGE;
-	
-	var fontStyleNode = this.node._cf.fontStyle.node;
+	this.type = gl.TEXTURE_2D;
+	this.format = gl.RGBA;
+	this.magFilter = gl.LINEAR;
+	this.minFilter = gl.LINEAR;
+    
+	var fontStyleNode = this.node._cf.fontStyle.node; // should always exist?
 
-    var font_family = 'serif';
+    var font_family = 'serif'; // should be dealt with by default fontStyleNode?
     var font_style = 'normal';
     var font_justify = 'left';
     var font_size = 1.0;
     var font_spacing = 1.0;
     var font_horizontal = true;
     var font_language = "";
+    var oversample = 2.0;
+    var minor_alignment = 'FIRST';
 
     if ( fontStyleNode !== null )
 	{
@@ -10130,14 +11052,14 @@ x3dom.Texture.prototype.updateText = function()
 		// clean attribute values and split in array
 		fonts = fonts.trim().replace(/\'/g,'').replace(/\,/, ' ');
 		fonts = fonts.split(" ");
-		
+
 		font_family = Array.map(fonts, function(s) {
 			if (s == 'SANS') { return 'sans-serif'; }
 			else if (s == 'SERIF') { return 'serif'; }
 			else if (s == 'TYPEWRITER') { return 'monospace'; }
-			else { return ''+s+''; }  //'Verdana' 
+			else { return ''+s+''; }  //'Verdana'
 		}).join(",");
-		
+
 		font_style = fontStyleNode._vf.style.toString().replace(/\'/g,'');
 		switch (font_style.toUpperCase()) {
 			case 'PLAIN': 		font_style = 'normal'; 		break;
@@ -10146,107 +11068,180 @@ x3dom.Texture.prototype.updateText = function()
 			case 'BOLDITALIC': 	font_style = 'italic bold'; break;
 			default: 			font_style = 'normal';
 		}
-		
+
 		var leftToRight = fontStyleNode._vf.leftToRight ? 'ltr' : 'rtl';
 		var topToBottom = fontStyleNode._vf.topToBottom;
-		
-		// TODO: make it possible to use multiple values
+
 		font_justify = fontStyleNode._vf.justify[0].toString().replace(/\'/g,'');
-		
 		switch (font_justify.toUpperCase()) {
 			case 'BEGIN': 	font_justify = 'left'; 		break;
 			case 'END': 	font_justify = 'right'; 	break;
-			case 'FIRST': 	font_justify = 'left'; 		break; // not clear what to do with this one
+			case 'FIRST': 	font_justify = 'left'; 		break; // relevant only in justify[1], eg. minor alignment
 			case 'MIDDLE': 	font_justify = 'center'; 	break;
 			default: 		font_justify = 'left'; 		break;
 		}
-
+		
+		if (fontStyleNode._vf.justify[1] === undefined) {
+			minor_alignment = 'FIRST';
+		}
+		else {
+			minor_alignment = fontStyleNode._vf.justify[1].toString().replace(/\'/g,'');
+			switch (minor_alignment.toUpperCase()) {
+				case 'BEGIN': 		minor_alignment = 'BEGIN'; 		break;
+				case 'FIRST': 		minor_alignment = 'FIRST'; 		break;
+				case 'MIDDLE': 		minor_alignment = 'MIDDLE'; 	break;
+				case 'END': 		minor_alignment = 'END'; 		break;
+				default: 			minor_alignment = 'FIRST'; 		break;
+			}
+		}
+		
 		font_size 		= fontStyleNode._vf.size;
 		font_spacing 	= fontStyleNode._vf.spacing;
-		font_horizontal = fontStyleNode._vf.horizontal;
+		font_horizontal = fontStyleNode._vf.horizontal; //TODO: vertical needs canvas support
 		font_language 	= fontStyleNode._vf.language;
-
+		oversample = fontStyleNode._vf.quality;
+		oversample = Math.max(x3dom.Texture.minFontQuality, oversample);
+		oversample = Math.min(x3dom.Texture.maxFontQuality, oversample);
+	
         if (font_size < 0.1) font_size = 0.1;
-        if(x3dom.Texture.clampFontSize && font_size > 2.3)
+        if (x3dom.Texture.clampFontSize && font_size > 2.3)
         {
             font_size = 2.3;
         }
 	}
-	
+
 	var textX, textY;
 	var paragraph = this.node._vf.string;
+	var maxExtent = this.node._vf.maxExtent;
+	var lengths = [];
 	var text_canvas = document.createElement('canvas');
 	text_canvas.dir = leftToRight;
-	var textHeight = font_size * 42; // pixel size relative to local coordinate system
-	var textAlignment = font_justify;			
+	var x3dToPx = 42;
+	var textHeight = font_size * x3dToPx; // pixel size relative to local coordinate system
+	var textAlignment = font_justify;
 	
 	// needed to make webfonts work
 	document.body.appendChild(text_canvas);
-
 	var text_ctx = text_canvas.getContext('2d');
 	
-	// calculate font font_size in px
 	text_ctx.font = font_style + " " + textHeight + "px " + font_family;
 
-	var maxWidth = text_ctx.measureText(paragraph[0]).width;
-    var i;
+	var maxWidth = 0, pWidth, pLength;
+	var i, j;
 
-	// calculate maxWidth
-	for(i = 1; i < paragraph.length; i++) {
-		if(text_ctx.measureText(paragraph[i]).width > maxWidth)
-			maxWidth = text_ctx.measureText(paragraph[i]).width;
+	// calculate maxWidth and length scaling; sanitize lengths
+	for(i = 0; i < paragraph.length; i++) {
+
+		pWidth = text_ctx.measureText( paragraph[i] ).width; 
+		if ( pWidth > maxWidth ) { maxWidth = pWidth; }
+
+		pLength = this.node._vf.length[i] | 0;
+		if (maxExtent > 0 && (pLength > maxExtent || pLength == 0)) {
+			pLength = maxExtent;			
+		}
+		lengths[i] = pLength <= 0 ? pWidth : pLength * x3dToPx;
 	}
-	var canvas_scale = 1.1; //needed for some fonts that are higher than the textHeight
-	text_canvas.width = maxWidth * canvas_scale;
-	text_canvas.height = textHeight * paragraph.length * canvas_scale;
+	
+	var canvas_extra = 0.1 * textHeight; //single line, some fonts are higher than textHeight
+	var txtW = maxWidth ;
+	var txtH = textHeight * font_spacing * paragraph.length + canvas_extra ;
 
-	switch(textAlignment) {
-		case "left": 	textX = 0; 						break;
-		case "center": 	textX = text_canvas.width/2; 	break;
-		case "right": 	textX = text_canvas.width;		break;
+	textX = 0;
+	textY = 0;
+	
+	var x_offset = 0, y_offset = 0, baseLine = 'top';
+	
+	//x_offset and starting X
+	switch (font_justify) {
+		case "center":	 
+			x_offset = -txtW/2;
+			textX = txtW/2;
+			break;
+		case "left":
+			x_offset = leftToRight == 'ltr' ? 0 : -txtW;
+			textX = 0;
+			break;
+		case "right":
+			x_offset = leftToRight == 'ltr' ? -txtW : 0;
+			textX = txtW;
+			break;
 	}
 
-	var txtW =  text_canvas.width;
-	var txtH = text_canvas.height;
-
+	//y_offset, baseline and first Y
+	switch (minor_alignment) {
+		case "MIDDLE":
+			y_offset = txtH/2;
+			break;
+		case "BEGIN":
+			y_offset = topToBottom ? 0 : txtH - canvas_extra;
+			baseLine = topToBottom ? 'top' : 'bottom';
+			textY = topToBottom ? 0 : textHeight; // adjust for baseline
+			break;
+		case "FIRST":
+			//special case of BEGIN
+			y_offset = topToBottom ? textHeight : txtH - canvas_extra ;
+			baseLine = topToBottom ? 'alphabetic' : 'bottom';
+			textY = topToBottom ? textHeight : textHeight;
+			break;
+		case "END":
+			y_offset = topToBottom ? txtH - canvas_extra: 0;
+			baseLine = topToBottom ? 'bottom' : 'top';
+			textY = topToBottom ? textHeight : 0;
+			break;
+	}
+	
+	var pxToX3d = 1/42.0;
+	var w = txtW * pxToX3d;
+	var h = txtH * pxToX3d;
+	
+	x_offset *= pxToX3d;
+	y_offset *= pxToX3d;
+	
+	text_canvas.width = txtW * oversample ;
+	text_canvas.height = txtH * oversample ;
+	text_canvas.dir = leftToRight;
+	
+	text_ctx.scale(oversample, oversample);
+	
+	// transparent background
 	text_ctx.fillStyle = 'rgba(0,0,0,0)';
 	text_ctx.fillRect(0, 0, text_ctx.canvas.width, text_ctx.canvas.height);
-	
+
 	// write white text with black border
-	text_ctx.fillStyle = 'white';		
-	text_ctx.lineWidth = 2.5;
-	text_ctx.strokeStyle = 'grey';
-	text_ctx.textBaseline = 'top';
+	text_ctx.fillStyle = 'white';
+	text_ctx.textBaseline = baseLine;
 
 	text_ctx.font = font_style + " " + textHeight + "px " + font_family;
 	text_ctx.textAlign = textAlignment;
 
-	// create the multiline text
-	for(i = 0; i < paragraph.length; i++) {
-		textY = i*textHeight;          
-		text_ctx.fillText(paragraph[i], textX,  textY);
+	// create the multiline text always top down
+	for (i = 0; i < paragraph.length; i++) {
+		j = topToBottom ? i : paragraph.length - 1 - i;
+		text_ctx.fillText(paragraph[j], textX,  textY, lengths[j]);
+		textY += textHeight * font_spacing;
 	}
-	
-	if( this.texture === null )
+
+	if ( this.texture === null )
 	{
 		this.texture = gl.createTexture();
 	}
-	
+
 	gl.bindTexture(this.type, this.texture);
 	gl.texImage2D(this.type, 0, this.format, this.format, gl.UNSIGNED_BYTE, text_canvas);
 	gl.bindTexture(this.type, null);
-	
+
 	//remove canvas after Texture creation
 	document.body.removeChild(text_canvas);
-	
-	var w = txtW / 100.0;
-    	var h = txtH / 100.0;
-	
-	this.node._mesh._positions[0] = [-w,-h+.4,0, w,-h+.4,0, w,h+.4,0, -w,h+.4,0];
 
-    this.node.invalidateVolume();
-    Array.forEach(this.node._parentNodes, function (node) {
-        node.setAllDirty();
+	this.node._mesh._positions[0] = [
+		0 + x_offset, -h + y_offset, 0,
+		w + x_offset, -h + y_offset, 0,
+		w + x_offset,  0 + y_offset, 0,
+		0 + x_offset,  0 + y_offset, 0];
+	
+	this.node.invalidateVolume();
+	Array.forEach(this.node._parentNodes, function (node) {
+    	node.setAllDirty();
     });
 };
 
@@ -10272,6 +11267,7 @@ x3dom.X3DDocument = function(canvas, ctx, settings) {
     this._scene = null;         // Scene root element
     this._viewarea = null;      // Viewport, handles rendering and interaction
     this.downloadCount = 0;     // Counter for objects to be loaded
+    this.previousDownloadCount = 0;
 
     // bag for pro-active (or multi-core-like) elements
     this._nodeBag = {
@@ -10741,9 +11737,6 @@ x3dom.X3DDocument.prototype.onKeyUp = function(keyCode)
         case 13: /* return */
             x3dom.toggleFullScreen();
             break;
-        case 27: /* ESC */
-            window.history.back(); // emulate good old ESC key
-            break;
         case 33: /* page up */
             stack = this._scene.getViewpoint()._stack;
 
@@ -10865,7 +11858,12 @@ x3dom.X3DDocument.prototype.onKeyPress = function(charCode)
             nav.setType("lookat", this._viewarea);
             break;
         case 109: /* m, toggle "points" attribute */
-            this._viewarea._points = ++this._viewarea._points % 3;
+            //"0" = triangles
+            //"1" = points
+            //"2" = lines
+	    //TODO: here, as option "2", we originally rendered triangle meshes as lines
+            //	    instead, we should create a separate line buffer and render it
+            this._viewarea._points = ++this._viewarea._points % 2;
             break;
         case 110: /* n, turntable */
             nav.setType("turntable", this._viewarea);
@@ -10971,11 +11969,35 @@ x3dom.MatrixMixer = function(beginTime, endTime) {
     this._beginLogMat = x3dom.fields.SFMatrix4f.identity();
     this._endMat = x3dom.fields.SFMatrix4f.identity();
     this._endLogMat = x3dom.fields.SFMatrix4f.identity();
+
+    this._beginRot = new x3dom.fields.Quaternion();
+    this._endRot = new x3dom.fields.Quaternion();
+
+    this._beginPos = new x3dom.fields.SFVec3f();
+    this._endPos = new x3dom.fields.SFVec3f();
+    this._result = x3dom.fields.SFMatrix4f.identity();
+
+    this._useQuaternion = false;
 };
 
 x3dom.MatrixMixer.prototype.calcFraction = function(time) {
     var fraction = (time - this._beginTime) / (this._endTime - this._beginTime);
     return (Math.sin((fraction * Math.PI) - (Math.PI / 2)) + 1) / 2.0;
+};
+
+x3dom.MatrixMixer.prototype._isValid = function() {
+    var angles = this._beginMat.inverse().mult(this._endMat).getEulerAngles();
+    return (Math.abs(angles[0]) != Math.PI && Math.abs(angles[1]) != Math.PI && Math.abs(angles[2]) != Math.PI);
+};
+
+x3dom.MatrixMixer.prototype._prepareQuaternionAnimation = function() {
+    this._beginRot.setValue(this._beginMat);
+    this._endRot.setValue(this._endMat);
+
+    this._beginPos = this._beginMat.e3();
+    this._endPos = this._endMat.e3();
+
+    this._useQuaternion = true;
 };
 
 x3dom.MatrixMixer.prototype.setBeginMatrix = function(mat) {
@@ -10984,33 +12006,66 @@ x3dom.MatrixMixer.prototype.setBeginMatrix = function(mat) {
     this._beginLogMat = x3dom.fields.SFMatrix4f.zeroMatrix();  // mat.log();
 };
 
+x3dom.MatrixMixer.prototype.reset = function() {
+    this._beginTime = 0;
+    this._endTime = 0;
+    this._useQuaternion = false;
+};
+
 x3dom.MatrixMixer.prototype.setEndMatrix = function(mat) {
     this._endMat.setValues(mat);
-    this._endLogMat = mat.mult(this._beginInvMat).log();
+
+    if (!this._isValid()) {
+        this._prepareQuaternionAnimation();
+    }
+
+    this._endLogMat = this._endMat.mult(this._beginInvMat).log();
     this._logDiffMat = this._endLogMat.addScaled(this._beginLogMat, -1);
 };
 
-x3dom.MatrixMixer.prototype.mix = function(time) {
+x3dom.MatrixMixer.prototype.mixQuaternion = function(time) {
+
+    var fraction = this.calcFraction(time);
+
+    var rotation = this._beginRot.slerp(this._endRot, fraction);
+    var translation = this._beginPos.addScaled(this._endPos.subtract(this._beginPos), fraction);
+
+    this._result.setRotate(rotation);
+    this._result.setTranslate(translation);
+
+    return this._result.copy();
+
+};
+
+x3dom.MatrixMixer.prototype.mixMatrix = function(time) {
+
     var mat = null;
 
-    if (time <= this._beginTime)
-    {
+    if (time <= this._beginTime) {
         mat = x3dom.fields.SFMatrix4f.copy(this._beginLogMat);
     }
-    else
-    {
-        if (time >= this._endTime)
-        {
+    else {
+        if (time >= this._endTime) {
             mat = x3dom.fields.SFMatrix4f.copy(this._endLogMat);
         }
-        else
-        {
+        else {
             var fraction = this.calcFraction(time);
             mat = this._logDiffMat.multiply(fraction).add(this._beginLogMat);
         }
     }
 
     return mat.exp().mult(this._beginMat);
+
+};
+
+
+x3dom.MatrixMixer.prototype.mix = function(time) {
+
+    if(this._useQuaternion) {
+        return this.mixQuaternion(time);
+    }else {
+        return this.mixMatrix(time);
+    }
 };
 
 /*
@@ -11197,15 +12252,17 @@ x3dom.Viewarea.prototype.tick = function(timeStamp)
                 this._scene.getViewpoint().setView(mat);
             }
             else {
-                this._mixer._beginTime = 0;
-                this._mixer._endTime = 0;
+                //this._mixer._beginTime = 0;
+                //this._mixer._endTime = 0;
+                this._mixer.reset();
 
                 this._scene.getViewpoint().setView(this._mixer._endMat);
             }
         }
         else {
-            this._mixer._beginTime = 0;
-            this._mixer._endTime = 0;
+            //this._mixer._beginTime = 0;
+            //this._mixer._endTime = 0;
+            this._mixer.reset();
             
             this._scene.getViewpoint().setView(this._mixer._beginMat);
         }
@@ -11374,20 +12431,26 @@ x3dom.Viewarea.prototype.navigateTo = function(timeStamp)
             if (navType === "helicopter")
                 this._at.y = this._from.y;
 
-            //lookat, lookaround
-            if (navType.substr(0, 5) === "looka")
-            {
-                this._up = this._flyMat.e1();
-            }
-            //all other modes
-            else
-            {
-                //initially read up-vector from current orientation and keep it
-                if (typeof this._up == 'undefined')
-                {
-                    this._up = this._flyMat.e1();
-                }
-            }
+            /*
+
+             //lookat, lookaround
+             if (navType.substr(0, 5) === "looka")
+             {
+             this._up = this._flyMat.e1();
+             }
+             //all other modes
+             else
+             {
+             //initially read up-vector from current orientation and keep it
+             if (typeof this._up == 'undefined')
+             {
+             this._up = this._flyMat.e1();
+             }
+             }
+
+             */
+
+            this._up = this._flyMat.e1();
 
             this._pitch = angleX * 180 / Math.PI;
             this._yaw = angleY * 180 / Math.PI;
@@ -11707,7 +12770,7 @@ x3dom.Viewarea.prototype.animateTo = function(target, prev, dur)
         target = target.getViewMatrix().mult(target.getCurrentTransform().inverse());
     }
 
-    if (navi._vf.transitionType[0].toLowerCase() !== "teleport" && navi.getType() !== "game")
+    if (navi._vf.transitionType[0].toLowerCase() !== "teleport" && dur != 0 && navi.getType() !== "game")
     {
         if (prev && x3dom.isa(prev, x3dom.nodeTypes.X3DViewpointNode)) {
             prev = prev.getViewMatrix().mult(prev.getCurrentTransform().inverse()).
@@ -12828,6 +13891,15 @@ x3dom.Viewarea.prototype.onDrag = function (x, y, buttonState)
                 }
                 else
                 {
+                    if ( navi._vf.typeParams.length >= 6 ) {
+
+                        var min = -navi._vf.typeParams[ 5 ];
+                        var max =  navi._vf.typeParams[ 4 ];
+
+                        this._movement.z = Math.min( Math.max( this._movement.z, min ), max );
+
+                    }
+
                     this._movement = this._movement.add(vec);
                     mat = this.getViewpointMatrix().mult(this._transMat);
                     //TODO; move real distance along viewing ray
@@ -16159,7 +17231,9 @@ x3dom.fields.SFImage.copy = function(that) {
     destination.width = that.width;
     destination.height = that.height;
     destination.comp = that.comp;
-    destination.setPixels(that.array);
+    //use instead slice?
+    //destination.array = that.array.slice();
+    destination.setPixels(that.getPixels());
     return destination;
 };
 
@@ -16572,7 +17646,7 @@ x3dom.fields.MFVec3f = function(vec3Array) {
     }
 };
 
-x3dom.fields.MFVec3f.prototype = x3dom.extend([]);
+x3dom.fields.MFVec3f.prototype = x3dom.extend(Array);
 
 x3dom.fields.MFVec3f.copy = function(vec3Array) {
     var destination = new x3dom.fields.MFVec3f();
@@ -16850,7 +17924,7 @@ x3dom.fields.MFString.parse = function(str) {
     if (str.length && str[0] == '"') {
         var m, re = /"((?:[^\\"]|\\\\|\\")*)"/g;
         while ((m = re.exec(str))) {
-            var s = m[1].replace(/\\([\\"])/, "$1");
+            var s = m[1].replace(/\\([\\"])/g, "$1");
             if (s !== undefined) {
                 arr.push(s);
             }
@@ -17699,7 +18773,15 @@ x3dom.fields.FrustumVolume = function(clipMat)
     this.directionIndex[1] = updateDirectionIndex(this.planeNormals[1]);
 };
 
-/** Check the volume against the frustum. */
+/**
+*  Check the volume against the frustum.
+*  Return values > 0 indicate a plane mask that was used to identify
+*  the object as "inside".
+*  Return value -1 means the object has been culled (i.e., is outside
+*  with respect to at least one plane).
+*  Return value 0 is a rare case, indicating that the object intersects
+*  with all planes of the frustum.
+*/
 x3dom.fields.FrustumVolume.prototype.intersect = function(vol, planeMask)
 {
     if (this.planeNormals.length < 6) {
@@ -17935,7 +19017,6 @@ x3dom.shader.FRONTGROUND_TEXTURE = "frontgroundTexture";
 x3dom.shader.BACKGROUND_TEXTURE = "backgroundTexture";
 x3dom.shader.BACKGROUND_SKYTEXTURE = "backgroundSkyTexture";
 x3dom.shader.BACKGROUND_CUBETEXTURE = "backgroundCubeTexture";
-x3dom.shader.SHADOW = "shadow";
 x3dom.shader.BLUR = "blur";
 x3dom.shader.DEPTH = "depth";
 x3dom.shader.NORMAL = "normal";
@@ -18352,7 +19433,7 @@ x3dom.shader.TBNCalculation = function() {
         "    // assume N, the interpolated vertex normal and\n" +
         "    // V, the view vector (vertex to eye)\n" +
         "    vec3 map = texture2D(normalMap, texcoord ).xyz;\n" +
-        "    map = map * 255./127. - 128./127.;\n" +
+		"    map = 2.0 * map - 1.0;\n" +
         "    mat3 TBN = cotangent_frame(N, -V, texcoord);\n" +
         "    return normalize(TBN * map);\n" +
         "}\n\n";
@@ -18489,7 +19570,7 @@ x3dom.shader.DynamicShader.prototype.generateVertexShader = function(gl, propert
 	}
 
 	//Textures
-	if(properties.TEXTURED || properties.CSSHADER) {
+	if(properties.TEXTURED) {
 		shader += "varying vec2 fragTexcoord;\n";
 		if(!properties.SPHEREMAPPING) {
 			if(properties.IMAGEGEOMETRY) {
@@ -18526,17 +19607,19 @@ x3dom.shader.DynamicShader.prototype.generateVertexShader = function(gl, propert
             shader += "uniform float displacementAxis;\n";
         }
         if (properties.DIFFPLACEMENTMAP) {
-            shader += "uniform sampler2D diffuseDisplacementMap;\n";
-            shader += "uniform float displacementFactor;\n";
-            shader += "uniform float displacementWidth;\n";
-            shader += "uniform float displacementHeight;\n";
-            shader += "uniform float displacementAxis;\n";
-        }
-        if (properties.MULTIDIFFALPMAP || properties.MULTIVISMAP) {
-            shader += "attribute float id;\n";
-            shader += "varying float fragID;\n";
-        }
+			shader += "uniform sampler2D diffuseDisplacementMap;\n";
+			shader += "uniform float displacementFactor;\n";
+			shader += "uniform float displacementWidth;\n";
+			shader += "uniform float displacementHeight;\n";
+			shader += "uniform float displacementAxis;\n";
+		}
 	}
+
+	if (properties.VERTEXID) {
+		shader += "attribute float id;\n";
+		shader += "varying float fragID;\n";
+	}
+
     if (properties.IS_PARTICLE) {
         shader += "attribute vec3 particleSize;\n";
     }
@@ -18617,7 +19700,7 @@ x3dom.shader.DynamicShader.prototype.generateVertexShader = function(gl, propert
 		}
 		
 		//TexCoords
-		if(properties.TEXTURED || properties.CSSHADER) {
+		if(properties.TEXTURED) {
 			shader += "vec4 IG_doubleTexCoords = texture2D( IG_texCoords, IG_texCoord );\n";
 			shader += "vec2 vertTexCoord;";
 			shader += "vertTexCoord.r = (IG_doubleTexCoords.r * 0.996108948) + (IG_doubleTexCoords.b * 0.003891051);\n";
@@ -18692,7 +19775,7 @@ x3dom.shader.DynamicShader.prototype.generateVertexShader = function(gl, propert
 		}
 		
 		//TexCoords
-		if( (properties.TEXTURED || properties.CSSHADER) && !properties.SPHEREMAPPING) {
+		if( (properties.TEXTURED) && !properties.SPHEREMAPPING) {
             if (properties.IS_PARTICLE) {
                 shader += "vec2 vertTexCoord = vec2(0.0);\n";
             }
@@ -18712,7 +19795,7 @@ x3dom.shader.DynamicShader.prototype.generateVertexShader = function(gl, propert
 	
 	//Normals
 	if(properties.LIGHTS) {
-        if (properties.DISPLACEMENTMAP || properties.DIFFPLACEMENTMAP && !properties.NORMALMAP) {
+        if ((properties.DISPLACEMENTMAP || properties.DIFFPLACEMENTMAP) && !properties.NORMALMAP) {
           //Map-Tile Size
           shader += "float dx = 1.0 / displacementWidth;\n";
           shader += "float dy = 1.0 / displacementHeight;\n";
@@ -18762,10 +19845,11 @@ x3dom.shader.DynamicShader.prototype.generateVertexShader = function(gl, propert
 	}
     
 	//Textures
-	if(properties.TEXTURED || properties.CSSHADER){
+	if(properties.TEXTURED){
 		if(properties.CUBEMAP) {
 			shader += "fragViewDir = (viewMatrix[3].xyz);\n";
-		} else if (properties.SPHEREMAPPING) {
+		}
+		if (properties.SPHEREMAPPING) {
 			shader += " fragTexcoord = 0.5 + fragNormal.xy / 2.0;\n";
 		} else if(properties.TEXTRAFO) {
 			shader += " fragTexcoord = (texTrafoMatrix * vec4(vertTexCoord, 1.0, 1.0)).xy;\n";
@@ -18875,14 +19959,41 @@ x3dom.shader.DynamicShader.prototype.generateFragmentShader = function(gl, prope
     {
         shader += "uniform mat4 modelViewMatrixInverse;\n";
     }
+
+	//VertexID
+	if (properties.VERTEXID) {
+		shader += "varying float fragID;\n";
+
+		if (properties.MULTIDIFFALPMAP) {
+			shader += "uniform sampler2D multiDiffuseAlphaMap;\n";
+			shader += "uniform float multiDiffuseAlphaWidth;\n";
+			shader += "uniform float multiDiffuseAlphaHeight;\n";
+		}
+		if (properties.MULTIEMIAMBMAP) {
+			shader += "uniform sampler2D multiEmissiveAmbientMap;\n";
+			shader += "uniform float multiEmissiveAmbientWidth;\n";
+			shader += "uniform float multiEmissiveAmbientHeight;\n";
+		}
+		if (properties.MULTISPECSHINMAP) {
+			shader += "uniform sampler2D multiSpecularShininessMap;\n";
+			shader += "uniform float multiSpecularShininessWidth;\n";
+			shader += "uniform float multiSpecularShininessHeight;\n";
+		}
+		if (properties.MULTIVISMAP) {
+			shader += "uniform sampler2D multiVisibilityMap;\n";
+			shader += "uniform float multiVisibilityWidth;\n";
+			shader += "uniform float multiVisibilityHeight;\n";
+		}
+	}
 	
 	//Textures
-	if(properties.TEXTURED || properties.CSSHADER) {
+	if(properties.TEXTURED) {
 		shader += "varying vec2 fragTexcoord;\n";
-		if((properties.TEXTURED || properties.DIFFUSEMAP) && !properties.CUBEMAP) {
+		if((properties.TEXTURED || properties.DIFFUSEMAP)) {
 			shader += "uniform sampler2D diffuseMap;\n";
-		} else if(properties.CUBEMAP) {
-			shader += "uniform samplerCube cubeMap;\n";
+		}
+		if(properties.CUBEMAP) {
+			shader += "uniform samplerCube environmentMap;\n";
 			shader += "varying vec3 fragViewDir;\n";
 
 		}
@@ -18901,29 +20012,6 @@ x3dom.shader.DynamicShader.prototype.generateFragmentShader = function(gl, prope
             shader += "uniform sampler2D diffuseDisplacementMap;\n";
             shader += "uniform float displacementWidth;\n";
             shader += "uniform float displacementHeight;\n";
-        }
-        if (properties.MULTIDIFFALPMAP || properties.MULTIVISMAP) {
-            shader += "varying float fragID;\n";
-        }
-        if (properties.MULTIDIFFALPMAP) {
-            shader += "uniform sampler2D multiDiffuseAlphaMap;\n";
-            shader += "uniform float multiDiffuseAlphaWidth;\n";
-            shader += "uniform float multiDiffuseAlphaHeight;\n";
-        }
-        if (properties.MULTIEMIAMBMAP) {
-            shader += "uniform sampler2D multiEmissiveAmbientMap;\n";
-            shader += "uniform float multiEmissiveAmbientWidth;\n";
-            shader += "uniform float multiEmissiveAmbientHeight;\n";
-        }
-        if (properties.MULTISPECSHINMAP) {
-            shader += "uniform sampler2D multiSpecularShininessMap;\n";
-            shader += "uniform float multiSpecularShininessWidth;\n";
-            shader += "uniform float multiSpecularShininessHeight;\n";
-        }
-        if (properties.MULTIVISMAP) {
-            shader += "uniform sampler2D multiVisibilityMap;\n";
-            shader += "uniform float multiVisibilityWidth;\n";
-            shader += "uniform float multiVisibilityHeight;\n";
         }
         if(properties.NORMALMAP){
             shader += "uniform sampler2D normalMap;\n";
@@ -18989,7 +20077,6 @@ x3dom.shader.DynamicShader.prototype.generateFragmentShader = function(gl, prope
     //gamma-adjusting actively before doing lighting computations. At the end
     //the color value is encoded again. See shader propery GAMMACORRECTION.
     shader += "vec4 color;\n";
-
 	shader += "color.rgb = " + x3dom.shader.decodeGamma(properties, "diffuseColor") + ";\n";
 	shader += "color.a = 1.0 - transparency;\n";
 
@@ -18997,6 +20084,7 @@ x3dom.shader.DynamicShader.prototype.generateFragmentShader = function(gl, prope
     shader += "float _shininess        = shininess;\n";
     shader += "vec3 _specularColor     = specularColor;\n";
     shader += "float _ambientIntensity = ambientIntensity;\n";
+	shader += "float _transparency     = transparency;\n";
 
     if (properties.MULTIVISMAP || properties.MULTIDIFFALPMAP || properties.MULTISPECSHINMAP || properties.MULTIEMIAMBMAP) {
         shader += "vec2 idCoord;\n";
@@ -19019,6 +20107,7 @@ x3dom.shader.DynamicShader.prototype.generateFragmentShader = function(gl, prope
         shader += "idCoord.y = floor(roundedIDMaterial / multiDiffuseAlphaWidth) * (1.0 / multiDiffuseAlphaHeight) + (0.5 / multiDiffuseAlphaHeight);\n";
         shader += "vec4 diffAlpha = texture2D( multiDiffuseAlphaMap, idCoord );\n";
         shader += "color.rgb = " + x3dom.shader.decodeGamma(properties, "diffAlpha.rgb") + ";\n";
+		shader += "_transparency = 1.0 - diffAlpha.a;\n";
         shader += "color.a = diffAlpha.a;\n";
     }
 
@@ -19109,6 +20198,7 @@ x3dom.shader.DynamicShader.prototype.generateFragmentShader = function(gl, prope
             shader += "  if(!gl_FrontFacing) {\n";
             shader += "    color.rgb = " + x3dom.shader.decodeGamma(properties, "backDiffuseColor") + ";\n";
             shader += "    color.a = 1.0 - backTransparency;\n";
+			shader += "    _transparency = 1.0 - backTransparency;\n";
             shader += "    _shininess = backShininess;\n";
             shader += "    _emissiveColor = backEmissiveColor;\n";
             shader += "    _specularColor = backSpecularColor;\n";
@@ -19145,20 +20235,21 @@ x3dom.shader.DynamicShader.prototype.generateFragmentShader = function(gl, prope
         }
 		
 		//Textures
-		if(properties.TEXTURED || properties.DIFFUSEMAP || properties.DIFFPLACEMENTMAP){        
+		if(properties.TEXTURED && ( properties.DIFFUSEMAP || properties.DIFFPLACEMENTMAP || properties.TEXT || properties.CUBEMAP)){
 			if(properties.CUBEMAP) {
 				shader += "vec3 viewDir = normalize(fragViewDir);\n";
-				shader += "vec3 reflected = reflect(viewDir, normal);\n";
-				shader += "reflected = (modelViewMatrixInverse * vec4(reflected,0.0)).xyz;\n";
-				shader += "vec4 texColor = " + x3dom.shader.decodeGamma(properties, "textureCube(cubeMap, reflected)") + ";\n";
-				shader += "color.a *= texColor.a;\n";
+				shader += "vec3 reflected = reflect(-eye, normal);\n";
+				shader += "reflected = (modelViewMatrixInverse * vec4(reflected, 0.0)).xyz;\n";
+				shader += "vec4 envColor = " + x3dom.shader.decodeGamma(properties, "textureCube(environmentMap, reflected)") + ";\n";
+				shader += "color.a *= envColor.a;\n";
 			}
-            else if (properties.DIFFPLACEMENTMAP)
+
+			if (properties.DIFFPLACEMENTMAP)
             {
                 shader += "vec2 texCoord = vec2(fragTexcoord.x, 1.0-fragTexcoord.y);\n";
                 shader += "vec4 texColor = texture2D(diffuseDisplacementMap, texCoord);\n";
             }
-            else
+            else if(properties.DIFFUSEMAP || properties.TEXT)
             {
                 if (properties.PIXELTEX) {
                     shader += "vec2 texCoord = fragTexcoord;\n";
@@ -19168,12 +20259,15 @@ x3dom.shader.DynamicShader.prototype.generateFragmentShader = function(gl, prope
 				shader += "vec4 texColor = " + x3dom.shader.decodeGamma(properties, "texture2D(diffuseMap, texCoord)") + ";\n";
 				shader += "color.a *= texColor.a;\n";
 			}
+
 			if(properties.BLENDING){
 				shader += "color.rgb = (_emissiveColor + max(ambient + diffuse, 0.0) * color.rgb + specular*_specularColor);\n";
-				if(properties.CUBEMAP) {
-					shader += "color.rgb = mix(color.rgb, texColor.rgb, vec3(0.75));\n";
-				} else {
+
+				if(properties.DIFFUSEMAP || properties.TEXT) {
 					shader += "color.rgb *= texColor.rgb;\n";
+				}
+				if(properties.CUBEMAP) {
+					shader += "color.rgb *= envColor.rgb;\n";
 				}
 			}else{
 				shader += "color.rgb = (_emissiveColor + max(ambient + diffuse, 0.0) * texColor.rgb + specular*_specularColor);\n";
@@ -19184,10 +20278,10 @@ x3dom.shader.DynamicShader.prototype.generateFragmentShader = function(gl, prope
 		
 	} else {
 		if (properties.APPMAT && !properties.VERTEXCOLOR) {
-			shader += "color = vec4(0.0, 0.0, 0.0, 1.0 - transparency);\n";
+			shader += "color = vec4(0.0, 0.0, 0.0, 1.0 - _transparency);\n";
 		}
 		
-		if(properties.TEXTURED || properties.DIFFUSEMAP){
+		if(properties.TEXTURED && ( properties.DIFFUSEMAP || properties.DIFFPLACEMENTMAP || properties.TEXT )){
             if (properties.PIXELTEX) {
                 shader += "vec2 texCoord = fragTexcoord;\n";
             } else {
@@ -19228,13 +20322,15 @@ x3dom.shader.DynamicShader.prototype.generateFragmentShader = function(gl, prope
         shader += "    color.rgb = cappingColor;\n";
         shader += "}\n";
     }
-	
+
 	//Kill pixel
 	if(properties.TEXT) {
 		shader += "if (color.a <= 0.5) discard;\n";
 	} else {
 		shader += "if (color.a <= " + properties.ALPHATHRESHOLD + ") discard;\n";
 	}
+
+
 
     //Output the gamma encoded result.
     shader += "color = clamp(color, 0.0, 1.0);\n";
@@ -20173,6 +21269,251 @@ x3dom.shader.DynamicShaderPicking.prototype.generateFragmentShader = function(gl
  */
 
 /**
+ * Generate the final ShadowShader program
+ */
+x3dom.shader.DynamicShadowShader = function(gl, properties)
+{
+	this.program = gl.createProgram();
+	
+	var vertexShader 	= this.generateVertexShader(gl, properties);
+	var fragmentShader 	= this.generateFragmentShader(gl, properties);
+	
+	gl.attachShader(this.program, vertexShader);
+    gl.attachShader(this.program, fragmentShader);
+    
+    // optional, but position should be at location 0 for performance reasons
+    gl.bindAttribLocation(this.program, 0, "position");
+    
+	gl.linkProgram(this.program);
+	
+	return this.program;
+};
+
+/**
+ * Generate the vertex shader
+ */
+x3dom.shader.DynamicShadowShader.prototype.generateVertexShader = function(gl, properties)
+{
+	var shader = "";
+
+	//Shadow stuff
+	shader += "attribute vec3 position;\n";
+	shader += "uniform mat4 modelViewProjectionMatrix;\n";
+	shader += "varying vec4 projCoords;\n";
+
+	//ShadowID stuff
+	if(properties.VERTEXID) {
+		shader += "varying float fragID;\n";
+		shader += "attribute float id;\n";
+	}
+
+	//Bounding stuff
+	if(properties.REQUIREBBOX) {
+		shader += "uniform vec3 bgCenter;\n";
+		shader += "uniform vec3 bgSize;\n";
+		shader += "uniform float bgPrecisionMax;\n";
+	}
+
+	//ImageGeometry stuff
+	if(properties.IMAGEGEOMETRY) {
+		shader += "uniform vec3 IG_bboxMin;\n";
+		shader += "uniform vec3 IG_bboxMax;\n";
+		shader += "uniform float IG_coordTextureWidth;\n";
+		shader += "uniform float IG_coordTextureHeight;\n";
+		shader += "uniform vec2 IG_implicitMeshSize;\n";
+
+		for( var i = 0; i < properties.IG_PRECISION; i++ ) {
+			shader += "uniform sampler2D IG_coords" + i + "\n;";
+		}
+
+		if(properties.IG_INDEXED) {
+			shader += "uniform sampler2D IG_index;\n";
+			shader += "uniform float IG_indexTextureWidth;\n";
+			shader += "uniform float IG_indexTextureHeight;\n";
+		}
+	}
+
+	//PopGeometry stuff
+	if (properties.POPGEOMETRY) {
+		shader += "uniform float PG_precisionLevel;\n";
+		shader += "uniform float PG_powPrecision;\n";
+		shader += "uniform vec3 PG_maxBBSize;\n";
+		shader += "uniform vec3 PG_bbMin;\n";
+		shader += "uniform vec3 PG_bbMaxModF;\n";
+		shader += "uniform vec3 PG_bboxShiftVec;\n";
+		shader += "uniform float PG_numAnchorVertices;\n";
+		shader += "attribute float PG_vertexID;\n";
+	}
+
+	//ClipPlane stuff
+	if(properties.CLIPPLANES) {
+		shader += "uniform mat4 modelViewMatrix;\n";
+		shader += "varying vec4 fragPosition;\n";
+	}
+
+	/*******************************************************************************
+	 * Generate main function
+	 ********************************************************************************/
+	shader += "void main(void) {\n";
+	shader += "    vec3 pos = position;\n";
+
+	/*******************************************************************************
+	 * Start of special Geometry switch
+	 ********************************************************************************/
+	if(properties.IMAGEGEOMETRY) { //ImageGeometry
+		if(properties.IG_INDEXED) {
+			shader += "    vec2 halfPixel = vec2(0.5/IG_indexTextureWidth,0.5/IG_indexTextureHeight);\n";
+			shader += "    vec2 IG_texCoord = vec2(position.x*(IG_implicitMeshSize.x/IG_indexTextureWidth), position.y*(IG_implicitMeshSize.y/IG_indexTextureHeight)) + halfPixel;\n";
+			shader += "    vec2 IG_indices = texture2D( IG_index, IG_texCoord ).rg;\n";
+			shader += "    halfPixel = vec2(0.5/IG_coordTextureWidth,0.5/IG_coordTextureHeight);\n";
+			shader += "    IG_texCoord = (IG_indices * 0.996108948) + halfPixel;\n";
+		} else {
+			shader += "    vec2 halfPixel = vec2(0.5/IG_coordTextureWidth, 0.5/IG_coordTextureHeight);\n";
+			shader += "    vec2 IG_texCoord = vec2(position.x*(IG_implicitMeshSize.x/IG_coordTextureWidth), position.y*(IG_implicitMeshSize.y/IG_coordTextureHeight)) + halfPixel;\n";
+		}
+
+		shader += "    pos = texture2D( IG_coordinateTexture, IG_texCoord ).rgb;\n";
+		shader += "    pos = pos * (IG_bboxMax - IG_bboxMin) + IG_bboxMin;\n";
+	} else if (properties.POPGEOMETRY) { //PopGeometry
+		shader += "    vec3 offsetVec = step(pos / bgPrecisionMax, PG_bbMaxModF) * PG_bboxShiftVec;\n";
+		shader += "    if (PG_precisionLevel <= 2.0) {\n";
+		shader += "        pos = floor(pos / PG_powPrecision) * PG_powPrecision;\n";
+		shader += "        pos /= (65536.0 - PG_powPrecision);\n";
+		shader += "    }\n";
+		shader += "    else {\n";
+		shader += "        pos /= bgPrecisionMax;\n";
+		shader += "    }\n";
+		shader += "    pos = (pos + offsetVec + PG_bbMin) * PG_maxBBSize;\n";
+	} else {
+		if(properties.REQUIREBBOX) {
+			shader += "    pos = bgCenter + bgSize * pos / bgPrecisionMax;\n";
+		}
+	}
+
+	if(properties.VERTEXID) {
+		shader += "    fragID = id;\n";
+	}
+
+	if(properties.CLIPPLANES) {
+		shader += "    fragPosition = (modelViewMatrix * vec4(pos, 1.0));\n";
+	}
+
+	shader += "    projCoords = modelViewProjectionMatrix * vec4(pos, 1.0);\n";
+	shader += "    gl_Position = projCoords;\n";
+
+	shader += "}\n";
+
+	var vertexShader = gl.createShader(gl.VERTEX_SHADER);
+	gl.shaderSource(vertexShader, shader);
+    gl.compileShader(vertexShader);
+		
+	if(!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)){
+		x3dom.debug.logError("[ShadowShader] VertexShader " + gl.getShaderInfoLog(vertexShader));		
+	}
+	
+	return vertexShader;
+};
+
+/**
+ * Generate the fragment shader
+ */
+x3dom.shader.DynamicShadowShader.prototype.generateFragmentShader = function(gl, properties)
+{
+	var shader = "";
+
+	shader += "#ifdef GL_FRAGMENT_PRECISION_HIGH\n";
+    shader += "    precision highp float;\n";
+    shader += "#else\n";
+    shader += "    precision mediump float;\n";
+    shader += "#endif\n\n";
+
+	//Shadow stuff
+	shader += "varying vec4 projCoords;\n";
+	shader += "uniform float offset;\n";
+	shader += "uniform bool cameraView;\n";
+
+	//ShadowID stuff
+	if(properties.VERTEXID) {
+		shader += "varying float fragID;\n";
+	}
+
+	if (properties.MULTIVISMAP) {
+		shader += "uniform sampler2D multiVisibilityMap;\n";
+		shader += "uniform float multiVisibilityWidth;\n";
+		shader += "uniform float multiVisibilityHeight;\n";
+	}
+
+	//ClipPlane stuff
+	if(properties.CLIPPLANES) {
+		shader += "uniform mat4 viewMatrixInverse;\n";
+		shader += "varying vec4 fragPosition;\n";
+		shader += x3dom.shader.clipPlanes(properties.CLIPPLANES);
+	}
+
+	//Import RGBA Packing stuff if FloatingPoint textures are not supported
+	if(!x3dom.caps.FP_TEXTURES) {
+		shader += x3dom.shader.rgbaPacking();
+	}
+
+	/*******************************************************************************
+	 * Generate main function
+	 ********************************************************************************/
+
+	shader += "void main(void) {\n";
+
+	if(properties.CLIPPLANES)
+	{
+		shader += "calculateClipPlanes();\n";
+	}
+
+	if (properties.MULTIVISMAP) {
+		shader += "    vec2 idTexCoord;\n";
+		shader += "    float roundedID = floor(fragID+0.5);\n";
+		shader += "    idTexCoord.x = (mod(roundedID, multiVisibilityWidth)) * (1.0 / multiVisibilityWidth) + (0.5 / multiVisibilityWidth);\n";
+		shader += "    idTexCoord.y = (floor(roundedID / multiVisibilityHeight)) * (1.0 / multiVisibilityHeight) + (0.5 / multiVisibilityHeight);\n";
+		shader += "    vec4 visibility = texture2D( multiVisibilityMap, idTexCoord );\n";
+		shader += "    if (visibility.r < 1.0) discard; \n";
+	}
+
+	shader += "    vec3 proj = (projCoords.xyz / projCoords.w);\n";
+
+ 	if(!x3dom.caps.FP_TEXTURES) {
+		shader += "    gl_FragColor = packDepth(proj.z);\n";
+	} else {
+		//use variance shadow maps, when not rendering from camera view
+		//shader +=	"if (!cameraView) proj.z = exp((1.0-offset)*80.0*proj.z);\n";
+		shader += "	   if (!cameraView){\n";
+		shader += "		   proj.z = (proj.z + 1.0)*0.5;\n";
+		shader += "		   proj.y = proj.z * proj.z;\n";
+		shader += "	   }\n";
+		shader += "    gl_FragColor = vec4(proj, 1.0);\n";
+	}
+
+	shader += "}\n";
+
+    var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+	gl.shaderSource(fragmentShader, shader);
+    gl.compileShader(fragmentShader);
+		
+	if(!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)){
+		x3dom.debug.logError("[ShadowShader] FragmentShader " + gl.getShaderInfoLog(fragmentShader));		
+	}
+	
+	return fragmentShader;
+};
+
+/*
+ * X3DOM JavaScript Library
+ * http://www.x3dom.org
+ *
+ * (C)2009 Fraunhofer IGD, Darmstadt, Germany
+ * Dual licensed under the MIT and GPL
+ *
+ * Based on code originally provided by
+ * Philip Taylor: http://philip.html5.org
+ */
+
+/**
  * Generate the final Shader program
  */
 x3dom.shader.ComposedShader = function(gl, shape)
@@ -20672,178 +22013,6 @@ x3dom.shader.BackgroundCubeTextureShader.prototype.generateFragmentShader = func
 		
 	if(!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)){
 		x3dom.debug.logError("[BackgroundCubeTextureShader] FragmentShader " + gl.getShaderInfoLog(fragmentShader));		
-	}
-	
-	return fragmentShader;
-};
-
-/*
- * X3DOM JavaScript Library
- * http://www.x3dom.org
- *
- * (C)2009 Fraunhofer IGD, Darmstadt, Germany
- * Dual licensed under the MIT and GPL
- *
- * Based on code originally provided by
- * Philip Taylor: http://philip.html5.org
- */
-
-/**
- * Generate the final ShadowShader program
- */
-x3dom.shader.ShadowShader = function(gl)
-{
-	this.program = gl.createProgram();
-	
-	var vertexShader 	= this.generateVertexShader(gl);
-	var fragmentShader 	= this.generateFragmentShader(gl);
-	
-	gl.attachShader(this.program, vertexShader);
-    gl.attachShader(this.program, fragmentShader);
-    
-    // optional, but position should be at location 0 for performance reasons
-    gl.bindAttribLocation(this.program, 0, "position");
-    
-	gl.linkProgram(this.program);
-	
-	return this.program;
-};
-
-/**
- * Generate the vertex shader
- */
-x3dom.shader.ShadowShader.prototype.generateVertexShader = function(gl)
-{
-	var shader = "";
-	if (!x3dom.caps.MOBILE) {
-	
-		shader +=   "attribute vec3 position;\n" +
-					"uniform mat4 modelViewProjectionMatrix;\n" +
-					"varying vec4 projCoords;\n" +
-					//image geometry 
-					"uniform float imageGeometry;\n" +
-					"uniform vec3 IG_bboxMin;\n" +
-					"uniform vec3 IG_bboxMax;\n" +
-					"uniform float IG_coordTextureWidth;\n" +
-					"uniform float IG_coordTextureHeight;\n" +
-					"uniform float IG_indexTextureWidth;\n" +
-					"uniform float IG_indexTextureHeight;\n" +
-					"uniform sampler2D IG_indexTexture;\n" +
-					"uniform sampler2D IG_coordinateTexture;\n" +
-					"uniform vec2 IG_implicitMeshSize;\n" +
-                    //pop geometry
-                    "uniform vec3 bgCenter;\n" +
-                    "uniform vec3 bgSize;\n" +
-                    "uniform float bgPrecisionMax;\n" +
-                    "uniform float popGeometry;\n" +
-                    "uniform float PG_precisionLevel;\n" +
-                    "uniform float PG_powPrecision;\n" +
-                    "uniform vec3 PG_maxBBSize;\n" +
-                    "uniform vec3 PG_bbMin;\n" +
-                    "uniform vec3 PG_bbMaxModF;\n" +
-                    "uniform vec3 PG_bboxShiftVec;\n" +
-
-					//MAIN
-					"void main(void) {\n" +
-					"	vec3 pos;\n" +
-					"	if (imageGeometry != 0.0) {\n" +
-						//IG
-					"		vec2 IG_texCoord;\n" +
-					"		if(imageGeometry == 1.0) {\n" +
-					"			vec2 halfPixel = vec2(0.5/IG_indexTextureWidth,0.5/IG_indexTextureHeight);\n" +
-					"			IG_texCoord = vec2(position.x*(IG_implicitMeshSize.x/IG_indexTextureWidth), position.y*(IG_implicitMeshSize.y/IG_indexTextureHeight)) + halfPixel;\n" +
-					"			vec2 IG_index = texture2D( IG_indexTexture, IG_texCoord ).rg;\n" + 
-					"			IG_texCoord = IG_index * 0.996108948;\n" +
-					"		} else {\n" +
-					"			vec2 halfPixel = vec2(0.5/IG_coordTextureWidth, 0.5/IG_coordTextureHeight);\n" +
-					"			IG_texCoord = vec2(position.x*(IG_implicitMeshSize.x/IG_coordTextureWidth), position.y*(IG_implicitMeshSize.y/IG_coordTextureHeight)) + halfPixel;\n" +
-					"		}\n" +
-					"		pos = texture2D( IG_coordinateTexture, IG_texCoord ).rgb;\n" +
-					"	 	pos = pos * (IG_bboxMax - IG_bboxMin) + IG_bboxMin;\n" +
-					"	} else if (popGeometry != 0.0){\n" +
-						//PG
-                    "		pos = position;\n" +
-                    "		vec3 offsetVec = step(pos / bgPrecisionMax, PG_bbMaxModF) * PG_bboxShiftVec;\n" +
-                    "		if (PG_precisionLevel <= 2.0) {\n" +
-                    "   		pos = floor(pos / PG_powPrecision) * PG_powPrecision;\n" +
-                    "   		pos /= (65536.0 - PG_powPrecision);\n" +
-                    "		}\n" +
-                    "		else {\n" +
-                    "   		pos /= bgPrecisionMax;\n" +
-                    "		}\n" +
-                    "		pos = (pos + offsetVec + PG_bbMin) * PG_maxBBSize;\n" +
-					"	} else {\n" +
-						//BG
-					"		pos = bgCenter + bgSize * position / bgPrecisionMax;\n" +
-					"	}\n" +
-					"   projCoords = modelViewProjectionMatrix * vec4(pos, 1.0);\n" +
-					"   gl_Position = projCoords;\n" +
-					"}\n";
-	} else {
-		shader = 	"attribute vec3 position;\n" +
-                    "uniform vec3 bgCenter;\n" +
-                    "uniform vec3 bgSize;\n" +
-                    "uniform float bgPrecisionMax;\n" +
-                    "uniform mat4 modelViewProjectionMatrix;\n" +
-					"varying vec4 projCoords;\n" +
-                    
-                    "void main(void) {\n" +
-                    "	vec3 pos = bgCenter + bgSize * position / bgPrecisionMax;\n" +
-					"	projCoords = modelViewProjectionMatrix * vec4(pos, 1.0);\n" +					
-                    "	gl_Position = projCoords;\n" +
-                    "}\n";
-	}
-
-	var vertexShader = gl.createShader(gl.VERTEX_SHADER);
-	gl.shaderSource(vertexShader, shader);
-    gl.compileShader(vertexShader);
-		
-	if(!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)){
-		x3dom.debug.logError("[ShadowShader] VertexShader " + gl.getShaderInfoLog(vertexShader));		
-	}
-	
-	return vertexShader;
-};
-
-/**
- * Generate the fragment shader
- */
-x3dom.shader.ShadowShader.prototype.generateFragmentShader = function(gl)
-{
-  var shader = "#ifdef GL_FRAGMENT_PRECISION_HIGH\n";
-  shader += "precision highp float;\n";
-  shader += "#else\n";
-  shader += " precision mediump float;\n";
-  shader += "#endif\n\n";
-
-	shader += "varying vec4 projCoords;\n" +
-				"uniform float offset;\n" +
-				"uniform bool cameraView;\n";
-	if(!x3dom.caps.FP_TEXTURES || x3dom.caps.MOBILE) 
-		shader += 	x3dom.shader.rgbaPacking();
-	
-	shader +=	"void main(void) {\n" +
-				"    vec3 proj = (projCoords.xyz / projCoords.w);\n";
-
- 	if(!x3dom.caps.FP_TEXTURES || x3dom.caps.MOBILE) {
-		shader +=	"gl_FragColor = packDepth(proj.z);\n";
-	} else {
-		//use variance shadow maps, when not rendering from camera view
-		//shader +=	"if (!cameraView) proj.z = exp((1.0-offset)*80.0*proj.z);\n";
-		shader +=	"	if (!cameraView){\n" +
-					"		proj.z = (proj.z + 1.0)*0.5;\n" +
-					"		proj.y = proj.z * proj.z;\n" +
-					"	}\n";
-		shader +=	"	gl_FragColor = vec4(proj, 1.0);\n";
-	}
-	shader +=	"}\n";
-
-    var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-	gl.shaderSource(fragmentShader, shader);
-    gl.compileShader(fragmentShader);
-		
-	if(!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)){
-		x3dom.debug.logError("[ShadowShader] FragmentShader " + gl.getShaderInfoLog(fragmentShader));		
 	}
 	
 	return fragmentShader;
@@ -21900,6 +23069,7 @@ x3dom.gfx_webgl = (function () {
                         x3dom.caps.STD_DERIVATIVES = ctx.getExtension("OES_standard_derivatives");
                         x3dom.caps.DRAW_BUFFERS = ctx.getExtension("WEBGL_draw_buffers");
                         x3dom.caps.DEBUGRENDERINFO = ctx.getExtension("WEBGL_debug_renderer_info");
+                        x3dom.caps.DEPTH_TEXTURE = ctx.getExtension("WEBGL_depth_texture");
                         x3dom.caps.EXTENSIONS = ctx.getSupportedExtensions();
 
                         if ( x3dom.caps.DEBUGRENDERINFO ) {
@@ -23007,25 +24177,11 @@ x3dom.gfx_webgl = (function () {
     Context.prototype.renderShadowPass = function (gl, viewarea, mat_scene, mat_view, targetFbo, camOffset, isCameraView)
     {
         var scene = viewarea._scene;
-        var sp = scene._webgl.shadowShader;
+
+        var indicesReady = false;
 
         this.stateManager.bindFramebuffer(gl.FRAMEBUFFER, targetFbo.fbo);
         this.stateManager.viewport(0, 0, targetFbo.width, targetFbo.height);
-
-        this.stateManager.useProgram(sp);
-
-        sp.cameraView = isCameraView;
-        sp.offset = camOffset;
-
-        // workaround for old graphics cards/ drivers
-        {
-            sp.PG_precisionLevel = 1.0;
-            sp.PG_powPrecision = 1.0;
-            sp.PG_maxBBSize = [0, 0, 0];
-            sp.PG_bbMin = [0, 0, 0];
-            sp.PG_bbMaxModF = [0, 0, 0];
-            sp.PG_bboxShiftVec = [0, 0, 0];
-        }
 
         gl.clearColor(1.0, 1.0, 1.0, 0.0);
         gl.clearDepth(1.0);
@@ -23057,14 +24213,27 @@ x3dom.gfx_webgl = (function () {
             }
 
             var s_geo = shape._cf.geometry.node;
+            var s_app = shape._cf.appearance.node;
             var s_msh = s_geo._mesh;
+
+            var properties = shape.getShaderProperties(viewarea);
+
+            //Generate Dynamic picking shader
+            var sp = this.cache.getShaderByProperties(gl, shape, properties, null, true);
+
+            if (!sp) {   // error
+                return;
+            }
+
+            //Bind shader
+            this.stateManager.useProgram(sp);
+
+            sp.cameraView = isCameraView;
+            sp.offset = camOffset;
 
             sp.modelViewProjectionMatrix = mat_scene.mult(trafo).toGL();
 
-            //Set ImageGeometry switch
-            sp.imageGeometry = s_gl.imageGeometry;
-            sp.popGeometry = s_gl.popGeometry;
-
+            // BoundingBox stuff
             if (s_gl.coordType != gl.FLOAT) {
                 if (!s_gl.popGeometry && (x3dom.Utils.isUnsignedType(s_geo._vf.coordType))) {
                     sp.bgCenter = s_geo.getMin().toGL();
@@ -23075,20 +24244,24 @@ x3dom.gfx_webgl = (function () {
                 sp.bgSize = s_geo._vf.size.toGL();
                 sp.bgPrecisionMax = s_geo.getPrecisionMax('coordType');
             }
-            else {
-                sp.bgCenter = bgCenter;
-                sp.bgSize = bgSize;
-                sp.bgPrecisionMax = 1;
+
+            //===========================================================================
+            // Set ClipPlanes
+            //===========================================================================
+            if (shape._clipPlanes) {
+                sp.modelViewMatrix = mat_view.mult(trafo).toGL();
+                sp.viewMatrixInverse = mat_view.inverse().toGL();
+                for (var cp = 0; cp < shape._clipPlanes.length; cp++) {
+                    var clip_plane = shape._clipPlanes[cp].plane;
+                    var clip_trafo = shape._clipPlanes[cp].trafo;
+
+                    sp['clipPlane' + cp + '_Plane'] = clip_trafo.multMatrixPlane(clip_plane._vf.plane).toGL();
+                    sp['clipPlane' + cp + '_CappingStrength'] = clip_plane._vf.cappingStrength;
+                    sp['clipPlane' + cp + '_CappingColor'] = clip_plane._vf.cappingColor.toGL();
+                }
             }
 
-            if (s_gl.colorType != gl.FLOAT) {
-                sp.bgPrecisionColMax = s_geo.getPrecisionMax('colorType');
-            }
-
-            if (s_gl.texCoordType != gl.FLOAT) {
-                sp.bgPrecisionTexMax = s_geo.getPrecisionMax('texCoordType');
-            }
-
+            //ImageGeometry stuff
             if (s_gl.imageGeometry != 0 && !x3dom.caps.MOBILE)  // FIXME: mobile errors
             {
                 sp.IG_bboxMin = s_geo.getMin().toGL();
@@ -23136,6 +24309,23 @@ x3dom.gfx_webgl = (function () {
                     }
                 }
             }
+            else if ((s_gl.binaryGeometry != 0 || s_gl.externalGeometry != 0) && s_geo._vf["idsPerVertex"] == true) { //MultiPart
+                var shader = s_app._shader;
+                if(shader && x3dom.isa(s_app._shader, x3dom.nodeTypes.CommonSurfaceShader)) {
+                    if (shader.getMultiVisibilityMap()) {
+                        sp.multiVisibilityMap = 0;
+                        var visTex = x3dom.Utils.findTextureByName(s_gl.texture, "multiVisibilityMap");
+                        sp.multiVisibilityWidth = visTex.texture.width;
+                        sp.multiVisibilityHeight = visTex.texture.height;
+                        gl.activeTexture(gl.TEXTURE0);
+                        gl.bindTexture(gl.TEXTURE_2D, visTex.texture);
+                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+                    }
+                }
+            }
 
             if (shape.isSolid()) {
                 this.stateManager.enable(gl.CULL_FACE);
@@ -23151,9 +24341,44 @@ x3dom.gfx_webgl = (function () {
                 this.stateManager.disable(gl.CULL_FACE);
             }
 
+            //===========================================================================
+            // Set DepthMode
+            //===========================================================================
+            var depthMode = s_app ? s_app._cf.depthMode.node : null;
+            if (depthMode)
+            {
+                if (depthMode._vf.enableDepthTest)
+                {
+                    //Enable Depth Test
+                    this.stateManager.enable(gl.DEPTH_TEST);
+
+                    //Set Depth Mask
+                    this.stateManager.depthMask(!depthMode._vf.readOnly);
+
+                    //Set Depth Function
+                    this.stateManager.depthFunc(x3dom.Utils.depthFunc(gl, depthMode._vf.depthFunc));
+
+                    //Set Depth Range
+                    this.stateManager.depthRange(depthMode._vf.zNearRange, depthMode._vf.zFarRange);
+                }
+                else
+                {
+                    //Disable Depth Test
+                    this.stateManager.disable(gl.DEPTH_TEST);
+                }
+            }
+            else //Set Defaults
+            {
+                this.stateManager.enable(gl.DEPTH_TEST);
+                this.stateManager.depthMask(true);
+                this.stateManager.depthFunc(gl.LEQUAL);
+            }
+
             //PopGeometry: adapt LOD and set shader variables
             if (s_gl.popGeometry) {
                 var model_view = mat_view.mult(trafo);
+                // FIXME; viewarea's width/height twice as big as render buffer size, which leads to too high precision
+                // the correct viewarea here would be one that holds this half-sized render buffer
                 this.updatePopState(drawable, s_geo, sp, s_gl, scene, model_view, viewarea, this.x3dElem.runtime.fps);
             }
 
@@ -23173,37 +24398,64 @@ x3dom.gfx_webgl = (function () {
                 if ( !(sp.position !== undefined && s_gl.buffers[q6 + 1] && (s_gl.indexes[q] || s_gl.externalGeometry != 0)) )
                     continue;
 
+                indicesReady = false;
+
                 // set buffers
                 if (s_gl.buffers[q6]) {
                     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, s_gl.buffers[q6]);
+                    indicesReady = true;
                 }
 
-                gl.bindBuffer(gl.ARRAY_BUFFER, s_gl.buffers[q6 + 1]);
+                if (sp.position !== undefined && s_gl.buffers[q6 + 1]) {
+                    gl.bindBuffer(gl.ARRAY_BUFFER, s_gl.buffers[q6 + 1]);
+                    gl.vertexAttribPointer(sp.position,
+                        s_msh._numPosComponents, s_gl.coordType, false,
+                        shape._coordStrideOffset[0], shape._coordStrideOffset[1]);
+                    gl.enableVertexAttribArray(sp.position);
+                }
 
-                gl.vertexAttribPointer(sp.position,
-                    s_msh._numPosComponents, s_gl.coordType, false,
-                    shape._coordStrideOffset[0], shape._coordStrideOffset[1]);
-                gl.enableVertexAttribArray(sp.position);
+                if (sp.id !== undefined && s_gl.buffers[q6 + 5]) {
 
-                if (s_gl.binaryGeometry > 0 || s_gl.popGeometry > 0) {
+                    gl.bindBuffer(gl.ARRAY_BUFFER, s_gl.buffers[q6 + 5]);
+                    //texture coordinate hack for IDs
+                    if ((s_gl.binaryGeometry != 0 || s_gl.externalGeometry != 0) && s_geo._vf["idsPerVertex"] == true)
+                    {
+                        gl.vertexAttribPointer(sp.id,
+                            1, gl.FLOAT, false,
+                            4, 0);
+                        gl.enableVertexAttribArray(sp.id);
+                    }
+                    else
+                    {
+                        /*
+                         gl.vertexAttribPointer(sp.id,
+                         1, gl.FLOAT, false,
+                         shape._idStrideOffset[0], shape._idStrideOffset[1]);
+                         gl.enableVertexAttribArray(sp.id);
+                         */
+                    }
+                }
+
+                // render mesh
+                if ( indicesReady && (s_gl.binaryGeometry > 0 || s_gl.popGeometry > 0) ) {
                     for (v = 0, offset = 0, v_n = s_geo._vf.vertexCount.length; v < v_n; v++) {
                         gl.drawElements(s_gl.primType[v], s_geo._vf.vertexCount[v], s_gl.indexType,
-                                        x3dom.Utils.getByteAwareOffset(offset, s_gl.indexType, gl));
+                            x3dom.Utils.getByteAwareOffset(offset, s_gl.indexType, gl));
                         offset += s_geo._vf.vertexCount[v];
                     }
                 }
-                else if (s_gl.binaryGeometry   < 0 || s_gl.popGeometry < 0 || s_gl.imageGeometry) {
+                else if (s_gl.binaryGeometry < 0 || s_gl.popGeometry < 0 || s_gl.imageGeometry) {
                     for (v = 0, offset = 0, v_n = s_geo._vf.vertexCount.length; v < v_n; v++) {
                         gl.drawArrays(s_gl.primType[v], offset, s_geo._vf.vertexCount[v]);
                         offset += s_geo._vf.vertexCount[v];
                     }
                 }
-                //ExternalGeometry: indexed rendering (shadow pass)
+                //ExternalGeometry: indexed rendering (picking pass)
                 else if (s_gl.externalGeometry == 1)
                 {
                     gl.drawElements(s_gl.primType[q], s_gl.drawCount[q], s_gl.indexType, s_gl.indexOffset[q]);
                 }
-                //ExternalGeometry: non-indexed rendering (shadow pass)
+                //ExternalGeometry: non-indexed rendering (picking pass)
                 else if (s_gl.externalGeometry == -1)
                 {
                     gl.drawArrays(s_gl.primType[q], 0, s_gl.drawCount[q]);
@@ -23223,6 +24475,16 @@ x3dom.gfx_webgl = (function () {
                 }
 
                 gl.disableVertexAttribArray(sp.position);
+
+                if (sp.texcoord !== undefined && s_gl.buffers[q6 + 3]) {
+                    gl.disableVertexAttribArray(sp.texcoord);
+                }
+                if (sp.color !== undefined && s_gl.buffers[q6 + 4]) {
+                    gl.disableVertexAttribArray(sp.color);
+                }
+                if (sp.id !== undefined && s_gl.buffers[q6 + 5]) {
+                    gl.disableVertexAttribArray(sp.id);
+                }
             }
 
             //Clean Texture units for IG
@@ -23234,9 +24496,22 @@ x3dom.gfx_webgl = (function () {
                     gl.bindTexture(gl.TEXTURE_2D, null);
                 }
             }
+
+        }
+
+        if (x3dom.Utils.needLineWidth) {
+            this.stateManager.lineWidth(1);
+        }
+
+        if (depthMode) {
+            this.stateManager.enable(gl.DEPTH_TEST);
+            this.stateManager.depthMask(true);
+            this.stateManager.depthFunc(gl.LEQUAL);
+            this.stateManager.depthRange(0, 1);
         }
 
         gl.flush();
+
         this.stateManager.bindFramebuffer(gl.FRAMEBUFFER, null);
     };
 
@@ -23250,6 +24525,8 @@ x3dom.gfx_webgl = (function () {
         var bufHeight = scene._webgl.fboPick.height;
         var x = lastX * ps;
         var y = (bufHeight - 1) - lastY * ps;
+
+        var indicesReady = false;
 
         this.stateManager.bindFramebuffer(gl.FRAMEBUFFER, scene._webgl.fboPick.fbo);
         this.stateManager.viewport(0, 0, scene._webgl.fboPick.width, bufHeight);
@@ -23321,7 +24598,7 @@ x3dom.gfx_webgl = (function () {
             sp.sceneSize = sceneSize;
 
             // Set shadow ids if available
-            if(s_gl.binaryGeometry != 0 && s_geo._vf.idsPerVertex) {
+            if((s_gl.binaryGeometry != 0 || s_gl.externalGeometry != 0) && s_geo._vf["idsPerVertex"] == true) {
                 sp.shadowIDs = (shape._vf.idOffset + x3dom.nodeTypes.Shape.objectID + 2);
             }
 
@@ -23409,7 +24686,7 @@ x3dom.gfx_webgl = (function () {
                     }
                 }
             }
-            else if (s_gl.binaryGeometry != 0 && s_geo._vf.idsPerVertex) { //MultiPart
+            else if ((s_gl.binaryGeometry != 0 || s_gl.externalGeometry != 0) && s_geo._vf["idsPerVertex"] == true) { //MultiPart
                 var shader = s_app._shader;
                 if(shader && x3dom.isa(s_app._shader, x3dom.nodeTypes.CommonSurfaceShader)) {
                     if (shader.getMultiVisibilityMap()) {
@@ -23499,21 +24776,23 @@ x3dom.gfx_webgl = (function () {
                 if ( !(sp.position !== undefined && s_gl.buffers[q6 + 1] && (s_gl.indexes[q] || s_gl.externalGeometry != 0)) )
                     continue;
 
+                indicesReady = false;
+
                 // set buffers
                 if (s_gl.buffers[q6]) {
                     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, s_gl.buffers[q6]);
+                    indicesReady = true;
                 }
 
-                gl.bindBuffer(gl.ARRAY_BUFFER, s_gl.buffers[q6 + 1]);
-
-                gl.vertexAttribPointer(sp.position,
-                    s_msh._numPosComponents, s_gl.coordType, false,
-                    shape._coordStrideOffset[0], shape._coordStrideOffset[1]);
-                gl.enableVertexAttribArray(sp.position);
-
+                if (sp.position !== undefined && s_gl.buffers[q6 + 1]) {
+                    gl.bindBuffer(gl.ARRAY_BUFFER, s_gl.buffers[q6 + 1]);
+                    gl.vertexAttribPointer(sp.position,
+                        s_msh._numPosComponents, s_gl.coordType, false,
+                        shape._coordStrideOffset[0], shape._coordStrideOffset[1]);
+                    gl.enableVertexAttribArray(sp.position);
+                }
                 if (pickMode == 1 && sp.color !== undefined && s_gl.buffers[q6 + 4]) {
                     gl.bindBuffer(gl.ARRAY_BUFFER, s_gl.buffers[q6 + 4]);
-
                     gl.vertexAttribPointer(sp.color,
                         s_msh._numColComponents, s_gl.colorType, false,
                         shape._colorStrideOffset[0], shape._colorStrideOffset[1]);
@@ -23522,7 +24801,6 @@ x3dom.gfx_webgl = (function () {
 
                 if (pickMode == 2 && sp.texcoord !== undefined && s_gl.buffers[q6 + 3]) {
                     gl.bindBuffer(gl.ARRAY_BUFFER, s_gl.buffers[q6 + 3]);
-
                     gl.vertexAttribPointer(sp.texcoord,
                         s_msh._numTexComponents, s_gl.texCoordType, false,
                         shape._texCoordStrideOffset[0], shape._texCoordStrideOffset[1]);
@@ -23533,7 +24811,7 @@ x3dom.gfx_webgl = (function () {
 
                     gl.bindBuffer(gl.ARRAY_BUFFER, s_gl.buffers[q6 + 5]);
                     //texture coordinate hack for IDs
-                    if (s_gl.binaryGeometry != 0 && s_geo._vf["idsPerVertex"] == true)
+                    if ((s_gl.binaryGeometry != 0 || s_gl.externalGeometry != 0) && s_geo._vf["idsPerVertex"] == true)
                     {
                         gl.vertexAttribPointer(sp.id,
                             1, gl.FLOAT, false,
@@ -23552,7 +24830,7 @@ x3dom.gfx_webgl = (function () {
                 }
 
                 // render mesh
-                if (s_gl.binaryGeometry > 0 || s_gl.popGeometry > 0) {
+                if ( indicesReady && (s_gl.binaryGeometry > 0 || s_gl.popGeometry > 0) ) {
                     for (v = 0, offset = 0, v_n = s_geo._vf.vertexCount.length; v < v_n; v++) {
                         gl.drawElements(s_gl.primType[v], s_geo._vf.vertexCount[v], s_gl.indexType,
                                         x3dom.Utils.getByteAwareOffset(offset, s_gl.indexType, gl));
@@ -23652,6 +24930,9 @@ x3dom.gfx_webgl = (function () {
     Context.prototype.renderShape = function (drawable, viewarea, slights, numLights, mat_view, mat_scene,
                                               mat_light, mat_proj, gl)
     {
+		// Variable to indicate that the indices are successful bind
+		var indicesReady = false;
+		
         var shape = drawable.shape;
         var transform = drawable.transform;
 
@@ -24144,6 +25425,8 @@ x3dom.gfx_webgl = (function () {
             if ( !(sp.position !== undefined && s_gl.buffers[q6 + 1] && (s_gl.indexes[q] || s_gl.externalGeometry != 0)) )
                 continue;
 
+            indicesReady = false;
+
             if (s_gl.buffers[q6]) {
                 if (isParticleSet && s_geo.drawOrder() != "any") {  // sort
                     var indexArray, zPos = [];
@@ -24180,18 +25463,18 @@ x3dom.gfx_webgl = (function () {
                 }
 
                 gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, s_gl.buffers[q6]);
+				indicesReady = true;
             }
 
-            gl.bindBuffer(gl.ARRAY_BUFFER, s_gl.buffers[q6 + 1]);
-
-            gl.vertexAttribPointer(sp.position,
-                s_msh._numPosComponents, s_gl.coordType, false,
-                shape._coordStrideOffset[0], shape._coordStrideOffset[1]);
-            gl.enableVertexAttribArray(sp.position);
-
+            if (sp.position !== undefined && s_gl.buffers[q6 + 1]) {
+                gl.bindBuffer(gl.ARRAY_BUFFER, s_gl.buffers[q6 + 1]);
+                gl.vertexAttribPointer(sp.position,
+                    s_msh._numPosComponents, s_gl.coordType, false,
+                    shape._coordStrideOffset[0], shape._coordStrideOffset[1]);
+                gl.enableVertexAttribArray(sp.position);
+            }
             if (sp.normal !== undefined && s_gl.buffers[q6 + 2]) {
                 gl.bindBuffer(gl.ARRAY_BUFFER, s_gl.buffers[q6 + 2]);
-
                 gl.vertexAttribPointer(sp.normal,
                     s_msh._numNormComponents, s_gl.normalType, false,
                     shape._normalStrideOffset[0], shape._normalStrideOffset[1]);
@@ -24199,7 +25482,6 @@ x3dom.gfx_webgl = (function () {
             }
             if (sp.texcoord !== undefined && s_gl.buffers[q6 + 3]) {
                 gl.bindBuffer(gl.ARRAY_BUFFER, s_gl.buffers[q6 + 3]);
-
                 gl.vertexAttribPointer(sp.texcoord,
                     s_msh._numTexComponents, s_gl.texCoordType, false,
                     shape._texCoordStrideOffset[0], shape._texCoordStrideOffset[1]);
@@ -24207,7 +25489,6 @@ x3dom.gfx_webgl = (function () {
             }
             if (sp.color !== undefined && s_gl.buffers[q6 + 4]) {
                 gl.bindBuffer(gl.ARRAY_BUFFER, s_gl.buffers[q6 + 4]);
-
                 gl.vertexAttribPointer(sp.color,
                     s_msh._numColComponents, s_gl.colorType, false,
                     shape._colorStrideOffset[0], shape._colorStrideOffset[1]);
@@ -24215,9 +25496,8 @@ x3dom.gfx_webgl = (function () {
             }
             if ((sp.id !== undefined || sp.particleSize !== undefined) && s_gl.buffers[q6 + 5]) {
                 gl.bindBuffer(gl.ARRAY_BUFFER, s_gl.buffers[q6 + 5]);
-
                 //texture coordinate hack for IDs
-                if (s_gl.binaryGeometry != 0 && s_geo._vf.idsPerVertex == true)
+                if ((s_gl.binaryGeometry != 0 || s_gl.externalGeometry != 0) && s_geo._vf["idsPerVertex"] == true)
                 {
                     gl.vertexAttribPointer(sp.id,
                         1, gl.FLOAT, false, 4, 0);
@@ -24244,7 +25524,7 @@ x3dom.gfx_webgl = (function () {
             if (renderMode > 0) {
                 var polyMode = (renderMode == 1) ? gl.POINTS : gl.LINES;
 
-                if (s_gl.binaryGeometry > 0 || s_gl.popGeometry > 0) {
+                if ( indicesReady && (s_gl.binaryGeometry > 0 || s_gl.popGeometry > 0) ) {
                     for (v = 0, offset = 0, v_n = s_geo._vf.vertexCount.length; v < v_n; v++) {
                         gl.drawElements(polyMode, s_geo._vf.vertexCount[v], s_gl.indexType,
                                         x3dom.Utils.getByteAwareOffset(offset, s_gl.indexType, gl));
@@ -24284,7 +25564,7 @@ x3dom.gfx_webgl = (function () {
                 }
             }
             else {
-                if (s_gl.binaryGeometry > 0 || s_gl.popGeometry > 0) {
+                if ( indicesReady && (s_gl.binaryGeometry > 0 || s_gl.popGeometry > 0) ) {
                     for (v = 0, offset = 0, v_n = s_geo._vf.vertexCount.length; v < v_n; v++) {
                         gl.drawElements(s_gl.primType[v], s_geo._vf.vertexCount[v], s_gl.indexType,
                                         x3dom.Utils.getByteAwareOffset(offset, s_gl.indexType, gl));
@@ -25108,7 +26388,7 @@ x3dom.gfx_webgl = (function () {
 			gl.bindBuffer(gl.ARRAY_BUFFER, scene._webgl.ppBuffer);
 			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);		
 			
-			scene._webgl.shadowShader = this.cache.getShader(gl, x3dom.shader.SHADOW);
+			//scene._webgl.shadowShader = this.cache.getShader(gl, x3dom.shader.SHADOW);
 
             // TODO; cleanup on shutdown and lazily create on first use like size-dependent variables below
             scene._webgl.refinement = {
@@ -25127,13 +26407,15 @@ x3dom.gfx_webgl = (function () {
                 rt_tex._webgl = {};
                 rt_tex._webgl.fbo = x3dom.Utils.initFBO(gl,
                     rt_tex._vf.dimensions[0], rt_tex._vf.dimensions[1], texType,
-                    (texProp && texProp._vf.generateMipMaps), !rt_tex.requirePingPong());
+                    (texProp && texProp._vf.generateMipMaps), rt_tex._vf.depthMap || !rt_tex.requirePingPong());
 
                 rt_tex._cleanupGLObjects = function(retainTex) {
                     if (!retainTex)
                         gl.deleteTexture(this._webgl.fbo.tex);
+                    if (this._webgl.fbo.dtex)
+                        gl.deleteTexture(this._webgl.fbo.dtex);
                     if (this._webgl.fbo.rbo)
-                        gl.deleteRenderbuffer(this._webgl.fbo.rbo);
+                        gl.deleteFramebuffer(this._webgl.fbo.rbo);
                     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
                     gl.deleteFramebuffer(this._webgl.fbo.fbo);
                     this._webgl.fbo.rbo = null;
@@ -25186,6 +26468,8 @@ x3dom.gfx_webgl = (function () {
                     rt_tex._cleanupGLObjects = function(retainTex) {
                         if (!retainTex)
                             gl.deleteTexture(this._webgl.fbo.tex);
+                        if (this._webgl.fbo.dtex)
+                            gl.deleteTexture(this._webgl.fbo.dtex);
                         if (this._webgl.fbo.rbo)
                             gl.deleteRenderbuffer(this._webgl.fbo.rbo);
                         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -25199,7 +26483,7 @@ x3dom.gfx_webgl = (function () {
                 rt_tex._webgl = {};
                 rt_tex._webgl.fbo = x3dom.Utils.initFBO(gl,
                                     rt_tex._vf.dimensions[0], rt_tex._vf.dimensions[1], texType,
-                                    (texProp && texProp._vf.generateMipMaps), !rt_tex.requirePingPong());
+                                    (texProp && texProp._vf.generateMipMaps), rt_tex._vf.depthMap || !rt_tex.requirePingPong());
 
                 if (rt_tex.requirePingPong()) {
                     refinementPos = rt_tex._vf.dimensions[0] + "x" + rt_tex._vf.dimensions[1];
@@ -27182,8 +28466,19 @@ x3dom.getFieldValue = function(fieldName)
 {
     var x3dNode = this._x3domNode;
 
-    if (x3dNode && x3dNode._vf[fieldName]) {
-        return x3dNode._vf[fieldName].copy();
+    if (x3dNode && (x3dNode._vf[fieldName] !== undefined)) {
+
+        var fieldValue = x3dNode._vf[fieldName];
+
+        if(fieldValue instanceof Object && 'copy' in fieldValue)
+        {
+            return x3dNode._vf[fieldName].copy();
+        }
+        else
+        {
+            //f.i. SFString SFBool aren't objects
+            return x3dNode._vf[fieldName];
+        }
     }
 
     return null;
@@ -27199,7 +28494,7 @@ x3dom.getFieldValue = function(fieldName)
  */
 x3dom.setFieldValue = function(fieldName, fieldvalue) {
     var x3dNode = this._x3domNode;
-    if (x3dNode && x3dNode._vf[fieldName]) {
+    if (x3dNode && (x3dNode._vf[fieldName] !== undefined)) {
 
         // SF/MF object types are cloned based on a copy function
         if(fieldvalue instanceof Object && 'copy' in fieldvalue)
@@ -29136,7 +30431,7 @@ x3dom.registerNodeType(
 
                 // check if sub-graph can be culled away or render flag was set to false
                 planeMask = drawableCollection.cull(transform, this.graphState(), singlePath, planeMask);
-                if (planeMask <= 0) {
+                if (planeMask < 0) {
                     return;
                 }
 
@@ -29178,6 +30473,7 @@ x3dom.registerNodeType(
         }
     )
 );
+
 /** @namespace x3dom.nodeTypes */
 /*
  * X3DOM JavaScript Library
@@ -29259,7 +30555,7 @@ x3dom.registerNodeType(
                     this.invalidateCache();
 
                 if (this._vf.whichChoice < 0 || this._vf.whichChoice >= this._childNodes.length ||
-                    (planeMask = drawableCollection.cull(transform, this.graphState(), singlePath, planeMask)) <= 0) {
+                    (planeMask = drawableCollection.cull(transform, this.graphState(), singlePath, planeMask)) < 0) {
                     return;
                 }
 
@@ -29297,6 +30593,7 @@ x3dom.registerNodeType(
         }
     )
 );
+
 /** @namespace x3dom.nodeTypes */
 /*
  * X3DOM JavaScript Library
@@ -29847,7 +31144,7 @@ x3dom.registerNodeType(
 
                 // check if sub-graph can be culled away or render flag was set to false
                 planeMask = drawableCollection.cull(transform, this.graphState(), singlePath, planeMask);
-                if (planeMask <= 0) {
+                if (planeMask < 0) {
                     return;
                 }
 
@@ -29936,6 +31233,7 @@ x3dom.registerNodeType(
         }
     )
 );
+
 /** @namespace x3dom.nodeTypes */
 /*
  * X3DOM JavaScript Library
@@ -31104,7 +32402,7 @@ x3dom.registerNodeType(
             this.addField_SFBool(ctx, 'colorPerVertex', true);
 
             /**
-             * If normalPerVertex is FALSE, colours are applied to each face. If normalPerVertex is true, normals are applied to each vertex.
+             * If normalPerVertex is FALSE, normals are applied to each face. If normalPerVertex is true, normals are applied to each vertex.
              * @var {x3dom.fields.SFBool} normalPerVertex
              * @memberof x3dom.nodeTypes.X3DComposedGeometryNode
              * @initvalue true
@@ -31219,6 +32517,7 @@ x3dom.registerNodeType(
         }
     )
 );
+
 /** @namespace x3dom.nodeTypes */
 /*
  * X3DOM JavaScript Library
@@ -31463,7 +32762,8 @@ x3dom.registerNodeType(
         
         },
         {
-            nodeChanged: function()
+
+            _buildGeometry: function ()
             {
                 var time0 = new Date().getTime();
 
@@ -31477,7 +32777,7 @@ x3dom.registerNodeType(
                 // TODO; implement colorPerVertex also for single index
                 var colPerVert = this._vf.colorPerVertex;
 
-                if (colorInd.length > 0)
+                if (colorInd.length == indexes.length)
                 {
                     hasColorInd = true;
                 }
@@ -31520,6 +32820,12 @@ x3dom.registerNodeType(
 
                     for (i=0; i < indexes.length; ++i)
                     {
+                        //Ignore out of Range Indices
+                        if(indexes[i] > positions.length-1)
+                        {
+                            continue;
+                        }
+
                         if (indexes[i] === -1) {
                             t = 0;
                             continue;
@@ -31644,17 +32950,18 @@ x3dom.registerNodeType(
                 //x3dom.debug.logInfo("Mesh load time: " + time1 + " ms");
             },
 
+            nodeChanged: function()
+            {
+                this._buildGeometry();
+            },
+
             fieldChanged: function(fieldName)
             {
                 var pnts = null;
 
                 if (fieldName == "coord")
                 {
-                    pnts = this._cf.coord.node._vf.point;
-
-                    this._mesh._positions[0] = pnts.toGL();
-
-                    this.invalidateVolume();
+                    this._buildGeometry();
 
                     Array.forEach(this._parentNodes, function (node) {
                         node._dirty.positions = true;
@@ -31663,37 +32970,25 @@ x3dom.registerNodeType(
                 }
                 else if (fieldName == "color")
                 {
-                    pnts = this._cf.color.node._vf.color;
-
-                    this._mesh._colors[0] = pnts.toGL();
+                    this._buildGeometry();
 
                     Array.forEach(this._parentNodes, function (node) {
                         node._dirty.colors = true;
                     });
                 }
                 else if (fieldName == "coordIndex") {
-                    this._mesh._indices[0] = [];
-
-                    var indexes = this._vf.coordIndex;
-                    var p0, p1, t = 0;
-
-                    for (var i=0, n=indexes.length; i < n; ++i) {
-                        if (indexes[i] == -1) {
-                            t = 0;
-                        }
-                        else {
-                            switch (t) {
-                                case 0: p0 = +indexes[i]; t = 1; break;
-                                case 1: p1 = +indexes[i]; t = 2; this._mesh._indices[0].push(p0, p1); break;
-                                case 2: p0 = p1; p1 = +indexes[i]; this._mesh._indices[0].push(p0, p1); break;
-                            }
-                        }
-                    }
-
-                    this.invalidateVolume();
+                    this._buildGeometry();
 
                     Array.forEach(this._parentNodes, function (node) {
                         node._dirty.indexes = true;
+                        node.invalidateVolume();
+                    });
+                }
+                else if (fieldName == "colorIndex") {
+                    this._buildGeometry();
+
+                    Array.forEach(this._parentNodes, function (node) {
+                        node._dirty.colors = true;
                         node.invalidateVolume();
                     });
                 }
@@ -31751,7 +33046,7 @@ x3dom.registerNodeType(
 
                 this.handleAttribs();
 
-                var colPerVert = this._vf.colorPerVertex;
+                var colPerVert  = this._vf.colorPerVertex;
                 var normPerVert = this._vf.normalPerVertex;
 
                 var indexes = this._vf.index;
@@ -31824,7 +33119,8 @@ x3dom.registerNodeType(
                 }
                 posMax = positions.length;
 
-                if (!normPerVert || posMax > x3dom.Utils.maxIndexableCoords)
+                //resolve indices, if necessary
+                if (!normPerVert || !colPerVert || posMax > x3dom.Utils.maxIndexableCoords)
                 {
                     t = 0;
                     cnt = 0;
@@ -33044,7 +34340,7 @@ x3dom.registerNodeType(
 
         },
         {
-            nodeChanged: function()
+            _buildGeometry: function()
             {
                 var colPerVert = this._vf.colorPerVertex;
                 var normPerVert = this._vf.normalPerVertex;
@@ -33054,6 +34350,13 @@ x3dom.registerNodeType(
 
                 var coordNode = this._cf.coord.node;
                 x3dom.debug.assert(coordNode);
+
+                if(!coordNode || coordNode._vf.point.length < 3)
+                {
+                    this._vf.render = false;
+                    return;
+                }
+
                 positions = coordNode._vf.point;
 
                 var normalNode = this._cf.normal.node;
@@ -33163,18 +34466,19 @@ x3dom.registerNodeType(
                 this._mesh._numCoords = positions.length;
 
                 this.invalidateVolume();
+
+            },
+
+            nodeChanged: function()
+            {
+                this._buildGeometry();
             },
 
             fieldChanged: function(fieldName)
             {
-                var pnts = this._cf.coord.node._vf.point;
-
                 if (fieldName == "coord")
                 {
-                    this._mesh._positions[0] = pnts.toGL();
-
-                    // tells the mesh that its bbox requires update
-                    this.invalidateVolume();
+                    this._buildGeometry();
 
                     Array.forEach(this._parentNodes, function (node) {
                         node._dirty.positions = true;
@@ -33183,11 +34487,7 @@ x3dom.registerNodeType(
                 }
                 else if (fieldName == "color")
                 {
-                    pnts = this._cf.color.node._vf.color;
-
-                    if (this._vf.colorPerVertex) {
-                        this._mesh._colors[0] = pnts.toGL();
-                    }
+                    this._buildGeometry();
 
                     Array.forEach(this._parentNodes, function (node) {
                         node._dirty.colors = true;
@@ -33195,11 +34495,7 @@ x3dom.registerNodeType(
                 }
                 else if (fieldName == "normal")
                 {
-                    pnts = this._cf.normal.node._vf.vector;
-
-                    if (this._vf.normalPerVertex) {
-                        this._mesh._normals[0] = pnts.toGL();
-                    }
+                    this._buildGeometry();
 
                     Array.forEach(this._parentNodes, function (node) {
                         node._dirty.normals = true;
@@ -33207,15 +34503,7 @@ x3dom.registerNodeType(
                 }
                 else if (fieldName == "texCoord")
                 {
-                    var texCoordNode = this._cf.texCoord.node;
-                    if (x3dom.isa(texCoordNode, x3dom.nodeTypes.MultiTextureCoordinate)) {
-                        if (texCoordNode._cf.texCoord.nodes.length)
-                            texCoordNode = texCoordNode._cf.texCoord.nodes[0];
-                    }
-
-                    pnts = texCoordNode._vf.point;
-
-                    this._mesh._texCoords[0] = pnts.toGL();
+                    this._buildGeometry();
 
                     Array.forEach(this._parentNodes, function (node) {
                         node._dirty.texcoords = true;
@@ -34871,7 +36159,8 @@ x3dom.registerNodeType(
                 texture: true,
                 material: true,
                 text: true,
-                shader: true
+                shader: true,
+                ids: true
             };
 
             // FIXME; move somewhere else and allow generic values!!!
@@ -34879,6 +36168,7 @@ x3dom.registerNodeType(
             this._normalStrideOffset = [0, 0];
             this._texCoordStrideOffset = [0, 0];
             this._colorStrideOffset = [0, 0];
+            this._idStrideOffset = [0, 0];
 
             this._tessellationProperties = [];
         },
@@ -39689,6 +40979,14 @@ x3dom.registerNodeType(
             fieldChanged: function (fieldName)
             {
                 if (fieldName == "url") {
+
+                    //Remove the childs of the x3domNode
+                    for (var i=0; i<this._childNodes.length; i++)
+                    {
+                        this.removeChild(this._childNodes[i]);
+                    }
+
+                    //if reflected to DOM remove the childs of the domNode
                     if (this._vf.nameSpaceName.length != 0) {
                         var node = this._xmlNode;
                         if (node && node.hasChildNodes())
@@ -40739,7 +42037,133 @@ x3dom.registerNodeType(
                         return new x3dom.Parts(multiPart, selection, colorMap, emissiveMap, specularMap, visibilityMap);
                     }
                 };
+
+                this._xmlNode.getPartsByRect2 = function (left, right, bottom, top)
+                {
+                    var viewarea = multiPart._nameSpace.doc._viewarea;
+                    var viewpoint = viewarea._scene.getViewpoint();
+
+                    var origViewMatrix    = viewarea.getViewMatrix();
+                    var origProjMatrix = viewarea.getProjectionMatrix();
+
+                    var upDir   = new x3dom.fields.SFVec3f(origViewMatrix._10, origViewMatrix._11, origViewMatrix._12);
+                    var viewDir = new x3dom.fields.SFVec3f(origViewMatrix._20, origViewMatrix._21, origViewMatrix._22);
+
+                    var normalizedLeft   = (left   - viewarea._width  / 2) / (viewarea._width  / 2);
+                    var normalizedRight  = (right  - viewarea._width  / 2) / (viewarea._width  / 2);
+                    var normalizedTop    = (top    - viewarea._height / 2) / (viewarea._height / 2);
+                    var normalizedBottom = (bottom - viewarea._height / 2) / (viewarea._height / 2);
+
+                    var rectCenter = new x3dom.fields.SFVec3f( (right - left) / 2, (top - bottom) / 2, 0);
+
+
+
+                    var transformedCenter = x3dom.Utils.unproject(rectCenter,
+
+                                                                  origProjMatrix,
+                                                                  origViewMatrix,
+                                                                  new x3dom.fields.SFMatrix4f());
+
+                    var projMatrix = x3dom.fields.SFMatrix4f.perspectiveFrustum(normalizedLeft,
+                                                                                normalizedRight,
+                                                                                normalizedBottom,
+                                                                                normalizedTop,
+                                                                                viewpoint.getNear(),
+                                                                                viewpoint.getFar());
+
+                    var viewMatrix = x3dom.fields.SFMatrix4f.lookAt(transformedCenter,
+                                                                    transformedCenter.add(viewDir.multiply(5.0)),
+                                                                    upDir);
+
+
+
+                    var frustum =  new x3dom.fields.FrustumVolume( projMatrix.mult(viewMatrix) );
+
+                };
+
+                this._xmlNode.getPartsByRect = function (x1, y1, x2, y2)
+                {
+                    var viewarea = multiPart._nameSpace.doc._viewarea;
+                    var vp = viewarea._scene.getViewpoint();
+
+                    var mat_view = viewarea.getViewMatrix();
+                    var mat_proj = viewarea.getProjectionMatrix();
+
+                    var mat_viewInv = mat_view.inverse();
+                    var mat_projInv = mat_proj.inverse();
+
+                    x1 = ( x1 / viewarea._width  * 2.0 ) - 1.0;
+                    x2 = ( x2 / viewarea._width  * 2.0 ) - 1.0;
+                    y1 = ( y1 / viewarea._height * 2.0 ) - 1.0;
+                    y2 = ( y2 / viewarea._height * 2.0 ) - 1.0;
+
+                    var p0CS = new x3dom.fields.SFVec3f(x2, -y1, -1);
+                    var p1CS = new x3dom.fields.SFVec3f(x1, -y1, -1);
+                    var p2CS = new x3dom.fields.SFVec3f(x1, -y2, -1);
+                    var p3CS = new x3dom.fields.SFVec3f(x2, -y2, -1);
+
+                    var p0VS = mat_projInv.multMatrixPnt(p0CS);
+                    var p1VS = mat_projInv.multMatrixPnt(p1CS);
+                    var p2VS = mat_projInv.multMatrixPnt(p2CS);
+                    var p3VS = mat_projInv.multMatrixPnt(p3CS);
+
+                    var p0WS = mat_viewInv.multMatrixPnt(p0VS);
+                    var p1WS = mat_viewInv.multMatrixPnt(p1VS);
+                    var p2WS = mat_viewInv.multMatrixPnt(p2VS);
+                    var p3WS = mat_viewInv.multMatrixPnt(p3VS);
+
+                    console.log("-----------------------------------------------------------");
+                    console.log(p0WS);
+                    console.log(p1WS);
+                    console.log(p2WS);
+                    console.log(p3WS);
+
+                    var halfWidth  = p0WS.subtract(p1WS).length() * 0.5;
+                    var halfHeight = p1WS.subtract(p2WS).length() * 0.5;
+
+                    var nearPlaneWidth  = halfWidth  * vp.getNear();
+                    var nearPlaneHeight = halfHeight * vp.getNear();
+
+                    var mat_proj2 = x3dom.fields.SFMatrix4f.perspectiveFrustum(-nearPlaneWidth,
+                                                                                nearPlaneWidth,
+                                                                               -nearPlaneHeight,
+                                                                                nearPlaneHeight,
+                                                                                vp.getNear(),
+                                                                                vp.getFar());
+
+                    //console.log(halfWidth, halfHeight);
+
+                    var position = new x3dom.fields.SFVec3f(p1WS.x + halfWidth, p2WS.y + halfHeight, p1WS.z);
+
+                    //p0WS.z += 1;
+
+                    //mat_view.setTranslate(p0WS.negate());
+
+
+
+                    console.log("QUADPOS-----------------------------------------------------------");
+                    console.log(p0WS.x, p0WS.y, p0WS.z);
+
+                    //vp.setViewAbsolute(mat_view);
+                    vp.setProjectionMatrix(mat_proj2);
+
+                    console.log("CAMPOS-----------------------------------------------------------");
+                    console.log(mat_view._03, mat_view._13, mat_view._23);
+
+
+                    //vp.setProjectionMatrix(mat_proj);
+
+                    return p0WS.x + " " + p0WS.y + " " + p0WS.z + " " +
+                           p1WS.x + " " + p1WS.y + " " + p1WS.z + " " +
+                           p2WS.x + " " + p2WS.y + " " + p2WS.z + " " +
+                           p3WS.x + " " + p3WS.y + " " + p3WS.z;
+
+                    //return p1WS;
+
+                };
             },
+
+
 
             loadInline: function ()
             {
@@ -41367,7 +42791,7 @@ x3dom.registerNodeType(
              * The gamma correction to apply by default, see lighting and gamma tutorial
              * @var {x3dom.fields.SFString} gammaCorrectionDefault
              * @memberof x3dom.nodeTypes.Environment
-             * @initvalue "none"
+             * @initvalue "linear"
              * @field x3dom
              * @instance
              */
@@ -41956,7 +43380,7 @@ x3dom.registerNodeType(
                     mult(this._vf.orientation.toMatrix()).inverse();
 
 				//Reset navigation helpers of the viewarea
-                if(this._nameSpace.doc._viewarea) {
+                if (this._vf.isActive && this._nameSpace && this._nameSpace.doc._viewarea) {
                     this._nameSpace.doc._viewarea.resetNavHelpers();
                 }
             },
@@ -42205,7 +43629,7 @@ x3dom.registerNodeType(
                 this._viewMatrix = this._viewMatrix.mult(offset).inverse();
 				
 				//Reset navigation helpers of the viewarea
-                if(this._nameSpace.doc._viewarea) {
+                if (this._vf.isActive && this._nameSpace && this._nameSpace.doc._viewarea) {
                     this._nameSpace.doc._viewarea.resetNavHelpers();
                 }
             },
@@ -42708,7 +44132,7 @@ x3dom.registerNodeType(
                     this.invalidateCache();
 
                 planeMask = drawableCollection.cull(transform, this.graphState(), singlePath, planeMask);
-                if (planeMask <= 0) {
+                if (planeMask < 0) {
                     return;
                 }
 
@@ -42786,6 +44210,7 @@ x3dom.registerNodeType(
         }
     )
 );
+
 /** @namespace x3dom.nodeTypes */
 /*
  * X3DOM JavaScript Library
@@ -42875,7 +44300,7 @@ x3dom.registerNodeType(
                     this.invalidateCache();
 
                 planeMask = drawableCollection.cull(transform, this.graphState(), singlePath, planeMask);
-                if (planeMask <= 0) {
+                if (planeMask < 0) {
                     return;
                 }
 
@@ -42901,6 +44326,7 @@ x3dom.registerNodeType(
         }
     )
 );
+
 /** @namespace x3dom.nodeTypes */
 /*
  * X3DOM JavaScript Library
@@ -42961,7 +44387,7 @@ x3dom.registerNodeType(
                     this.invalidateCache();
 
                 planeMask = drawableCollection.cull(transform, this.graphState(), singlePath, planeMask);
-                if (planeMask <= 0) {
+                if (planeMask < 0) {
                     return;
                 }
 
@@ -42979,6 +44405,7 @@ x3dom.registerNodeType(
         }
     )
 );
+
 /** @namespace x3dom.nodeTypes */
 /*
  * X3DOM JavaScript Library
@@ -43425,15 +44852,16 @@ x3dom.registerNodeType(
             this.addField_SFBool(ctx, 'horizontal', true);
 
             /**
-             * Specifies where the text is anchored.
+             * Specifies where the text is anchored. The default of ["MIDDLE", "MIDDLE"] deviates from the ISO spec. default
+             * of ["BEGIN", "FIRST"] for backward compatibiliy reasons. 
              * @var {x3dom.fields.MFString} justify
              * @range ["BEGIN","END","FIRST","MIDDLE",""]
              * @memberof x3dom.nodeTypes.FontStyle
-             * @initvalue ['BEGIN']
+             * @initvalue ['MIDDLE', 'MIDDLE']
              * @field x3d
              * @instance
              */
-            this.addField_MFString(ctx, 'justify', ['BEGIN']);
+            this.addField_MFString(ctx, 'justify', ['MIDDLE', 'MIDDLE']);
 
             /**
              * The language field specifies the context of the language for the text string in the form of a language and a country in which that language is used.
@@ -43497,6 +44925,18 @@ x3dom.registerNodeType(
              * @instance
              */
             this.addField_SFBool(ctx, 'topToBottom', true);
+            
+            /**
+             * Sets the quality of the text rendering as an oversampling factor.
+             * @var {x3dom.fields.SFFloat} quality
+             * @range [0, inf]
+             * @memberof x3dom.nodeTypes.FontStyle
+             * @initvalue 2.0
+             * @field x3dom
+             * @instance
+             */
+            this.addField_SFFloat(ctx, 'quality', 2.0);
+
         
         },
         {
@@ -43505,7 +44945,9 @@ x3dom.registerNodeType(
                     fieldName == 'language' || fieldName == 'leftToRight' || fieldName == 'size' ||
                     fieldName == 'spacing' || fieldName == 'style' || fieldName == 'topToBottom') {
                     Array.forEach(this._parentNodes, function (node) {
-                        node.fieldChanged(fieldName);
+                        Array.forEach(node._parentNodes, function (textnode) {
+                            textnode.setAllDirty();
+                        });
                     });
                 }
             }
@@ -43520,6 +44962,7 @@ x3dom.nodeTypes.FontStyle.defaultNode = function() {
     }
     return x3dom.nodeTypes.FontStyle._defaultNode;
 };
+
 /** @namespace x3dom.nodeTypes */
 /*
  * X3DOM JavaScript Library
@@ -44813,6 +46256,17 @@ x3dom.registerNodeType(
              * @instance
              */
             this.addField_SFFloat(ctx, 'interpupillaryDistance', 0.064);
+            
+            /** 
+             * Determines if textures shall be treated as depth map.
+             * If it is TRUE, then the generated texture will also contain the depth buffer.
+             * @var {x3dom.fields.SFBool} depthMap
+             * @memberof x3dom.nodeTypes.RenderedTexture
+             * @initvalue false
+             * @field x3dom
+             * @instance
+             */
+            this.addField_SFBool(ctx, 'depthMap', false);
 
             /**
              * Very experimental field to change between DK1 and DK2.
@@ -44838,7 +46292,12 @@ x3dom.registerNodeType(
                 "RenderedTexture.dimensions requires at least 3 entries.");
             this._clearParents = true;
             this._needRenderUpdate = true;
-        
+            
+            this.checkDepthTextureSupport = function() {
+                if(this._vf.depthMap && x3dom.caps.DEPTH_TEXTURE === null)
+                    x3dom.debug.logWarning("RenderedTexture Node: depth texture extension not supported");
+            };
+            this.checkDepthTextureSupport();
         },
         {
             nodeChanged: function()
@@ -44860,6 +46319,10 @@ x3dom.registerNodeType(
                             this._needRenderUpdate = true;
                         }
                         break;
+                    case "depthMap":
+                        this.checkDepthTextureSupport();
+                        this._x3domTexture.updateTexture();
+                        this._needRenderUpdate = true;
                     default:
                         // TODO: dimensions
                         break;
@@ -45566,7 +47029,7 @@ x3dom.registerNodeType(
     "ImageTextureAtlas",
     "Texturing",
     defineClass(x3dom.nodeTypes.Texture,
-        
+
         /**
          * Constructor for ImageTextureAtlas
          * @constructs x3dom.nodeTypes.ImageTextureAtlas
@@ -45609,7 +47072,7 @@ x3dom.registerNodeType(
              * @instance
              */
             this.addField_SFInt32(ctx, 'slicesOverY', 0);
-        
+
         }
     )
 );
@@ -45742,7 +47205,7 @@ x3dom.registerNodeType(
              * @instance
              */
             this.addField_SFNode('right',  x3dom.nodeTypes.Texture);
-            this._type = "cubeMap";
+            this._type = "environmentMap";
         
         },
         {
@@ -46743,6 +48206,21 @@ x3dom.registerNodeType(
                 }
             },
 
+            getEnvironmentMap: function()
+            {
+                if(this._cf.environmentTexture.node) {
+                    if (x3dom.isa(this._cf.environmentTexture.node, x3dom.nodeTypes.SurfaceShaderTexture)) {
+                        this._cf.environmentTexture.node._cf.texture.node._type = "environmentMap";
+                        return this._cf.environmentTexture.node._cf.texture.node;
+                    } else {
+                        this._cf.environmentTexture.node._type = "environmentMap";
+                        return this._cf.environmentTexture.node;
+                    }
+                } else {
+                    return null;
+                }
+            },
+
             getNormalMap: function()
             {
                 if(this._cf.normalTexture.node) {
@@ -46924,6 +48402,9 @@ x3dom.registerNodeType(
                 var shin = this.getShininessMap();
                 if(shin) textures.push(shin);
 
+                var env = this.getEnvironmentMap();
+                if(env) textures.push(env);
+
                 var displacement = this.getDisplacementMap();
                 if(displacement) textures.push(displacement);
 
@@ -46943,6 +48424,16 @@ x3dom.registerNodeType(
                 if(multiVisibility) textures.push(multiVisibility);
 
                 return textures;
+            },
+
+            needTexcoords: function()
+            {
+
+               return ( this.getDiffuseMap()      || this.getNormalMap()    ||
+                        this.getSpecularMap()     || this.getShininessMap() ||
+                        this.getDisplacementMap() || this.getDiffuseDisplacementMap() ||
+                        this.getEnvironmentMap() ) ? true : false;
+
             }
         }
     )
@@ -49253,7 +50744,7 @@ x3dom.registerNodeType(
              * Multiple urls specify alternatives (if downloading fails).
              *
              * @var {x3dom.fields.MFString} url
-             * @memberof x3dom.nodeTypes.Geometry3D
+             * @memberof x3dom.nodeTypes.ExternalGeometry
              * @initvalue []
              * @field x3dom
              * @instance
@@ -49311,7 +50802,7 @@ x3dom.registerNodeType(
                 //post request
                 xhr = new XMLHttpRequest();
 
-                xhr.open("GET", this._vf['url'][this._currentURLIdx], true);
+                xhr.open("GET", shape._nameSpace.getURL(this._vf['url'][this._currentURLIdx]), true);
 
                 xhr.responseType = "arraybuffer";
 
@@ -49576,6 +51067,7 @@ x3dom.registerNodeType(
                                 x3domShortTypeID = "Id";
                                 shape._webgl.buffers[ID_BUFFER_IDX + bufferOffset] =
                                     viewIDsToGLBufferIDs[attributeView["bufferView"]];
+                                shape._cf.geometry.node._vf.idsPerVertex = true;
                                 break;
                         }
 
@@ -49593,6 +51085,8 @@ x3dom.registerNodeType(
 
 
                 //4. notify renderer
+
+                shape._dirty.shader = true;
 
                 shape._nameSpace.doc.needRender = true;
 
@@ -51336,7 +52830,7 @@ x3dom.registerNodeType(
         
         },
         {
-            nodeChanged: function()
+            _buildGeometry: function()
             {
                 var time0 = new Date().getTime();
 
@@ -51459,6 +52953,11 @@ x3dom.registerNodeType(
 
                         for (i=0; i < indexes.length; ++i)
                         {
+                            if(indexes[i] > positions.length-1)
+                            {
+                                continue;
+                            }
+
                             // Convert non-triangular polygons to a triangle fan
                             // (TODO: this assumes polygons are convex)
                             if (indexes[i] == -1) {
@@ -51716,18 +53215,35 @@ x3dom.registerNodeType(
 
                                 for (j = 0; j < multi_index_data.indices.length; j++)
                                 {
+                                    if(multi_index_data.indices[i] > positions.length-1)
+                                    {
+                                        continue;
+                                    }
+
+
                                     this._mesh._indices[0].push(cnt);
                                     cnt++;
 
                                     this._mesh._positions[0].push(multi_index_data.point[j].x,
                                         multi_index_data.point[j].y,
                                         multi_index_data.point[j].z);
+
                                     if (hasNormal) {
+                                        if(multi_index_data.indices[i] > normals.length-1)
+                                        {
+                                            continue;
+                                        }
+
                                         this._mesh._normals[0].push(multi_index_data.normals[j].x,
                                             multi_index_data.normals[j].y,
                                             multi_index_data.normals[j].z);
                                     }
                                     if (hasColor) {
+                                        if(multi_index_data.indices[i] > colors.length-1)
+                                        {
+                                            continue;
+                                        }
+
                                         this._mesh._colors[0].push(multi_index_data.colors[j].r,
                                             multi_index_data.colors[j].g,
                                             multi_index_data.colors[j].b);
@@ -51736,6 +53252,11 @@ x3dom.registerNodeType(
                                         }
                                     }
                                     if (hasTexCoord) {
+                                        if(multi_index_data.indices[i] > texCoords.length-1)
+                                        {
+                                            continue;
+                                        }
+
                                         this._mesh._texCoords[0].push(multi_index_data.texCoords[j].x,
                                             multi_index_data.texCoords[j].y);
                                         if (numTexComponents === 3) {
@@ -51872,6 +53393,11 @@ x3dom.registerNodeType(
                 //x3dom.debug.logInfo("Mesh load time: " + time1 + " ms");
             },
 
+            nodeChanged: function()
+            {
+                this._buildGeometry();
+            },
+
             fieldChanged: function(fieldName)
             {
                 if (fieldName != "coord" && fieldName != "normal" &&
@@ -51883,608 +53409,52 @@ x3dom.registerNodeType(
                     return;
                 }
 
-                var pnts = this._cf.coord.node._vf.point;
-                var n = pnts.length;
+                var needNormals = !this._cf.normal.node && this._vf.normalUpdateMode.toLowerCase() != 'none';
 
-                var texCoordNode = this._cf.texCoord.node;
-                if (x3dom.isa(texCoordNode, x3dom.nodeTypes.MultiTextureCoordinate)) {
-                    if (texCoordNode._cf.texCoord.nodes.length)
-                        texCoordNode = texCoordNode._cf.texCoord.nodes[0];
-                }
-
-                if (((this._vf.creaseAngle <= x3dom.fields.Eps) || (n > x3dom.Utils.maxIndexableCoords) ||
-                    (this._vf.normalIndex.length > 0 && this._cf.normal.node) ||
-                    (this._vf.texCoordIndex.length > 0 && texCoordNode) ||
-                    (this._vf.colorIndex.length > 0 && this._cf.color.node)) && this._mesh._multiIndIndices)
+                if (fieldName == "coord")
                 {
-                    var needNormals = !this._cf.normal.node && this._vf.normalUpdateMode.toLowerCase() != 'none';
-
-                    n = this._mesh._multiIndIndices.length;
-
-                    this._mesh._positions[0] = [];
-                    this._mesh._indices[0] =[];
-
-                    // special coordinate interpolator handler
-                    if (fieldName == "coord" && n)
-                    {
-                        if (needNormals) {
-                            this._mesh._normals[0] = [];
-                        }
-
-                        for (i=0; i<n; i+=3) {
-                            var ind0 = this._mesh._multiIndIndices[i  ];
-                            var ind1 = this._mesh._multiIndIndices[i+1];
-                            var ind2 = this._mesh._multiIndIndices[i+2];
-
-                            var pos0 = pnts[ind0];
-                            var pos1 = pnts[ind1];
-                            var pos2 = pnts[ind2];
-
-                            this._mesh._positions[0].push(pos0.x, pos0.y, pos0.z);
-                            this._mesh._positions[0].push(pos1.x, pos1.y, pos1.z);
-                            this._mesh._positions[0].push(pos2.x, pos2.y, pos2.z);
-
-                            if (needNormals) {
-                                var a = pos0.subtract(pos1);
-                                var b = pos1.subtract(pos2);
-
-                                var norm = a.cross(b).normalize();
-                                if (!this._vf.ccw)
-                                    norm = norm.negate();
-
-                                this._mesh._normals[0].push(norm.x, norm.y, norm.z);
-                                this._mesh._normals[0].push(norm.x, norm.y, norm.z);
-                                this._mesh._normals[0].push(norm.x, norm.y, norm.z);
-                            }
-                        }
-
-                        this.invalidateVolume();
-
-                        Array.forEach(this._parentNodes, function (node) {
-                            node._dirty.positions = true;
-                            if (needNormals)
-                                node._dirty.normals = true;
-                        });
-
-                        return;
-                    }
-
-                    // TODO; optimize this very slow and brute force code, at least for creaseAngle=0 case!
-                    this._mesh._normals[0] = [];
-                    this._mesh._texCoords[0] =[];
-                    this._mesh._colors[0] = [];
-
-                    var indexes = this._vf.coordIndex;
-                    var normalInd = this._vf.normalIndex;
-                    var texCoordInd = this._vf.texCoordIndex;
-                    var colorInd = this._vf.colorIndex;
-                    var hasNormal = false, hasNormalInd = false;
-                    var hasTexCoord = false, hasTexCoordInd = false;
-                    var hasColor = false, hasColorInd = false;
-
-                    var colPerVert = this._vf.colorPerVertex;
-                    var normPerVert = this._vf.normalPerVertex;
-
-                    if (normalInd.length > 0)
-                    {
-                        hasNormalInd = true;
-                    }
-                    if (texCoordInd.length > 0)
-                    {
-                        hasTexCoordInd = true;
-                    }
-                    if (colorInd.length > 0)
-                    {
-                        hasColorInd = true;
-                    }
-
-                    var positions, normals, texCoords, colors;
-
-                    var coordNode = this._cf.coord.node;
-                    x3dom.debug.assert(coordNode);
-                    positions = coordNode.getPoints();
-
-                    var normalNode = this._cf.normal.node;
-                    if (normalNode)
-                    {
-                        hasNormal = true;
-                        normals = normalNode._vf.vector;
-                    }
-                    else {
-                        hasNormal = false;
-                    }
-
-                    var texMode = "", numTexComponents = 2;
-                    texCoordNode = this._cf.texCoord.node;
-                    if (x3dom.isa(texCoordNode, x3dom.nodeTypes.MultiTextureCoordinate)) {
-                        if (texCoordNode._cf.texCoord.nodes.length)
-                            texCoordNode = texCoordNode._cf.texCoord.nodes[0];
-                    }
-                    if (texCoordNode)
-                    {
-                        if (texCoordNode._vf.point) {
-                            hasTexCoord = true;
-                            texCoords = texCoordNode._vf.point;
-
-                            if (x3dom.isa(texCoordNode, x3dom.nodeTypes.TextureCoordinate3D)) {
-                                numTexComponents = 3;
-                            }
-                        }
-                        else if (texCoordNode._vf.mode) {
-                            texMode = texCoordNode._vf.mode;
-                        }
-                    }
-                    else {
-                        hasTexCoord = false;
-                    }
-                    this._mesh._numTexComponents = numTexComponents;
-
-                    var numColComponents = 3;
-                    var colorNode = this._cf.color.node;
-                    if (colorNode)
-                    {
-                        hasColor = true;
-                        colors = colorNode._vf.color;
-
-                        if (x3dom.isa(colorNode, x3dom.nodeTypes.ColorRGBA)) {
-                            numColComponents = 4;
-                        }
-                    }
-                    else {
-                        hasColor = false;
-                    }
-                    this._mesh._numColComponents = numColComponents;
-
-                    var i, j, t, cnt, faceCnt;
-                    var p0, p1, p2, n0, n1, n2, t0, t1, t2, c0, c1, c2;
-
-                    if(this._vf.convex) {
-                        t = 0;
-                        cnt = 0;
-                        faceCnt = 0;
-                        this._mesh._multiIndIndices = [];
-                        this._mesh._posSize = positions.length;
-
-                        for (i=0; i < indexes.length; ++i)
-                        {
-                            if (indexes[i] == -1) {
-                                t = 0;
-                                faceCnt++;
-                                continue;
-                            }
-
-                            if (hasNormalInd) {
-                                x3dom.debug.assert(normalInd[i] != -1);
-                            }
-                            if (hasTexCoordInd) {
-                                x3dom.debug.assert(texCoordInd[i] != -1);
-                            }
-                            if (hasColorInd) {
-                                x3dom.debug.assert(colorInd[i] != -1);
-                            }
-
-                            switch (t)
-                            {
-                                case 0:
-                                    p0 = +indexes[i];
-                                    if (hasNormalInd && normPerVert) { n0 = +normalInd[i]; }
-                                    else if (hasNormalInd && !normPerVert) { n0 = +normalInd[faceCnt]; }
-                                    else if (normPerVert) { n0 = p0; }
-                                    else { n0 = faceCnt; }
-
-                                    if (hasTexCoordInd) { t0 = +texCoordInd[i]; }
-                                    else { t0 = p0; }
-                                    if (hasColorInd && colPerVert) { c0 = +colorInd[i]; }
-                                    else if (hasColorInd && !colPerVert) { c0 = +colorInd[faceCnt]; }
-                                    else if (colPerVert) { c0 = p0; }
-                                    else { c0 = faceCnt; }
-                                    t = 1;
-                                    break;
-                                case 1:
-                                    p1 = +indexes[i];
-                                    if (hasNormalInd && normPerVert) { n1 = +normalInd[i]; }
-                                    else if (hasNormalInd && !normPerVert) { n1 = +normalInd[faceCnt]; }
-                                    else if (normPerVert) { n1 = p1; }
-                                    else { n1 = faceCnt; }
-
-                                    if (hasTexCoordInd) { t1 = +texCoordInd[i]; }
-                                    else { t1 = p1; }
-                                    if (hasColorInd && colPerVert) { c1 = +colorInd[i]; }
-                                    else if (hasColorInd && !colPerVert) { c1 = +colorInd[faceCnt]; }
-                                    else if (colPerVert) { c1 = p1; }
-                                    else { c1 = faceCnt; }
-                                    t = 2;
-                                    break;
-                                case 2:
-                                    p2 = +indexes[i];
-                                    if (hasNormalInd && normPerVert) { n2 = +normalInd[i]; }
-                                    else if (hasNormalInd && !normPerVert) { n2 = +normalInd[faceCnt]; }
-                                    else if (normPerVert) { n2 = p2; }
-                                    else { n2 = faceCnt; }
-
-                                    if (hasTexCoordInd) { t2 = +texCoordInd[i]; }
-                                    else { t2 = p2; }
-                                    if (hasColorInd && colPerVert) { c2 = +colorInd[i]; }
-                                    else if (hasColorInd && !colPerVert) { c2 = +colorInd[faceCnt]; }
-                                    else if (colPerVert) { c2 = p2; }
-                                    else { c2 = faceCnt; }
-                                    t = 3;
-
-                                    //this._mesh._indices[0].push(cnt++, cnt++, cnt++);
-
-                                    this._mesh._positions[0].push(positions[p0].x);
-                                    this._mesh._positions[0].push(positions[p0].y);
-                                    this._mesh._positions[0].push(positions[p0].z);
-                                    this._mesh._positions[0].push(positions[p1].x);
-                                    this._mesh._positions[0].push(positions[p1].y);
-                                    this._mesh._positions[0].push(positions[p1].z);
-                                    this._mesh._positions[0].push(positions[p2].x);
-                                    this._mesh._positions[0].push(positions[p2].y);
-                                    this._mesh._positions[0].push(positions[p2].z);
-
-                                    if (hasNormal) {
-                                        this._mesh._normals[0].push(normals[n0].x);
-                                        this._mesh._normals[0].push(normals[n0].y);
-                                        this._mesh._normals[0].push(normals[n0].z);
-                                        this._mesh._normals[0].push(normals[n1].x);
-                                        this._mesh._normals[0].push(normals[n1].y);
-                                        this._mesh._normals[0].push(normals[n1].z);
-                                        this._mesh._normals[0].push(normals[n2].x);
-                                        this._mesh._normals[0].push(normals[n2].y);
-                                        this._mesh._normals[0].push(normals[n2].z);
-                                    }
-                                    //else {
-                                    this._mesh._multiIndIndices.push(p0, p1, p2);
-                                    //}
-
-                                    if (hasColor) {
-                                        this._mesh._colors[0].push(colors[c0].r);
-                                        this._mesh._colors[0].push(colors[c0].g);
-                                        this._mesh._colors[0].push(colors[c0].b);
-                                        if (numColComponents === 4) {
-                                            this._mesh._colors[0].push(colors[c0].a);
-                                        }
-                                        this._mesh._colors[0].push(colors[c1].r);
-                                        this._mesh._colors[0].push(colors[c1].g);
-                                        this._mesh._colors[0].push(colors[c1].b);
-                                        if (numColComponents === 4) {
-                                            this._mesh._colors[0].push(colors[c1].a);
-                                        }
-                                        this._mesh._colors[0].push(colors[c2].r);
-                                        this._mesh._colors[0].push(colors[c2].g);
-                                        this._mesh._colors[0].push(colors[c2].b);
-                                        if (numColComponents === 4) {
-                                            this._mesh._colors[0].push(colors[c2].a);
-                                        }
-                                    }
-
-                                    if (hasTexCoord) {
-                                        this._mesh._texCoords[0].push(texCoords[t0].x);
-                                        this._mesh._texCoords[0].push(texCoords[t0].y);
-                                        if (numTexComponents === 3) {
-                                            this._mesh._texCoords[0].push(texCoords[t0].z);
-                                        }
-                                        this._mesh._texCoords[0].push(texCoords[t1].x);
-                                        this._mesh._texCoords[0].push(texCoords[t1].y);
-                                        if (numTexComponents === 3) {
-                                            this._mesh._texCoords[0].push(texCoords[t1].z);
-                                        }
-                                        this._mesh._texCoords[0].push(texCoords[t2].x);
-                                        this._mesh._texCoords[0].push(texCoords[t2].y);
-                                        if (numTexComponents === 3) {
-                                            this._mesh._texCoords[0].push(texCoords[t2].z);
-                                        }
-                                    }
-
-                                    //faceCnt++;
-                                    break;
-                                case 3:
-                                    p1 = p2;
-                                    t1 = t2;
-                                    if (normPerVert) {
-                                        n1 = n2;
-                                    }
-                                    if (colPerVert) {
-                                        c1 = c2;
-                                    }
-                                    p2 = +indexes[i];
-
-                                    if (hasNormalInd && normPerVert) {
-                                        n2 = +normalInd[i];
-                                    } else if (hasNormalInd && !normPerVert) {
-                                        /*n2 = +normalInd[faceCnt];*/
-                                    } else if (normPerVert) {
-                                        n2 = p2;
-                                    } else {
-                                        n2 = faceCnt;
-                                    }
-
-                                    if (hasTexCoordInd) {
-                                        t2 = +texCoordInd[i];
-                                    } else {
-                                        t2 = p2;
-                                    }
-
-                                    if (hasColorInd && colPerVert) {
-                                        c2 = +colorInd[i];
-                                    } else if (hasColorInd && !colPerVert) {
-                                        /*c2 = +colorInd[faceCnt];*/
-                                    } else if (colPerVert) {
-                                        c2 = p2;
-                                    } else {
-                                        c2 = faceCnt;
-                                    }
-
-                                    //this._mesh._indices[0].push(cnt++, cnt++, cnt++);
-
-                                    this._mesh._positions[0].push(positions[p0].x);
-                                    this._mesh._positions[0].push(positions[p0].y);
-                                    this._mesh._positions[0].push(positions[p0].z);
-                                    this._mesh._positions[0].push(positions[p1].x);
-                                    this._mesh._positions[0].push(positions[p1].y);
-                                    this._mesh._positions[0].push(positions[p1].z);
-                                    this._mesh._positions[0].push(positions[p2].x);
-                                    this._mesh._positions[0].push(positions[p2].y);
-                                    this._mesh._positions[0].push(positions[p2].z);
-
-                                    if (hasNormal) {
-                                        this._mesh._normals[0].push(normals[n0].x);
-                                        this._mesh._normals[0].push(normals[n0].y);
-                                        this._mesh._normals[0].push(normals[n0].z);
-                                        this._mesh._normals[0].push(normals[n1].x);
-                                        this._mesh._normals[0].push(normals[n1].y);
-                                        this._mesh._normals[0].push(normals[n1].z);
-                                        this._mesh._normals[0].push(normals[n2].x);
-                                        this._mesh._normals[0].push(normals[n2].y);
-                                        this._mesh._normals[0].push(normals[n2].z);
-                                    }
-                                    //else {
-                                    this._mesh._multiIndIndices.push(p0, p1, p2);
-                                    //}
-
-                                    if (hasColor) {
-                                        this._mesh._colors[0].push(colors[c0].r);
-                                        this._mesh._colors[0].push(colors[c0].g);
-                                        this._mesh._colors[0].push(colors[c0].b);
-                                        if (numColComponents === 4) {
-                                            this._mesh._colors[0].push(colors[c0].a);
-                                        }
-                                        this._mesh._colors[0].push(colors[c1].r);
-                                        this._mesh._colors[0].push(colors[c1].g);
-                                        this._mesh._colors[0].push(colors[c1].b);
-                                        if (numColComponents === 4) {
-                                            this._mesh._colors[0].push(colors[c1].a);
-                                        }
-                                        this._mesh._colors[0].push(colors[c2].r);
-                                        this._mesh._colors[0].push(colors[c2].g);
-                                        this._mesh._colors[0].push(colors[c2].b);
-                                        if (numColComponents === 4) {
-                                            this._mesh._colors[0].push(colors[c2].a);
-                                        }
-                                    }
-
-                                    if (hasTexCoord) {
-                                        this._mesh._texCoords[0].push(texCoords[t0].x);
-                                        this._mesh._texCoords[0].push(texCoords[t0].y);
-                                        if (numTexComponents === 3) {
-                                            this._mesh._texCoords[0].push(texCoords[t0].z);
-                                        }
-                                        this._mesh._texCoords[0].push(texCoords[t1].x);
-                                        this._mesh._texCoords[0].push(texCoords[t1].y);
-                                        if (numTexComponents === 3) {
-                                            this._mesh._texCoords[0].push(texCoords[t1].z);
-                                        }
-                                        this._mesh._texCoords[0].push(texCoords[t2].x);
-                                        this._mesh._texCoords[0].push(texCoords[t2].y);
-                                        if (numTexComponents === 3) {
-                                            this._mesh._texCoords[0].push(texCoords[t2].z);
-                                        }
-                                    }
-
-                                    //faceCnt++;
-                                    break;
-                                default:
-                            }
-                        }
-                    }
-                    else {
-                        var linklist = new x3dom.DoublyLinkedList();
-                        var data = {};
-                        cnt = 0; faceCnt = 0;
-
-                        for (i = 0; i < indexes.length; ++i)
-                        {
-                            if (indexes[i] == -1) {
-                                var multi_index_data = x3dom.EarClipping.getMultiIndexes(linklist);
-
-                                for (j = 0; j < multi_index_data.indices.length; j++)
-                                {
-                                    this._mesh._indices[0].push(cnt);
-                                    cnt++;
-
-                                    this._mesh._positions[0].push(multi_index_data.point[j].x,
-                                        multi_index_data.point[j].y,
-                                        multi_index_data.point[j].z);
-                                    if (hasNormal) {
-                                        this._mesh._normals[0].push(multi_index_data.normals[j].x,
-                                            multi_index_data.normals[j].y,
-                                            multi_index_data.normals[j].z);
-                                    }
-                                    if (hasColor) {
-                                        this._mesh._colors[0].push(multi_index_data.colors[j].r,
-                                            multi_index_data.colors[j].g,
-                                            multi_index_data.colors[j].b);
-                                        if (numColComponents === 4) {
-                                            this._mesh._colors[0].push(multi_index_data.colors[j].a);
-                                        }
-                                    }
-                                    if (hasTexCoord) {
-                                        this._mesh._texCoords[0].push(multi_index_data.texCoords[j].x,
-                                            multi_index_data.texCoords[j].y);
-                                        if (numTexComponents === 3) {
-                                            this._mesh._texCoords[0].push(multi_index_data.texCoords[j].z);
-                                        }
-                                    }
-                                }
-
-                                linklist = new x3dom.DoublyLinkedList();
-                                faceCnt++;
-                                continue;
-                            }
-
-                            if (hasNormal) {
-                                if (hasNormalInd && normPerVert) {
-                                    data.normals =  normals[normalInd[i]];
-                                } else if (hasNormalInd && !normPerVert) {
-                                    data.normals =  normals[normalInd[faceCnt]];
-                                } else {
-                                    data.normals =  normals[indexes[i]];
-                                }
-                            }
-
-                            if (hasColor) {
-                                if (hasColorInd && colPerVert) {
-                                    data.colors =  colors[colorInd[i]];
-                                } else if (hasColorInd && !colPerVert) {
-                                    data.colors =  colors[colorInd[faceCnt]];
-                                } else {
-                                    data.colors =  colors[indexes[i]];
-                                }
-                            }
-                            if (hasTexCoord) {
-                                if (hasTexCoordInd) {
-                                    data.texCoords =  texCoords[texCoordInd[i]];
-                                } else {
-                                    data.texCoords =  texCoords[indexes[i]];
-                                }
-                            }
-
-                            linklist.appendNode(new x3dom.DoublyLinkedList.ListNode(
-                                positions[indexes[i]], indexes[i], data.normals, data.colors, data.texCoords));
-                        }
-
-                        this._mesh.splitMesh();
-                    }
-
-                    if (!hasNormal) {
-                        this._mesh.calcNormals(this._vf.creaseAngle, this._vf.ccw);
-                    }
-                    if (!hasTexCoord) {
-                        this._mesh.calcTexCoords(texMode);
-                    }
-
-                    this.invalidateVolume();
-
-                    this._mesh._numFaces = 0;
-                    this._mesh._numCoords = 0;
-
-                    for (i=0; i<this._mesh._positions.length; i++) {
-                        var indexLength = this._mesh._indices[i].length;
-                        var numCoords = this._mesh._positions[i].length / 3;
-                        this._mesh._numCoords += numCoords;
-                        if (indexLength > 0)
-                            this._mesh._numFaces += indexLength / 3;
-                        else
-                            this._mesh._numFaces += numCoords / 3;
-                    }
+                    this._buildGeometry();
 
                     Array.forEach(this._parentNodes, function (node) {
-                        node.setGeoDirty();
+                        node._dirty.positions = true;
+                        if (needNormals) { node._dirty.normals = true; }
+
                     });
                 }
-                else {
-                    if (fieldName == "coord")
-                    {
-                        var needNormals = !this._cf.normal.node && this._vf.normalUpdateMode.toLowerCase() != 'none';
+                else if (fieldName == "color")
+                {
+                    this._buildGeometry();
 
-                        this._mesh._positions[0] = pnts.toGL();
-
-                        if (needNormals) {
-                            // position update usually also requires update of vertex normals
-                            this._mesh.calcNormals(this._vf.creaseAngle, this._vf.ccw);
-                        }
-
-                        // tells the mesh that its bbox requires update
-                        this.invalidateVolume();
-
-                        Array.forEach(this._parentNodes, function (node) {
-                            node._dirty.positions = true;
-                            if (needNormals)
-                                node._dirty.normals = true;
-                            node.invalidateVolume();
-                        });
-                    }
-                    else if (fieldName == "color")
-                    {
-                        pnts = this._cf.color.node._vf.color;
-
-                        this._mesh._colors[0] = pnts.toGL();
-
-                        Array.forEach(this._parentNodes, function (node) {
-                            node._dirty.colors = true;
-                        });
-                    }
-                    else if (fieldName == "normal")
-                    {
-                        pnts = this._cf.normal.node._vf.vector;
-
-                        this._mesh._normals[0] = pnts.toGL();
-
-                        Array.forEach(this._parentNodes, function (node) {
-                            node._dirty.normals = true;
-                        });
-                    }
-                    else if (fieldName == "texCoord")
-                    {
-                        texCoordNode = this._cf.texCoord.node;
-                        if (x3dom.isa(texCoordNode, x3dom.nodeTypes.MultiTextureCoordinate)) {
-                            if (texCoordNode._cf.texCoord.nodes.length)
-                                texCoordNode = texCoordNode._cf.texCoord.nodes[0];
-                        }
-                        pnts = texCoordNode._vf.point;
-
-                        this._mesh._texCoords[0] = pnts.toGL();
-
-                        Array.forEach(this._parentNodes, function (node) {
-                            node._dirty.texcoords = true;
-                        });
-                    }
-                    else if (fieldName == "coordIndex")
-                    {
-                        needNormals = !this._cf.normal.node && this._vf.normalUpdateMode.toLowerCase() != 'none';
-
-                        indexes = this._vf.coordIndex;
-                        t = 0;
-                        n = indexes.length;
-
-                        this._mesh._indices[0] = [];
-
-                        for (i = 0; i < n; ++i) {
-                            if (indexes[i] == -1) {
-                                t = 0;
-                            }
-                            else {
-                                switch (t) {
-                                    case 0: p0 = +indexes[i]; t = 1; break;
-                                    case 1: p1 = +indexes[i]; t = 2; break;
-                                    case 2: p2 = +indexes[i]; t = 3; this._mesh._indices[0].push(p0, p1, p2); break;
-                                    case 3: p1 = p2; p2 = +indexes[i]; this._mesh._indices[0].push(p0, p1, p2); break;
-                                }
-                            }
-                        }
-
-                        if (needNormals) {
-                            // index update usually also requires update of vertex normals
-                            this._mesh.calcNormals(this._vf.creaseAngle, this._vf.ccw);
-                        }
-
-                        Array.forEach(this._parentNodes, function (node) {
-                            node._dirty.indexes = true;
-                            if (needNormals)
-                                node._dirty.normals = true;
-                        });
-                    }
+                    Array.forEach(this._parentNodes, function (node) {
+                        node._dirty.colors = true;
+                    });
                 }
+                else if (fieldName == "normal")
+                {
+                    this._buildGeometry();
+
+                    Array.forEach(this._parentNodes, function (node) {
+                        node._dirty.normals = true;
+                    });
+                }
+                else if (fieldName == "texCoord")
+                {
+                    this._buildGeometry();
+
+                    Array.forEach(this._parentNodes, function (node) {
+                        node._dirty.texcoords = true;
+                    });
+                }
+                else if (fieldName == "coordIndex")
+                {
+                    this._buildGeometry();
+
+                    Array.forEach(this._parentNodes, function (node) {
+                        node._dirty.indexes = true;
+                        if (needNormals) { node._dirty.normals = true; }
+                    });
+                }
+
             }
         }
     )
@@ -54624,6 +55594,15 @@ x3dom.registerNodeType(
         function (ctx) {
             x3dom.nodeTypes.GeoElevationGrid.superClass.call(this, ctx);
 
+            /**
+            * The texCoord field specifies per-vertex texture coordinates for the GeoElevationGrid node. If texCoord is NULL, default texture coordinates are applied to the geometry.
+            * @var {x3dom.fields.SFNode} texCoord
+            * @memberof x3dom.nodeTypes.GeoElevationGrid
+            * @initvalue x3dom.nodeTypes.X3DTextureCoordinateNode
+            * @field x3d
+            * @instance
+            */
+            this.addField_SFNode('texCoord', x3dom.nodeTypes.X3DTextureCoordinateNode);
 
             /**
              * The geoSystem field is used to define the spatial reference frame.
@@ -54644,7 +55623,7 @@ x3dom.registerNodeType(
              * @field x3d
              * @instance
              */
-            this.addField_SFVec3d(ctx, 'geoGridOrigin', 0, 0, 0);
+            this.addField_SFVec3f(ctx, 'geoGridOrigin', 0, 0, 0);
 
             /**
              * The height array contains xDimension × zDimension floating point values that represent elevation above the ellipsoid or the geoid, as appropriate.
@@ -54792,15 +55771,37 @@ x3dom.registerNodeType(
                 // coords, texture coords
                 var delta_x = 1 / (xDimension-1);
                 var delta_z = 1 / (zDimension-1);
+                
+                //from elevationgrid.js
+                var numTexComponents = 2;
 
+                var texCoordNode = this._cf.texCoord.node;
+                var texPoints;
+                if (x3dom.isa(texCoordNode, x3dom.nodeTypes.MultiTextureCoordinate)) {
+                    if (texCoordNode._cf.texCoord.nodes.length)
+                        texCoordNode = texCoordNode._cf.texCoord.nodes[0];
+                }
+
+                if (texCoordNode) {
+                    if (texCoordNode._vf.point) {
+                        texPoints = texCoordNode._vf.point;
+                        if (x3dom.isa(texCoordNode, x3dom.nodeTypes.TextureCoordinate3D)) {
+                            numTexComponents = 3;
+                        }
+                    }
+                }
+                
                 var positions = new x3dom.fields.MFVec3f();
+                        
                 var texCoords = new x3dom.fields.MFVec2f();
-
+                        
                 for(var z=0; z<zDimension; ++z)
                     for(var x=0; x<xDimension; ++x)
                     {
                         // texture coord
-                        var tex_coord = new x3dom.fields.SFVec2f(x*delta_x, z*delta_z);
+                        var tex_coord = new x3dom.fields.SFVec2f();
+                        tex_coord.x = x*delta_x;
+                        tex_coord.y = z*delta_z;
                         texCoords.push(tex_coord);
 
                         // coord
@@ -54818,7 +55819,6 @@ x3dom.registerNodeType(
                         }
                         coord.z = height[(z*xDimension)+x] * yScale;
                         coord = coord.add(geoGridOrigin);
-
                         positions.push(coord);
                     }
 
@@ -54868,11 +55868,16 @@ x3dom.registerNodeType(
                     (function (){
                         var indicesFlat   = new x3dom.fields.MFInt32(),
                             positionsFlat = new x3dom.fields.MFVec3f(),
-                            texCoordsFlat = new x3dom.fields.MFVec3f();
+                            texCoordsFlat = new x3dom.fields.MFVec2f(); //typo? was 3f
 
-                        that.generateNonIndexedTriangleData(indices, transformed, null, texCoords, null,
+                        if (texPoints) {
+                            that.generateNonIndexedTriangleData(indices, transformed, null, texPoints, null,
                             positionsFlat, null, texCoordsFlat, null);
-
+                        }
+                        else {
+                            that.generateNonIndexedTriangleData(indices, transformed, null, texCoords, null,
+                            positionsFlat, null, texCoordsFlat, null);
+                        }
                         for (var i = 0; i < positionsFlat.length; ++i) {
                             indicesFlat.push(i);
                         }
@@ -54880,6 +55885,7 @@ x3dom.registerNodeType(
                         that._mesh._indices[0]   = indicesFlat.toGL();
                         that._mesh._positions[0] = positionsFlat.toGL();
                         that._mesh._texCoords[0] = texCoordsFlat.toGL();
+                        that._mesh._numTexComponents = 2; //3 not yet generated
                     })();
 
                     this._mesh.calcNormals(0);
@@ -54888,8 +55894,9 @@ x3dom.registerNodeType(
                 else {
                     this._mesh._indices[0]   = indices.toGL();
                     this._mesh._positions[0] = transformed.toGL();
-                    this._mesh._texCoords[0] = texCoords.toGL();
-
+                    if (texPoints)  {this._mesh._texCoords[0] = texPoints.toGL();}
+                    else            {this._mesh._texCoords[0] = texCoords.toGL();}
+                    this._mesh._numTexComponents = numTexComponents;
                     this._mesh.calcNormals(Math.PI);
                 }
 
@@ -54942,9 +55949,9 @@ x3dom.registerNodeType(
                             t1 = new x3dom.fields.SFVec2f(),
                             t2 = new x3dom.fields.SFVec2f();
 
-                        t0.setValues(texCoords[i0]);
+                        t0.setValues(texCoords[i0]);//ignores .z if 3d
                         t1.setValues(texCoords[i1]);
-                        t1.setValues(texCoords[i2]);
+                        t2.setValues(texCoords[i2]); //typo? was t1
 
                         newTexCoords.push(t0);
                         newTexCoords.push(t1);
@@ -55660,6 +56667,7 @@ x3dom.registerNodeType(
  * http://www.x3dom.org
  *
  * (C)2009 Fraunhofer IGD, Darmstadt, Germany
+ * (C)2015 Andreas Plesch, Waltham, MA, U.S.A.
  * Dual licensed under the MIT and GPL
  */
 
@@ -55667,7 +56675,7 @@ x3dom.registerNodeType(
 x3dom.registerNodeType(
     "GeoTransform",
     "Geospatial",
-    defineClass(x3dom.nodeTypes.X3DGroupingNode,
+    defineClass(x3dom.nodeTypes.X3DTransformNode, //should be X3DGroupingNode but more convenient
         
         /**
          * Constructor for GeoTransform
@@ -55743,7 +56751,7 @@ x3dom.registerNodeType(
              * @field x3d
              * @instance
              */
-            this.addField_SFNode('geoOrigin', x3dom.nodeTypes.Transform);
+            this.addField_SFNode('geoOrigin', x3dom.nodeTypes.GeoOrigin);
 
             /**
              * The geoSystem field is used to define the spatial reference frame.
@@ -55755,10 +56763,106 @@ x3dom.registerNodeType(
              * @instance
              */
             this.addField_MFString(ctx, 'geoSystem', ['GD', 'WE']);
-        
+            
+             /**
+            * The globalGeoOrigin field specifies whether a GeoOrigin should be applied to child nodes.
+            * The default is false which means that GeoOrigin nodes are expected to have been provided to child nodes.
+            * A true value means that GeoOrigin nodes are expected to have been omitted from child nodes. In this case,
+            * the GeoOrigin of the GeoTransform is applied to the child nodes as if GeoOrigin nodes had been provided to child nodes.
+            * A true value in combination with provided GeoOrigin in child nodes leads to undefined behaviour.
+            * @var {x3dom.fields.SFBool} globalGeoOrigin
+            * @memberof x3dom.nodeTypes.GeoTransform
+            * @initvalue false
+            * @field x3dom
+            * @instance
+            */
+            this.addField_SFBool(ctx, 'globalGeoOrigin', false);
+        },
+        {
+            nodeChanged: function ()
+            {
+                this._trafo = this.getGeoTransform();
+            },
+            
+            getGeoTransform: function ()
+            {
+                // OR x OT x C x GR x T x R x SR x S x -SR x -GR x -C x -OT x -OR
+                // based on regular Transform and geoCenter defined transforms in correct order
+                // OR: GeoOrigin Rotation
+                // OT: GeoOrigin Translation
+                // GR: GeoLocation Rotation with geoCenter
+                // C: geoCenter Translation
+                // regular Transform P' = T * C * R * SR * S * -SR * -C * P
+                
+                var geoCenterRotMat, geoCenter, scaleOrientMat, geoTransform, coords, geoCenterGC, geoSystem, geoOrigin;
+                geoSystem = this._vf.geoSystem;
+                geoOrigin = this._cf.geoOrigin;
+                geoCenter = this._vf.geoCenter;
+                skipGO = this._vf.globalGeoOrigin;
+                scaleOrientMat = this._vf.scaleOrientation.toMatrix();
+                coords = new x3dom.fields.MFVec3f();
+                coords.push(geoCenter);
+                geoCenterGC = x3dom.nodeTypes.GeoCoordinate.prototype.GEOtoGC(geoSystem, geoOrigin, coords)[0];
+                geoCenterRotMat = x3dom.nodeTypes.GeoLocation.prototype.getGeoRotMat(geoSystem, geoCenterGC);
+                geoTransform = 
+                    x3dom.fields.SFMatrix4f.translation(geoCenterGC).
+                    mult(geoCenterRotMat).
+                    mult(x3dom.fields.SFMatrix4f.translation(this._vf.translation)).
+                    mult(this._vf.rotation.toMatrix()).
+                    mult(scaleOrientMat).
+                    mult(x3dom.fields.SFMatrix4f.scale(this._vf.scale)).
+                    mult(scaleOrientMat.inverse()).
+                    mult(geoCenterRotMat.inverse()).
+                    mult(x3dom.fields.SFMatrix4f.translation(geoCenterGC.negate()));
+                //deal with geoOrigin by first reversing its effect, then reapplying it.
+                if(geoOrigin.node)
+                {
+                    var originGC = x3dom.nodeTypes.GeoCoordinate.prototype.OriginToGC(geoOrigin);
+                    if (!skipGO) 
+                    {
+                        //undo geoOrigin translation from child node
+                        geoTransform = geoTransform.mult(x3dom.fields.SFMatrix4f.translation(originGC));
+                    }
+                    if(geoOrigin.node._vf.rotateYUp)
+                    {
+                        var rotMatOrigin = x3dom.nodeTypes.GeoLocation.prototype.getGeoRotMat(geoSystem, originGC);
+                        if (!skipGO) 
+                        {    
+                            //undo GeoOrigin rotation from child node before translation
+                            geoTransform = geoTransform.mult(rotMatOrigin);
+                        }
+                    }
+                    //apply GeoOrigin translation. after geoTransform
+                    geoTransform = x3dom.fields.SFMatrix4f.translation(originGC.negate()).mult(geoTransform);
+                    if(geoOrigin.node._vf.rotateYUp)
+                    {
+                        //apply GeoOrigin rotation after translation
+                        geoTransform = rotMatOrigin.inverse().mult(geoTransform);
+                    }
+                }
+                return geoTransform;
+            },
+            
+            fieldChanged: function (fieldName)
+            {
+                if (fieldName == "geoCenter" || fieldName == "translation" ||
+                    fieldName == "rotation" || fieldName == "scale" ||
+                    fieldName == "scaleOrientation")
+                {
+                    this._trafo = this.getGeoTransform();
+                    
+                    this.invalidateVolume();
+                    //this.invalidateCache();
+                }
+                else if (fieldName == "render") {
+                    this.invalidateVolume();
+                    //this.invalidateCache();
+                }
+            }
         }
     )
 );
+
 /** @namespace x3dom.nodeTypes */
 /*
  * X3DOM JavaScript Library
@@ -56301,7 +57405,7 @@ x3dom.registerNodeType(
                     this.invalidateCache();
 
                 planeMask = drawableCollection.cull(transform, this.graphState(), singlePath, planeMask);
-                if (planeMask <= 0) {
+                if (planeMask < 0) {
                     return;
                 }
 
@@ -57892,6 +58996,16 @@ x3dom.registerNodeType(
             //this.addField_SFBool(ctx, 'swapped', false);
             //this.addField_SFVec3f(ctx, 'sliceThickness', 1, 1, 1);
 
+            /**
+             * Allow to locate the viewpoint inside the volume.
+             * @var {x3dom.fields.SFBool} allowViewpointInside
+             * @memberof x3dom.nodeTypes.X3DVolumeDataNode
+             * @initvalue true
+             * @field x3dom
+             * @instance
+             */
+            this.addField_SFBool(ctx, 'allowViewpointInside', true)
+
             //Neccesary for counting the textures which are added on each style, number of textures can be variable
             this._textureID = 0;
             this._first = true;
@@ -57925,14 +59039,14 @@ x3dom.registerNodeType(
             },
 
             //Common vertex shader text for all volume data nodes
-            vertexShaderText: function(){
+            vertexShaderText: function(needEyePosition){
                 var shader = 
                 "attribute vec3 position;\n"+
                 "uniform vec3 dimensions;\n"+
                 "uniform mat4 modelViewProjectionMatrix;\n"+
                 "varying vec4 vertexPosition;\n"+
                 "varying vec4 pos;\n";
-                if(x3dom.nodeTypes.X3DLightNode.lightID>0){
+                if(x3dom.nodeTypes.X3DLightNode.lightID>0 || (needEyePosition===true)){
                     shader += "uniform mat4 modelViewMatrix;\n"+
                     "varying vec4 position_eye;\n";
                 }
@@ -57940,7 +59054,7 @@ x3dom.registerNodeType(
                 "void main()\n"+
                 "{\n"+
                 "  vertexPosition = modelViewProjectionMatrix * vec4(position, 1.0);\n";
-                if(x3dom.nodeTypes.X3DLightNode.lightID>0){
+                if(x3dom.nodeTypes.X3DLightNode.lightID>0 || (needEyePosition===true)){
                    shader += "  position_eye = modelViewMatrix * vec4(position, 1.0);\n";
                 }
                 shader += 
@@ -57950,7 +59064,7 @@ x3dom.registerNodeType(
                 return shader;
             },
 
-            defaultUniformsShaderText: function(numberOfSlices, slicesOverX, slicesOverY){
+            defaultUniformsShaderText: function(numberOfSlices, slicesOverX, slicesOverY, needEyePosition){
                var uniformsText = 
                 "uniform sampler2D uVolData;\n"+
                 "uniform vec3 dimensions;\n"+
@@ -57959,7 +59073,7 @@ x3dom.registerNodeType(
                 "uniform mat4 modelViewMatrixInverse;\n"+
                 "varying vec4 vertexPosition;\n"+
                 "varying vec4 pos;\n";
-                if(x3dom.nodeTypes.X3DLightNode.lightID>0){
+                if(x3dom.nodeTypes.X3DLightNode.lightID>0 || (needEyePosition===true)){
                     uniformsText += "varying vec4 position_eye;\n";
                 }
                 //LIGHTS
@@ -58032,11 +59146,17 @@ x3dom.registerNodeType(
                 initializeValues = typeof initializeValues !== 'undefined' ? initializeValues : ""; //default value, empty string
                 var shaderLoop = "void main()\n"+
                 "{\n"+
-                "  bool out_box = all(bvec2(any(greaterThan(pos.xyz, vec3(1.0))), any(lessThan(pos.xyz, vec3(0.0)))));\n"+
-                "  if(out_box) discard;\n"+
                 "  vec3 cam_pos = vec3(modelViewMatrixInverse[3][0], modelViewMatrixInverse[3][1], modelViewMatrixInverse[3][2]);\n"+
-                "  vec3 dir = normalize(pos.xyz-(cam_pos/dimensions+0.5));\n"+
-                "  vec3 ray_pos = pos.xyz;\n"+
+                "  vec3 cam_cube = cam_pos/dimensions+0.5;\n"+
+                "  vec3 dir = normalize(pos.xyz-cam_cube);\n";
+                if(this._vf.allowViewpointInside){
+                    shaderLoop +=
+                    "  float cam_inside = float(all(bvec2(all(lessThan(cam_cube, vec3(1.0))),all(greaterThan(cam_cube, vec3(0.0))))));\n"+
+                    "  vec3 ray_pos = mix(pos.xyz, cam_cube, cam_inside);\n";
+                }else{
+                    shaderLoop += "  vec3 ray_pos = pos.xyz;\n";
+                }
+                shaderLoop +=
                 "  vec4 accum  = vec4(0.0, 0.0, 0.0, 0.0);\n"+
                 "  vec4 sample = vec4(0.0, 0.0, 0.0, 0.0);\n"+
                 "  vec4 value  = vec4(0.0, 0.0, 0.0, 0.0);\n"+
@@ -59698,11 +60818,17 @@ x3dom.registerNodeType(
                     this.lightEquationShaderText();
                     shaderText += "void main()\n"+
                     "{\n"+
-                    "  bool out_box = all(bvec2(any(greaterThan(pos.xyz, vec3(1.0))), any(lessThan(pos.xyz, vec3(0.0)))));\n"+
-                    "  if(out_box) discard;\n"+
                     "  vec3 cam_pos = vec3(modelViewMatrixInverse[3][0], modelViewMatrixInverse[3][1], modelViewMatrixInverse[3][2]);\n"+
-                    "  vec3 dir = normalize(pos.xyz-(cam_pos/dimensions+0.5));\n"+
-                    "  vec3 ray_pos = pos.xyz;\n"+
+                    "  vec3 cam_cube = cam_pos/dimensions+0.5;\n"+
+                    "  vec3 dir = normalize(pos.xyz-cam_cube);\n";
+                    if(this._vf.allowViewpointInside){
+                        shaderText +=
+                        "  float cam_inside = float(all(bvec2(all(lessThan(cam_cube, vec3(1.0))),all(greaterThan(cam_cube, vec3(0.0))))));\n"+
+                        "  vec3 ray_pos = mix(pos.xyz, cam_cube, cam_inside);\n";
+                    }else{
+                        shaderText += "  vec3 ray_pos = pos.xyz;\n";
+                    }
+                    shaderText +=
                     "  vec4 accum  = vec4(0.0, 0.0, 0.0, 0.0);\n"+
                     "  float sample = 0.0;\n"+
                     "  vec4 value  = vec4(0.0, 0.0, 0.0, 0.0);\n"+
@@ -59821,6 +60947,7 @@ x3dom.registerNodeType(
                 if (!this._cf.geometry.node) {
                     this.addChild(new x3dom.nodeTypes.Box());
 
+                    this._cf.geometry.node._vf.solid = false;
                     this._cf.geometry.node._vf.hasHelperColors = false;
                     this._cf.geometry.node._vf.size = new x3dom.fields.SFVec3f(
                         this._vf.dimensions.x, this._vf.dimensions.y, this._vf.dimensions.z);
@@ -60617,6 +61744,8 @@ x3dom.registerNodeType(
                 if (!this._cf.geometry.node) {
                     this.addChild(new x3dom.nodeTypes.Box());
 
+                    this._cf.geometry.node._vf.solid = false;
+                    this._cf.geometry.node._vf.hasHelperColors = false;
                     this._cf.geometry.node._vf.size = new x3dom.fields.SFVec3f(
                         this._vf.dimensions.x, this._vf.dimensions.y, this._vf.dimensions.z);
 
@@ -61388,6 +62517,400 @@ x3dom.registerNodeType(
 );
 /** @namespace x3dom.nodeTypes */
 /*
+ * Based on code originally provided by
+ * http://www.x3dom.org
+ * 
+ * (c) 2014 Toshiba Corporation
+ * Dual licensed under the MIT and GPL.
+ */
+
+/* ### RadarVolumeStyle ### */
+x3dom.registerNodeType(
+    "RadarVolumeStyle",
+    "VolumeRendering",
+    defineClass(x3dom.nodeTypes.X3DVolumeRenderStyleNode,
+        /**
+         * Constructor for RadarVolumeStyle
+         * @constructs x3dom.nodeTypes.RadarVolumeStyle
+         * @x3d n/a
+         * @component VolumeRendering
+         * @status experimental
+         * @extends x3dom.nodeTypes.X3DVolumeRenderStyleNode
+         * @param {Object} [ctx=null] - context object, containing initial settings like namespace
+         * @classdesc The RadarVolumeStyle generates a volume rendering based on ray casting.
+         * The rays terminate when they encounter a polygonal object inside the volume. Depth upto 
+         * which a particular ray can travel inside the volume is calculated from the depth buffer 
+         * of the polygonal objects in the volume.
+         * The node also provides a method for generating flat cross-sectional views of the volume
+         * at arbitrary positions. 
+         */
+        function (ctx) {
+            x3dom.nodeTypes.RadarVolumeStyle.superClass.call(this, ctx);
+            
+            /**
+             * depthTexture holds the depth limits for ray termination.
+             * @var {x3dom.fields.SFNode} depthTexture
+             * @memberof x3dom.nodeTypes.RadarVolumeStyle
+             * @initvalue x3dom.nodeTypes.Texture
+             * @field x3dom
+             * @instance
+             */
+            this.addField_SFNode('depthTexture', x3dom.nodeTypes.Texture);
+            
+            /**
+             * The transferFunction field is a texture that is going to be used to map each voxel value to a specific color output.
+             * Voxel intensities from 0.0 to 1.0 are mapped linearly and horizontally to the texture.
+             * @var {x3dom.fields.SFNode} transferFunction
+             * @memberof x3dom.nodeTypes.RadarVolumeStyle
+             * @initvalue x3dom.nodeTypes.Texture
+             * @field x3dom
+             * @instance
+             */
+            this.addField_SFNode('transferFunction', x3dom.nodeTypes.Texture);
+            
+            /**
+             * The isoSurfaceCutoffValue field is specifies a threshold such that data with intensity below this is ignored during ray casting.
+             * @var {x3dom.fields.SFFloat} isoSurfaceCutoffValue
+             * @memberof x3dom.nodeTypes.RadarVolumeStyle
+             * @initvalue 0.4
+             * @field x3dom
+             * @instance
+             */
+            this.addField_SFFloat(ctx, 'isoSurfaceCutoffValue', 0.4); // 0.0 ~ 1.0
+            
+            /**
+             * The transparency field specifies a multiplier for the alpha value of the output color.
+             * @var {x3dom.fields.SFFloat} transparency
+             * @memberof x3dom.nodeTypes.RadarVolumeStyle
+             * @initvalue 0.7
+             * @field x3dom
+             * @instance
+             */
+            this.addField_SFFloat(ctx, 'transparency', 1.0); // 0.0 ~ 1.0
+            
+            /**
+             * The brightness field specifies a multiplier for the RGB values of the output color.
+             * @var {x3dom.fields.SFFloat} brightness
+             * @memberof x3dom.nodeTypes.RadarVolumeStyle
+             * @initvalue 1.2
+             * @field x3dom
+             * @instance
+             */
+            this.addField_SFFloat(ctx, 'brightness', 1.0); // 1.0 ~ 
+            
+            /**
+             * The accumFactor field specifies a multiplier for the color and intensity accumulated as the ray traverses the volume data in case of alpha composting based volume rendering (renderMode 2).
+             * @var {x3dom.fields.SFFloat} accumFactor
+             * @memberof x3dom.nodeTypes.RadarVolumeStyle
+             * @initvalue 0.2
+             * @field x3dom
+             * @instance
+             */
+            this.addField_SFFloat(ctx, 'accumFactor', 0.2); // 0.2 ~ 
+            
+            /**
+             * The intensityLimits field scales voxel intensities lying in (intensityLimits[0] ~ intensityLimits[1]) to (0.0 ~ 1.0) using : (xx - intensityLimits[0])/(intensityLimits[1]-intensityLimits[0])
+             * @var {x3dom.fields.SFVec2f} intensityLimits
+             * @memberof x3dom.nodeTypes.RadarVolumeStyle
+             * @initvalue 0.1, 0.75
+             * @field x3dom
+             * @instance
+             */
+            this.addField_SFVec2f(ctx, 'intensityLimits', 0.0, 1.00); // 0.0 ~ 1.0
+            
+            /**
+             * The xSectionOrientation field defines the rotation for plane used for cutting data. Given the bounding cube for the data is a unit cube centred at (0,0,0), the field provides a plane that intersects the bounding box.
+             * Data on positive side of the plane is rendered.
+             * @var {x3dom.fields.SFVec4f} xSectionOrientation
+             * @memberof x3dom.nodeTypes.RadarVolumeStyle
+             * @initvalue 0.0, 0.0, 0.0, 0.0
+             * @field x3dom
+             * @instance
+             */
+            this.addField_SFRotation(ctx, 'xSectionOrientation', 0.0, 0.0 ,1.0 ,0.0);
+            
+            /**
+             * The xSectionPosition field defines the position of the cutting plane along an axis passing through (0,0,0) and perpendicular to the plane. Given the bounding cube for the data is a unit cube centred at (0,0,0), the field provides a plane that intersects the bounding box.
+             * Data on positive side of the plane is rendered.
+             * @var {x3dom.fields.SFFloat} xSectionPosition
+             * @memberof x3dom.nodeTypes.RadarVolumeStyle
+             * @initvalue 0.5
+             * @field x3dom
+             * @instance
+             */
+            this.addField_SFFloat(ctx, 'xSectionPosition', 0.0); // 0.0 ~ 1.0
+            
+            /* -- Private Functions and Variables -- */
+            
+            this.uniformFloatCubeSize = new x3dom.nodeTypes.Uniform(ctx);
+            this.uniformFloatIsoSurfaceCutoffValue = new x3dom.nodeTypes.Uniform(ctx);
+            this.uniformVec2fIntensityLimits = new x3dom.nodeTypes.Uniform(ctx);
+            this.uniformFloatTransparency = new x3dom.nodeTypes.Uniform(ctx);
+            this.uniformFloatAccumFactor = new x3dom.nodeTypes.Uniform(ctx);
+            this.uniformFloatBrightness = new x3dom.nodeTypes.Uniform(ctx);
+            this.uniformSampler2DDepthTexture = new x3dom.nodeTypes.Uniform(ctx);
+            this.uniformSampler2DTransferFunction = new x3dom.nodeTypes.Uniform(ctx);
+            this.uniformVec4fXSection = new x3dom.nodeTypes.Uniform(ctx);
+            
+            // local variables
+            this.xSection = new x3dom.fields.SFVec4f(0.0, 0.0, 0.0, 0.0);
+            this.vec_before_rot = new x3dom.fields.Quaternion(0.0, 0.0, 1.0, 1.0);
+            
+            // keep reference to VolumeData parent node
+            this.volumeDataParent = null;
+            
+            this.checkSanity = function() {
+                return true;
+            };
+        },
+        {
+            fieldChanged: function(fieldName){
+                switch(fieldName){
+                    case 'isoSurfaceCutoffValue':
+                        this.uniformFloatIsoSurfaceCutoffValue._vf.value = this._vf.isoSurfaceCutoffValue;
+                        this.uniformFloatIsoSurfaceCutoffValue.fieldChanged("value");
+                        break;
+                    case 'transparency':
+                        this.uniformFloatTransparency._vf.value = this._vf.transparency;
+                        this.uniformFloatTransparency.fieldChanged("value");
+                        break;
+                    case 'accumFactor':
+                        this.uniformFloatAccumFactor._vf.value = this._vf.accumFactor;
+                        this.uniformFloatAccumFactor.fieldChanged("value");
+                        break;
+                    case 'brightness':
+                        this.uniformFloatBrightness._vf.value = this._vf.brightness;
+                        this.uniformFloatBrightness.fieldChanged("value");
+                        break;
+                    case 'intensityLimits':
+                        this.uniformVec2fIntensityLimits._vf.value = this._vf.intensityLimits;
+                        this.uniformVec2fIntensityLimits.fieldChanged("value");
+                        break;
+                    case 'xSectionPosition':
+                    case 'xSectionOrientation':
+                    {
+                        var tz = this._vf.xSectionPosition - 0.5;
+                        var rot_quat = this._vf.xSectionOrientation;
+                        var rot_quat_inverse = this._vf.xSectionOrientation.inverse();
+                        var vec_after_rot = rot_quat.multiply(this.vec_before_rot).multiply(rot_quat_inverse);
+                        vec_after_rot.normalize(vec_after_rot);
+                        this.xSection.x = vec_after_rot.x;
+                        this.xSection.y = vec_after_rot.y;
+                        this.xSection.z = vec_after_rot.z;
+                        this.xSection.w = (vec_after_rot.x * tz + 0.5) * vec_after_rot.x  + (vec_after_rot.y * tz + 0.5) * vec_after_rot.y + (vec_after_rot.z * tz + 0.5) * vec_after_rot.z;
+                        this.uniformVec4fXSection._vf.value = this.xSection;
+                        this.uniformVec4fXSection.fieldChanged("value");
+                        break;
+                    }
+                    case 'render_mode':
+                        break;
+                    default:
+                }
+            },
+
+            uniforms: function(){
+                var unis = [];
+                                
+                if (this._cf.transferFunction.node || this._cf.depthTexture.node) {
+                    // Lookup for the parent VolumeData                 
+                    if(this.volumeDataParent === null) {
+                        this.volumeDataParent = this._parentNodes[0];
+                        while(!x3dom.isa(this.volumeDataParent, x3dom.nodeTypes.X3DVolumeDataNode) || !x3dom.isa(this.volumeDataParent, x3dom.nodeTypes.X3DNode)) {
+                            this.volumeDataParent = this.volumeDataParent._parentNodes[0];
+                        }
+                        if(x3dom.isa(this.volumeDataParent, x3dom.nodeTypes.X3DVolumeDataNode) == false){
+                            x3dom.debug.logError("[VolumeRendering][RadarVolumeStyle] No VolumeData parent found!");
+                            this.volumeDataParent = null;
+                        }
+                    }
+                    
+                    if(this._cf.transferFunction.node) {
+                        this.uniformSampler2DTransferFunction._vf.name = 'uTransferFunction';
+                        this.uniformSampler2DTransferFunction._vf.type = 'SFInt32';
+                        this.uniformSampler2DTransferFunction._vf.value = this.volumeDataParent._textureID++;
+                        unis.push(this.uniformSampler2DTransferFunction);
+                    }
+                    if(this._cf.depthTexture.node) {
+                        this.uniformSampler2DDepthTexture._vf.name = 'uDepthTexture';
+                        this.uniformSampler2DDepthTexture._vf.type = 'SFInt32';
+                        this.uniformSampler2DDepthTexture._vf.value = this.volumeDataParent._textureID++;
+                        unis.push(this.uniformSampler2DDepthTexture);
+                    }
+                }
+                
+                this.uniformFloatCubeSize._vf.name = 'uCubeSize';
+                this.uniformFloatCubeSize._vf.type = 'SFFloat';
+                this.uniformFloatCubeSize._vf.value = this._parentNodes[0]._vf.dimensions.x; // The code here assumes a cubic bounding box for the volume data.
+                unis.push(this.uniformFloatCubeSize);
+                
+                this.uniformFloatIsoSurfaceCutoffValue._vf.name = 'uIsoSurfaceCutoffValue';
+                this.uniformFloatIsoSurfaceCutoffValue._vf.type = 'SFFloat';
+                this.uniformFloatIsoSurfaceCutoffValue._vf.value = this._vf.isoSurfaceCutoffValue;
+                unis.push(this.uniformFloatIsoSurfaceCutoffValue);
+                
+                this.uniformFloatTransparency._vf.name = 'uTransparency';
+                this.uniformFloatTransparency._vf.type = 'SFFloat';
+                this.uniformFloatTransparency._vf.value = this._vf.transparency;
+                unis.push(this.uniformFloatTransparency);
+                
+                this.uniformFloatAccumFactor._vf.name = 'uAccumFactor';
+                this.uniformFloatAccumFactor._vf.type = 'SFFloat';
+                this.uniformFloatAccumFactor._vf.value = this._vf.accumFactor;
+                unis.push(this.uniformFloatAccumFactor);
+                
+                this.uniformFloatBrightness._vf.name = 'uBrightness';
+                this.uniformFloatBrightness._vf.type = 'SFFloat';
+                this.uniformFloatBrightness._vf.value = this._vf.brightness;
+                unis.push(this.uniformFloatBrightness);
+                
+                this.uniformVec2fIntensityLimits._vf.name = 'uIntensityLimits';
+                this.uniformVec2fIntensityLimits._vf.type = 'SFVec2f';
+                this.uniformVec2fIntensityLimits._vf.value = this._vf.intensityLimits;
+                unis.push(this.uniformVec2fIntensityLimits);
+                
+                this.uniformVec4fXSection._vf.name = 'uXSection';
+                this.uniformVec4fXSection._vf.type = 'SFVec4f';
+                this.uniformVec4fXSection._vf.value = this.xSection;
+                unis.push(this.uniformVec4fXSection);
+                
+                return unis;
+            },
+            
+            textures: function() {
+                var texs = [];
+                
+                var tex = this._cf.transferFunction.node;
+                if (tex) {
+                    tex._vf.repeatS = false;
+                    tex._vf.repeatT = false;
+                    texs.push(tex);
+                }
+                
+                tex = this._cf.depthTexture.node;
+                if(tex) {
+                    tex._vf.repeatS = false;
+                    tex._vf.repeatT = false;
+                    texs.push(tex);
+                }
+                
+                return texs;
+            },
+            
+            styleUniformsShaderText: function() {
+                var uniformsText = "uniform mat4 projectionMatrix;\n";
+                uniformsText += "uniform float uCubeSize;\n";
+                uniformsText += "uniform float uIsoSurfaceCutoffValue;\n";
+                uniformsText += "uniform float uTransparency;\n";
+                uniformsText += "uniform float uAccumFactor;\n";
+                uniformsText += "uniform float uBrightness;\n";
+                uniformsText += "uniform vec4 uXSection;\n";
+                uniformsText += "uniform vec2 uIntensityLimits;\n";
+                if (this._cf.transferFunction.node) {
+                        uniformsText += "uniform sampler2D uTransferFunction;\n";
+                }
+                if (this._cf.depthTexture.node) {
+                        uniformsText += "uniform sampler2D uDepthTexture;\n";
+                }
+                
+                return uniformsText;
+            },
+
+            fragmentShaderText: function(numberOfSlices, slicesOverX, slicesOverY){
+                var shader = 
+                this._parentNodes[0].fragmentPreamble+
+                this._parentNodes[0].defaultUniformsShaderText(numberOfSlices, slicesOverX, slicesOverY, true)+
+                this.styleUniformsShaderText()+
+                this._parentNodes[0].texture3DFunctionShaderText;
+                
+                var shaderLoop = "";
+                
+                shaderLoop +=
+                    "void main()\n"+
+                    "{\n"+
+                    "  vec3 cam_pos = vec3(modelViewMatrixInverse[3][0], modelViewMatrixInverse[3][1], modelViewMatrixInverse[3][2]);\n"+
+                    "  cam_pos = cam_pos/dimensions+0.5;\n"+
+                    
+                    "  vec2 texC = vertexPosition.xy/vertexPosition.w;\n"+
+                    "  texC = 0.5*texC + 0.5;\n";
+                
+                if (this._cf.depthTexture.node) {
+                    shaderLoop +=
+                        "  float depth_limit = texture2D(uDepthTexture,texC).r;\n"+
+                        "  float depth_ray = 0.0;\n"+
+                        "  vec3 ray_start_ec = position_eye.xyz;\n"+ // ray start in eye coordinates
+                        "  vec3 ray_dir_ec = uCubeSize * normalize(ray_start_ec);\n"+ // since camera is at (0,0,0) in eye_coords
+                        "  vec3 step_ec = 1.7321*ray_dir_ec/Steps;\n"; // multiplying by sqrt(3.0)
+                }
+                shaderLoop +=
+                    
+                    "  vec3 ray_start = pos.xyz;\n"+
+                    "  vec3 ray_dir = normalize(pos.xyz-cam_pos);\n"+
+                    
+                    "  vec4 accum  = vec4(0.0, 0.0, 0.0, 0.0);\n"+
+                    "  vec4 sample = vec4(0.0, 0.0, 0.0, 0.0);\n"+
+                    "  vec4 value  = vec4(0.0, 0.0, 0.0, 0.0);\n"+
+                    
+                    "  vec3 step = 1.7321*ray_dir/Steps;\n"; // multiplying by sqrt(3.0)
+                    
+                // classical shader
+                shaderLoop +=
+                    "  for(float i = 0.0; i < Steps; i+=1.0)\n"+
+                    "  {\n";
+                    
+                if (this._cf.depthTexture.node) {
+                    shaderLoop +=
+                        "    value = projectionMatrix * vec4(ray_start_ec, 1.0);\n"+
+                        "    depth_ray = ((value.z/value.w) + 1.0)/2.0;\n";
+                }
+                
+                shaderLoop += "    ray_start += step;\n";
+                
+                if (this._cf.depthTexture.node) {
+                    shaderLoop +=
+                        "    ray_start_ec += step_ec;\n"+
+                        "    if(depth_ray > depth_limit || ray_start.x > 1.0 || ray_start.y > 1.0 || ray_start.z > 1.0 || ray_start.x < 0.0 || ray_start.y < 0.0 || ray_start.z < 0.0)\n"+
+                        "      {break;}\n";
+                }
+                else {
+                    shaderLoop +=
+                        "    if(ray_start.x > 1.0 || ray_start.y > 1.0 || ray_start.z > 1.0 || ray_start.x < 0.0 || ray_start.y < 0.0 || ray_start.z < 0.0)\n"+
+                        "      {break;}\n";
+                }
+                
+                shaderLoop +=
+                    "    if(ray_start.x*uXSection[0] + ray_start.y*uXSection[1] + ray_start.z*uXSection[2] > uXSection[3]) {continue;}\n"+
+                    
+                    "    sample = cTexture3D(uVolData, ray_start, numberOfSlices, slicesOverX, slicesOverY);\n"+
+                    "    sample = vec4(sample.rgb,(0.299*sample.r)+(0.587*sample.g)+(0.114*sample.b));\n"+
+                    "    // Calculate maximum intensity\n"+
+                    "    if(sample.a > uIsoSurfaceCutoffValue) {\n";
+                if (this._cf.transferFunction.node) {
+                    shaderLoop +=
+                        "       value = texture2D(uTransferFunction, vec2((sample.a-uIntensityLimits[0])/(uIntensityLimits[1]-uIntensityLimits[0]),0.5));\n"+
+                        "       accum.rgb = sample.rgb * value.rgb * (1.0-accum.a)*uAccumFactor + accum.rgb;\n"+
+                        "       accum.a = uAccumFactor * value.a * (1.0-accum.a) + accum.a;\n";
+                }
+                else {
+                    shaderLoop +=
+                        "       accum.rgb = sample.rgb * (1.0-accum.a) * uAccumFactor + accum.rgb;\n"+
+                        "       accum.a = uAccumFactor * (1.0-accum.a) + accum.a;\n";
+                }
+                shaderLoop +=
+                    "    }\n"+
+                    "  }\n";
+                                
+                shader += shaderLoop;
+                
+                shader += "  gl_FragColor = vec4(accum.rgb*uBrightness, accum.a*uTransparency);\n"+
+                          "}";
+                
+                return shader;
+            }
+        }
+    )
+);
+/** @namespace x3dom.nodeTypes */
+/*
  * MEDX3DOM JavaScript Library
  * http://medx3dom.org
  *
@@ -61524,7 +63047,7 @@ x3dom.registerNodeType(
 
                     // here goes the volume shader
                     this.vrcSinglePassShaderVertex._vf.type = 'vertex';
-                    this.vrcSinglePassShaderVertex._vf.url[0]=this.vertexShaderText();
+                    this.vrcSinglePassShaderVertex._vf.url[0]=this.vertexShaderText(x3dom.isa(this._cf.renderStyle.node, x3dom.nodeTypes.RadarVolumeStyle));
 
                     this.vrcSinglePassShaderFragment._vf.type = 'fragment';
                     var shaderText = "";
@@ -61600,6 +63123,7 @@ x3dom.registerNodeType(
                 if (!this._cf.geometry.node) {
                     this.addChild(new x3dom.nodeTypes.Box());
 
+                    this._cf.geometry.node._vf.solid = false;
                     this._cf.geometry.node._vf.hasHelperColors = false;
                     this._cf.geometry.node._vf.size = new x3dom.fields.SFVec3f(
                         this._vf.dimensions.x, this._vf.dimensions.y, this._vf.dimensions.z);
@@ -62443,7 +63967,7 @@ x3dom.registerNodeType(
                     this.invalidateCache();
 
                 if (!this._cf.shape.node ||
-                    (planeMask = drawableCollection.cull(transform, this.graphState(), singlePath, planeMask)) <= 0) {
+                    (planeMask = drawableCollection.cull(transform, this.graphState(), singlePath, planeMask)) < 0) {
                     return;
                 }
 
@@ -63827,7 +65351,7 @@ function QuadtreeNode2dWMTS(ctx, bvhRefiner, level, nodeNumber, nodeTransformati
         if (!readyState || !childrenReadyState)
             updateLoadingState(drawableCollection, nodeTransformation);
 
-        if (readyState && planeMask > 0) {
+        if (readyState && planeMask >= 0) {
             var mat_view = drawableCollection.viewMatrix;
             var vPos = mat_view.multMatrixPnt(nodeTransformation.multMatrixPnt(position));
             var distanceToCamera = Math.sqrt(Math.pow(vPos.x, 2) + Math.pow(vPos.y, 2) + Math.pow(vPos.z, 2));
@@ -68371,7 +69895,8 @@ x3dom.registerNodeType(
                 }
 
                 var numTexComponents = 2;
-
+                var texMode;
+                
                 var texCoordNode = this._cf.texCoord.node;
                 if (x3dom.isa(texCoordNode, x3dom.nodeTypes.MultiTextureCoordinate)) {
                     if (texCoordNode._cf.texCoord.nodes.length)
@@ -68384,6 +69909,10 @@ x3dom.registerNodeType(
                         if (x3dom.isa(texCoordNode, x3dom.nodeTypes.TextureCoordinate3D)) {
                             numTexComponents = 3;
                         }
+                    }
+                    
+                    else if (texCoordNode._vf.mode) {
+                        texMode = texCoordNode._vf.mode;
                     }
                 }
 
@@ -68421,6 +69950,7 @@ x3dom.registerNodeType(
                                 this._mesh._texCoords[0].push(texCoords[c].z);
                             }
                         }
+                        
                         else {
                             this._mesh._texCoords[0].push(x / subx);
                             this._mesh._texCoords[0].push(y / suby);
@@ -68440,7 +69970,7 @@ x3dom.registerNodeType(
                         c++;
                     }
                 }
-
+                
                 for (y = 1; y <= suby; y++) {
                     for (x = 0; x < subx; x++) {
                         this._mesh._indices[0].push((y - 1) * (subx + 1) + x);
@@ -68459,6 +69989,8 @@ x3dom.registerNodeType(
                 if (!normals)
                     this._mesh.calcNormals(Math.PI, this._vf.ccw);
 
+                if (texMode) {this._mesh.calcTexCoords(texMode);}
+                
                 this.invalidateVolume();
                 this._mesh._numTexComponents = numTexComponents;
                 this._mesh._numColComponents = numColComponents;
@@ -69473,3165 +71005,17 @@ x3dom.registerNodeType(
         }
     )
 );
-/*
- * X3DOM JavaScript Library
- * http://www.x3dom.org
- *
- * (C)2009 Fraunhofer IGD, Darmstadt, Germany
- * Dual licensed under the MIT and GPL
- */
-
-// TODO: this file has lots of syntactical issues, fix them!
-
-function X3DCollidableShape(){
-    var CollidableShape = new x3dom.fields.SFNode();
-    var RigidBody = new x3dom.fields.SFNode();
-    var RigidBodyCollection = new x3dom.fields.SFNode();
-    var CollisionCollection = new x3dom.fields.SFNode();
-    var Transform = new x3dom.fields.SFNode();
-    var RB_setup = new x3dom.fields.MFBoolean();
-    var T_setup = new x3dom.fields.MFBoolean();
-    var CC_setup = new x3dom.fields.MFBoolean();
-    var createRigid = new x3dom.fields.MFBoolean();
-    var isMotor = new x3dom.fields.MFBoolean();
-    var torque = new x3dom.fields.SFVec3f();
-    var isInline = new x3dom.fields.MFBoolean();
-    var inlineExternalTransform = new x3dom.fields.SFNode();
-    var inlineInternalTransform = new x3dom.fields.SFNode();
-}
-
-function X3DJoint(){
-    var createJoint = new x3dom.fields.MFBoolean();
-    var Joint = [];
-}
-
-//	###############################################################
-//	###############################################################
-//	###############################################################
-
-(function(){
-
-    var CollidableShapes = [], JointShapes = [], bulletWorld, x3dWorld = null, initScene, main, updateRigidbodies, MakeUpdateList, X3DRigidBodyComponents, CreateX3DCollidableShape,
-        UpdateTransforms, CreateRigidbodies, rigidbodies = [], mousePickObject, mousePos = new x3dom.fields.SFVec3f(), drag = false, interactiveTransforms = [], UpdateRigidbody,
-        intervalVar, building_constraints = true, ParseX3DElement, InlineObjectList, inline_x3dList = [], inlineLoad = false, completeJointSetup = false;
-
-    function ParseX3DElement(){
-
-        for(var cv in x3dom.canvases){
-            for(var sc in x3dom.canvases[cv].x3dElem.children){
-                if(x3dom.isa(x3dom.canvases[cv].x3dElem.children[sc]._x3domNode, x3dom.nodeTypes.Scene)){
-                    x3dWorld = x3dom.canvases[cv].x3dElem.children[sc];
-                }
-            }
-        }
-
-        if (x3dWorld) {
-            for (var i in x3dWorld.children) {
-                if (x3dom.isa(x3dWorld.children[i]._x3domNode, x3dom.nodeTypes.Transform)) {
-                    if (x3dom.isa(x3dWorld.children[i]._x3domNode._cf.children.nodes[0]._xmlNode._x3domNode, x3dom.nodeTypes.Inline)) {
-                        if (inline_x3dList.length == 0) {
-                            inline_x3dList.push(x3dWorld.children[i]);
-                        }
-                        else {
-                            for (var n in inline_x3dList) {
-                                if (inline_x3dList[n]._x3domNode._DEF.toString() == x3dWorld.children[i]._x3domNode._DEF.toString()) {
-                                    break;
-                                }
-                                else {
-                                    if (n == inline_x3dList.length - 1) {
-                                        inline_x3dList.push(x3dWorld.children[i]);
-                                    }
-                                }
-
-                            }
-                        }
-                    }
-                }
-                if (x3dom.isa(x3dWorld.children[i]._x3domNode, x3dom.nodeTypes.Group)) {
-                    for (var all in x3dWorld.children[i].childNodes) {
-                        CreateX3DCollidableShape(x3dWorld.children[i].childNodes[all], null);
-                    }
-                }
-                else {
-                    CreateX3DCollidableShape(x3dWorld.children[i], null);
-                }
-            }
-        }
-    }
-
-    function CreateX3DCollidableShape(a, b){
-
-        if(x3dom.isa(a._x3domNode, x3dom.nodeTypes.CollidableShape)){
-            var X3D_CS = new X3DCollidableShape;
-            CollidableShapes.push(X3D_CS);
-            X3D_CS.CollidableShape = a;
-            X3D_CS.createRigid = true;
-            X3D_CS.RB_setup = false;
-            X3D_CS.T_setup = false;
-            X3D_CS.CC_setup = false;
-            X3D_CS.isMotor = false;
-            X3D_CS.torque = new x3dom.fields.SFVec3f(0,0,0);
-            X3D_CS.isInline = false;
-            X3D_CS.inlineExternalTransform = null;
-            X3D_CS.Transform = a._x3domNode._cf.transform;
-            if(b){
-                X3D_CS.isInline = true;
-                X3D_CS.inlineExternalTransform = b;
-            }
-        }
-        if(x3dom.isa(a._x3domNode, x3dom.nodeTypes.RigidBodyCollection)){
-            for(var ea in a._x3domNode._cf.joints.nodes){
-                if(x3dom.isa(a._x3domNode._cf.joints.nodes[ea], x3dom.nodeTypes.BallJoint) || x3dom.isa(a._x3domNode._cf.joints.nodes[ea], x3dom.nodeTypes.UniversalJoint)
-                    || x3dom.isa(a._x3domNode._cf.joints.nodes[ea], x3dom.nodeTypes.SliderJoint) || x3dom.isa(a._x3domNode._cf.joints.nodes[ea], x3dom.nodeTypes.MotorJoint)
-                    || x3dom.isa(a._x3domNode._cf.joints.nodes[ea], x3dom.nodeTypes.SingleAxisHingeJoint) || x3dom.isa(a._x3domNode._cf.joints.nodes[ea], x3dom.nodeTypes.DoubleAxisHingeJoint)){
-                    var X3D_J = new X3DJoint;
-                    X3D_J.createJoint = true;
-                    X3D_J.Joint = a._x3domNode._cf.joints.nodes[ea];
-                    JointShapes.push(X3D_J);
-                }
-            }
-            completeJointSetup = true;
-        }
-        if(inlineLoad){
-            X3DRigidBodyComponents(a);
-        }
-        if(a.parentNode){
-            for (var ea in a.parentNode.children){
-                if(a.parentNode && a.parentNode.children.hasOwnProperty(ea) && a.parentNode.children[ea]){
-                    if(x3dom.isa(a.parentNode.children[ea]._x3domNode, x3dom.nodeTypes.Group)){
-                        for(var all in a.parentNode.children[ea].childNodes){
-                            if(a.parentNode.children[ea].childNodes.hasOwnProperty(all) && a.parentNode.children[ea].childNodes[all]){
-                                X3DRigidBodyComponents(a.parentNode.children[ea].childNodes[all]);
-                            }
-                        }
-                    }
-                    else{
-                        X3DRigidBodyComponents(a.parentNode.children[ea]);
-                    }
-                }
-            }
-        }
-    }
-
-    function X3DRigidBodyComponents(a){
-        if(x3dom.isa(a._x3domNode, x3dom.nodeTypes.CollisionSensor)){
-            for(var ea in a._x3domNode._cf.collider._x3domNode._cf.collidables.nodes){
-                for(var cs in CollidableShapes){
-                    if(!CollidableShapes[cs].CC_setup && CollidableShapes[cs].CollidableShape._x3domNode._DEF == a._x3domNode._cf.collider._x3domNode._cf.collidables.nodes[ea]._DEF){
-                        CollidableShapes[cs].CC_setup = true;
-                        CollidableShapes[cs].CollisionCollection = a._x3domNode._cf.collider;
-                    }
-                }
-            }
-        }
-        if(x3dom.isa(a._x3domNode, x3dom.nodeTypes.CollisionCollection)){
-            for(var ea in a._x3domNode._cf.collidables.nodes){
-                for(var cs in CollidableShapes){
-                    if(!CollidableShapes[cs].CC_setup && CollidableShapes[cs].CollidableShape._x3domNode._DEF == a._x3domNode._cf.collidables.nodes[ea]._DEF){
-                        CollidableShapes[cs].CC_setup = true;
-                        CollidableShapes[cs].CollisionCollection = a._x3domNode._cf.collider;
-                    }
-                }
-            }
-        }
-        if(x3dom.isa(a._x3domNode, x3dom.nodeTypes.Transform)){
-            for(var cs in CollidableShapes){
-                if(!CollidableShapes[cs].T_setup && CollidableShapes[cs].Transform._x3domNode._DEF == a._x3domNode._DEF){
-                    CollidableShapes[cs].T_setup = true;
-                    CollidableShapes[cs].inlineInternalTransform = null;
-                    interactiveTransforms.push(a);
-                    if(!CollidableShapes[cs].inlineInternalTransform && CollidableShapes[cs].isInline){
-                        CollidableShapes[cs].inlineInternalTransform = a;
-                    }
-                }
-            }
-        }
-        if(x3dom.isa(a._x3domNode, x3dom.nodeTypes.RigidBodyCollection)){
-            for(var ea in a._x3domNode._cf.bodies.nodes){
-                for(var eac in a._x3domNode._cf.bodies.nodes[ea]._cf.geometry.nodes){
-                    for(var cs in CollidableShapes){
-                        if(!CollidableShapes[cs].RB_setup && CollidableShapes[cs].CollidableShape._x3domNode._DEF == a._x3domNode._cf.bodies.nodes[ea]._cf.geometry.nodes[eac]._DEF){
-                            CollidableShapes[cs].RB_setup = true;
-                            CollidableShapes[cs].RigidBody = a._x3domNode._cf.bodies.nodes[ea];
-                            CollidableShapes[cs].RigidBodyCollection = a;
-                        }
-                    }
-                }
-            }
-        }
-
-    }
-
-
-//	################################################################
-//	###################	INITIALIZE BULLET WORLD	####################
-//	################################################################
-
-    initScene = function(){
-        var collisionConfiguration, dispatcher, overlappingPairCache, solver, WorldGravity = new x3dom.fields.SFVec3f();
-        collisionConfiguration = new Ammo.btDefaultCollisionConfiguration();
-        dispatcher = new Ammo.btCollisionDispatcher( collisionConfiguration );
-        overlappingPairCache = new Ammo.btDbvtBroadphase();
-        solver = new Ammo.btSequentialImpulseConstraintSolver();
-        bulletWorld = new Ammo.btDiscreteDynamicsWorld( dispatcher, overlappingPairCache, solver, collisionConfiguration );
-        bulletWorld.setGravity(new Ammo.btVector3(0, -9.81, 0));
-    };
-
-//	###############################################################
-//	###########	CREATE&DESCRIBE RIGIDBODIES IN BULLET	###########
-//	###############################################################
-
-    CreateRigidbodies = function(){
-        var mass, startTransform, localInertia, sphereShape, boxShape, cylinderShape, coneShape, indexedfacesetShape, centerOfMass, motionState, rbInfo,
-            sphereAmmo, boxAmmo, cylinderAmmo, coneAmmo, indexedfacesetAmmo;
-
-        building_constraints = true;
-        for (var cs in CollidableShapes){
-            if(CollidableShapes[cs].CC_setup && CollidableShapes[cs].T_setup && CollidableShapes[cs].RB_setup && CollidableShapes[cs].CollidableShape._x3domNode._cf.shape._x3domNode._cf.geometry.node._xmlNode.nodeName && CollidableShapes[cs].createRigid == true){
-                switch (CollidableShapes[cs].CollidableShape._x3domNode._cf.shape._x3domNode._cf.geometry.node._xmlNode.nodeName.toLowerCase())
-                {
-                    case "sphere":{
-                        var sphere = CollidableShapes[cs];
-                        if(!CollidableShapes[cs].RigidBody._vf.enabled || CollidableShapes[cs].RigidBody._vf.fixed){
-                            mass = 0;
-                        }
-                        else{
-                            mass = CollidableShapes[cs].RigidBody._vf.mass;
-                        }
-                        startTransform = new Ammo.btTransform();
-                        startTransform.setIdentity();
-                        startTransform.setOrigin(new Ammo.btVector3(	CollidableShapes[cs].CollidableShape._x3domNode._vf.translation.x,
-                            CollidableShapes[cs].CollidableShape._x3domNode._vf.translation.y,
-                            CollidableShapes[cs].CollidableShape._x3domNode._vf.translation.z));
-                        if(CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.x == 0
-                            && CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.y == 0
-                            && CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.z == 0
-                            && CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.w == 1
-                            ){
-                            startTransform.setRotation(new Ammo.btQuaternion(0,0,1,0));
-                        }
-                        else{
-                            CollidableShapes[cs].Transform._x3domNode._vf.rotation = CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation;
-                            startTransform.setRotation(new Ammo.btQuaternion(	CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.x,
-                                CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.y,
-                                CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.z,
-                                CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.w));
-                        }
-                        if(CollidableShapes[cs].RigidBody._vf.centerOfMass != null){
-                            centerOfMass = 	new Ammo.btTransform(startTransform.getRotation(),
-                                new Ammo.btVector3(	CollidableShapes[cs].CollidableShape._x3domNode._vf.translation.x+CollidableShapes[cs].RigidBody._vf.centerOfMass.x,
-                                        CollidableShapes[cs].CollidableShape._x3domNode._vf.translation.y+CollidableShapes[cs].RigidBody._vf.centerOfMass.y,
-                                        CollidableShapes[cs].CollidableShape._x3domNode._vf.translation.z+CollidableShapes[cs].RigidBody._vf.centerOfMass.z));
-                        }
-                        else{
-                            centerOfMass = startTransform;
-                        }
-                        if(CollidableShapes[cs].RigidBody._vf.inertia){
-                            if(CollidableShapes[cs].RigidBody._vf.inertia[0] + CollidableShapes[cs].RigidBody._vf.inertia[1] + CollidableShapes[cs].RigidBody._vf.inertia[2] ==
-                                CollidableShapes[cs].RigidBody._vf.inertia[3] + CollidableShapes[cs].RigidBody._vf.inertia[4] + CollidableShapes[cs].RigidBody._vf.inertia[5] ==
-                                CollidableShapes[cs].RigidBody._vf.inertia[6] + CollidableShapes[cs].RigidBody._vf.inertia[7] + CollidableShapes[cs].RigidBody._vf.inertia[8] == 1){
-                                localInertia = new Ammo.btVector3(0,0,0);
-                            }
-                            else{
-                                localInertia = new Ammo.btVector3(
-                                        CollidableShapes[cs].RigidBody._vf.inertia[0] + CollidableShapes[cs].RigidBody._vf.inertia[1] + CollidableShapes[cs].RigidBody._vf.inertia[2],
-                                        CollidableShapes[cs].RigidBody._vf.inertia[3] + CollidableShapes[cs].RigidBody._vf.inertia[4] + CollidableShapes[cs].RigidBody._vf.inertia[5],
-                                        CollidableShapes[cs].RigidBody._vf.inertia[6] + CollidableShapes[cs].RigidBody._vf.inertia[7] + CollidableShapes[cs].RigidBody._vf.inertia[8]);
-                            }
-                        }
-                        else{
-                            localInertia = new Ammo.btVector3(0,0,0);
-                        }
-                        sphereShape = new Ammo.btSphereShape(CollidableShapes[cs].CollidableShape._x3domNode._cf.shape._x3domNode._cf.geometry.node._vf.radius);
-                        sphereShape.calculateLocalInertia(mass, localInertia);
-                        sphereShape.setMargin(CollidableShapes[cs].RigidBodyCollection._x3domNode._vf.contactSurfaceThickness);
-                        motionState = new Ammo.btDefaultMotionState(startTransform);
-                        rbInfo = new Ammo.btRigidBodyConstructionInfo(mass, motionState, sphereShape, localInertia);
-                        rbInfo.m_friction = CollidableShapes[cs].CollisionCollection._x3domNode._vf.frictionCoefficients.x;
-                        rbInfo.m_rollingFriction = CollidableShapes[cs].CollisionCollection._x3domNode._vf.frictionCoefficients.y;
-                        sphereAmmo = new Ammo.btRigidBody(rbInfo);
-                        if(CollidableShapes[cs].RigidBody._vf.autoDamp){
-                            sphereAmmo.setDamping(CollidableShapes[cs].RigidBody._vf.linearDampingFactor, CollidableShapes[cs].RigidBody._vf.angularDampingFactor);
-                        }
-                        else{
-                            sphereAmmo.setDamping(0,0);
-                        }
-                        sphereAmmo.setAngularVelocity(new Ammo.btVector3(	CollidableShapes[cs].RigidBody._vf.angularVelocity.x,
-                            CollidableShapes[cs].RigidBody._vf.angularVelocity.y,
-                            CollidableShapes[cs].RigidBody._vf.angularVelocity.z));
-                        sphereAmmo.setLinearVelocity(new Ammo.btVector3(	CollidableShapes[cs].RigidBody._vf.linearVelocity.x,
-                            CollidableShapes[cs].RigidBody._vf.linearVelocity.y,
-                            CollidableShapes[cs].RigidBody._vf.linearVelocity.z));
-                        if(CollidableShapes[cs].CollisionCollection._x3domNode._vf.bounce != null){
-                            sphereAmmo.setRestitution(CollidableShapes[cs].CollisionCollection._x3domNode._vf.bounce);
-                        }
-                        else{
-                            sphereAmmo.setRestitution(1.0);
-                        }
-                        if(CollidableShapes[cs].CollisionCollection._x3domNode._vf.frictionCoefficients != null){
-                            sphereAmmo.setFriction(CollidableShapes[cs].CollisionCollection._x3domNode._vf.frictionCoefficients.y);
-                        }
-                        else{
-                            sphereAmmo.setFriction(0);
-                        }
-                        if(CollidableShapes[cs].RigidBody._vf.disableLinearSpeed && CollidableShapes[cs].RigidBody._vf.disableAngularSpeed){
-                            sphereAmmo.setSleepingThresholds(CollidableShapes[cs].RigidBody._vf.disableLinearSpeed, CollidableShapes[cs].RigidBody._vf.disableAngularSpeed);
-                        }
-                        if(CollidableShapes[cs].RigidBody._vf.useGlobalGravity){
-                            sphereAmmo.setGravity(new Ammo.btVector3(	CollidableShapes[cs].RigidBodyCollection._x3domNode._vf.gravity.x,
-                                CollidableShapes[cs].RigidBodyCollection._x3domNode._vf.gravity.y,
-                                CollidableShapes[cs].RigidBodyCollection._x3domNode._vf.gravity.z));
-                            sphereAmmo.setFlags(0);
-                        }
-                        else{
-                            sphereAmmo.setFlags(1);
-                        }
-                        sphereAmmo.setCenterOfMassTransform(centerOfMass);
-                        if(UpdateRigidbody != null){
-                            bulletWorld.removeRigidBody(rigidbodies[UpdateRigidbody]);
-                            bulletWorld.addRigidBody(sphereAmmo);
-                            sphereAmmo.geometry = sphere;
-                            rigidbodies.splice(UpdateRigidbody,1,sphereAmmo);
-                        }
-                        else{
-                            bulletWorld.addRigidBody(sphereAmmo);
-                            sphereAmmo.geometry = sphere;
-                            rigidbodies.push(sphereAmmo);
-                        }
-                    }
-                        break;
-
-                    case "box":{
-
-                        var box = CollidableShapes[cs];
-                        if(!CollidableShapes[cs].RigidBody._vf.enabled || CollidableShapes[cs].RigidBody._vf.fixed){
-                            mass = 0;
-                        }
-                        else{
-                            mass = CollidableShapes[cs].RigidBody._vf.mass;
-                        }
-                        startTransform = new Ammo.btTransform();
-                        startTransform.setIdentity();
-                        startTransform.setBasis(CollidableShapes[cs].RigidBody._vf.inertia);
-                        startTransform.setOrigin(new Ammo.btVector3(	CollidableShapes[cs].CollidableShape._x3domNode._vf.translation.x,
-                            CollidableShapes[cs].CollidableShape._x3domNode._vf.translation.y,
-                            CollidableShapes[cs].CollidableShape._x3domNode._vf.translation.z));
-
-                        var zeroRot = new x3dom.fields.Quaternion(0,0,0,1);
-                        if(CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.x == 0
-                            && CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.y == 0
-                            && CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.z == 0
-                            && CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.w == 1
-                            ){
-                            startTransform.setRotation(new Ammo.btQuaternion(0,0,1,0));
-                        }
-                        else{
-                            startTransform.setRotation(new Ammo.btQuaternion(	CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.x,
-                                CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.y,
-                                CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.z,
-                                CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.w));
-                        }
-                        if(CollidableShapes[cs].RigidBody._vf.centerOfMass != null){
-                            centerOfMass = 	new Ammo.btTransform(startTransform.getRotation(),
-                                new Ammo.btVector3(	CollidableShapes[cs].CollidableShape._x3domNode._vf.translation.x+CollidableShapes[cs].RigidBody._vf.centerOfMass.x,
-                                        CollidableShapes[cs].CollidableShape._x3domNode._vf.translation.y+CollidableShapes[cs].RigidBody._vf.centerOfMass.y,
-                                        CollidableShapes[cs].CollidableShape._x3domNode._vf.translation.z+CollidableShapes[cs].RigidBody._vf.centerOfMass.z));
-                        }
-                        else{
-                            centerOfMass = startTransform;
-                        }
-                        if(CollidableShapes[cs].RigidBody._vf.inertia){
-                            if(CollidableShapes[cs].RigidBody._vf.inertia[0] + CollidableShapes[cs].RigidBody._vf.inertia[1] + CollidableShapes[cs].RigidBody._vf.inertia[2] ==
-                                CollidableShapes[cs].RigidBody._vf.inertia[3] + CollidableShapes[cs].RigidBody._vf.inertia[4] + CollidableShapes[cs].RigidBody._vf.inertia[5] ==
-                                CollidableShapes[cs].RigidBody._vf.inertia[6] + CollidableShapes[cs].RigidBody._vf.inertia[7] + CollidableShapes[cs].RigidBody._vf.inertia[8] == 1){
-                                localInertia = new Ammo.btVector3(0,0,0);
-                            }
-                            else{
-                                localInertia = new Ammo.btVector3(
-                                        CollidableShapes[cs].RigidBody._vf.inertia[0] + CollidableShapes[cs].RigidBody._vf.inertia[1] + CollidableShapes[cs].RigidBody._vf.inertia[2],
-                                        CollidableShapes[cs].RigidBody._vf.inertia[3] + CollidableShapes[cs].RigidBody._vf.inertia[4] + CollidableShapes[cs].RigidBody._vf.inertia[5],
-                                        CollidableShapes[cs].RigidBody._vf.inertia[6] + CollidableShapes[cs].RigidBody._vf.inertia[7] + CollidableShapes[cs].RigidBody._vf.inertia[8]);
-                            }
-                        }
-                        else{
-                            localInertia = new Ammo.btVector3(0,0,0);
-                        }
-                        boxShape = new Ammo.btBoxShape(new Ammo.btVector3( 	CollidableShapes[cs].CollidableShape._x3domNode._cf.shape._x3domNode._cf.geometry.node._vf.size.x/2,
-                                CollidableShapes[cs].CollidableShape._x3domNode._cf.shape._x3domNode._cf.geometry.node._vf.size.y/2,
-                                CollidableShapes[cs].CollidableShape._x3domNode._cf.shape._x3domNode._cf.geometry.node._vf.size.z/2));
-                        localInertia = new Ammo.btVector3(0,0,0);
-                        boxShape.calculateLocalInertia(mass, localInertia);
-                        boxShape.setMargin(CollidableShapes[cs].RigidBodyCollection._x3domNode._vf.contactSurfaceThickness);
-                        motionState = new Ammo.btDefaultMotionState(startTransform);
-                        rbInfo = new Ammo.btRigidBodyConstructionInfo(mass, motionState, boxShape, localInertia);
-                        rbInfo.m_friction = CollidableShapes[cs].CollisionCollection._x3domNode._vf.frictionCoefficients.x;
-                        rbInfo.m_rollingFriction = CollidableShapes[cs].CollisionCollection._x3domNode._vf.frictionCoefficients.y;
-                        boxAmmo = new Ammo.btRigidBody(rbInfo);
-                        if(CollidableShapes[cs].RigidBody._vf.autoDamp){
-                            boxAmmo.setDamping(CollidableShapes[cs].RigidBody._vf.linearDampingFactor, CollidableShapes[cs].RigidBody._vf.angularDampingFactor);
-                        }
-                        else{
-                            boxAmmo.setDamping(0,0);
-                        }
-                        boxAmmo.setAngularVelocity(new Ammo.btVector3(	CollidableShapes[cs].RigidBody._vf.angularVelocity.x,
-                            CollidableShapes[cs].RigidBody._vf.angularVelocity.y,
-                            CollidableShapes[cs].RigidBody._vf.angularVelocity.z));
-                        boxAmmo.setLinearVelocity(new Ammo.btVector3(	CollidableShapes[cs].RigidBody._vf.linearVelocity.x,
-                            CollidableShapes[cs].RigidBody._vf.linearVelocity.y,
-                            CollidableShapes[cs].RigidBody._vf.linearVelocity.z));
-                        if(CollidableShapes[cs].CollisionCollection._x3domNode._vf.bounce != null){
-                            boxAmmo.setRestitution(CollidableShapes[cs].CollisionCollection._x3domNode._vf.bounce);
-                        }
-                        else{
-                            boxAmmo.setRestitution(1.0);
-                        }
-                        if(CollidableShapes[cs].CollisionCollection._x3domNode._vf.frictionCoefficients != null){
-                            boxAmmo.setFriction(CollidableShapes[cs].CollisionCollection._x3domNode._vf.frictionCoefficients.y);
-                        }
-                        else{
-                            boxAmmo.setFriction(1);
-                        }
-                        if(CollidableShapes[cs].RigidBody._vf.disableLinearSpeed && CollidableShapes[cs].RigidBody._vf.disableAngularSpeed){
-                            boxAmmo.setSleepingThresholds(CollidableShapes[cs].RigidBody._vf.disableLinearSpeed, CollidableShapes[cs].RigidBody._vf.disableAngularSpeed);
-                        }
-                        if(CollidableShapes[cs].RigidBody._vf.useGlobalGravity){
-                            boxAmmo.setGravity(new Ammo.btVector3(	CollidableShapes[cs].RigidBodyCollection._x3domNode._vf.gravity.x,
-                                CollidableShapes[cs].RigidBodyCollection._x3domNode._vf.gravity.y,
-                                CollidableShapes[cs].RigidBodyCollection._x3domNode._vf.gravity.z));
-                            boxAmmo.setFlags(0);
-                        }
-                        else{
-                            boxAmmo.setFlags(1);
-                        }
-                        boxAmmo.setCenterOfMassTransform(centerOfMass);
-                        if(UpdateRigidbody != null){
-                            bulletWorld.removeRigidBody(rigidbodies[UpdateRigidbody]);
-                            bulletWorld.addRigidBody(boxAmmo);
-                            boxAmmo.geometry = box;
-                            rigidbodies.splice(UpdateRigidbody,1,boxAmmo);
-                        }
-                        else{
-                            bulletWorld.addRigidBody(boxAmmo);
-                            boxAmmo.geometry = box;
-                            rigidbodies.push(boxAmmo);
-                        }
-                    }
-                        break;
-
-                    case "cylinder":{
-                        var cylinder = CollidableShapes[cs];
-
-                        if(!CollidableShapes[cs].RigidBody._vf.enabled || CollidableShapes[cs].RigidBody._vf.fixed){
-                            mass = 0;
-                        }
-                        else{
-                            mass = CollidableShapes[cs].RigidBody._vf.mass;
-                        }
-                        startTransform = new Ammo.btTransform();
-                        startTransform.setIdentity();
-                        startTransform.setBasis(CollidableShapes[cs].RigidBody._vf.inertia);
-                        startTransform.setOrigin(new Ammo.btVector3(	CollidableShapes[cs].CollidableShape._x3domNode._vf.translation.x,
-                            CollidableShapes[cs].CollidableShape._x3domNode._vf.translation.y,
-                            CollidableShapes[cs].CollidableShape._x3domNode._vf.translation.z));
-                        if(CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.x == 0
-                            && CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.y == 0
-                            && CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.z == 0
-                            && CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.w == 1
-                            ){
-                            startTransform.setRotation(new Ammo.btQuaternion(0,0,1,0));
-                        }
-                        else{
-                            CollidableShapes[cs].Transform._x3domNode._vf.rotation = CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation;
-                            startTransform.setRotation(new Ammo.btQuaternion(	CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.x,
-                                CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.y,
-                                CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.z,
-                                CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.w));
-                        }
-                        if(CollidableShapes[cs].RigidBody._vf.centerOfMass != null){
-                            centerOfMass = 	new Ammo.btTransform(startTransform.getRotation(),
-                                new Ammo.btVector3(	CollidableShapes[cs].CollidableShape._x3domNode._vf.translation.x+CollidableShapes[cs].RigidBody._vf.centerOfMass.x,
-                                        CollidableShapes[cs].CollidableShape._x3domNode._vf.translation.y+CollidableShapes[cs].RigidBody._vf.centerOfMass.y,
-                                        CollidableShapes[cs].CollidableShape._x3domNode._vf.translation.z+CollidableShapes[cs].RigidBody._vf.centerOfMass.z));
-                        }
-                        else{
-                            centerOfMass = startTransform;
-                        }
-                        if(CollidableShapes[cs].RigidBody._vf.inertia){
-                            if(CollidableShapes[cs].RigidBody._vf.inertia[0] + CollidableShapes[cs].RigidBody._vf.inertia[1] + CollidableShapes[cs].RigidBody._vf.inertia[2] ==
-                                CollidableShapes[cs].RigidBody._vf.inertia[3] + CollidableShapes[cs].RigidBody._vf.inertia[4] + CollidableShapes[cs].RigidBody._vf.inertia[5] ==
-                                CollidableShapes[cs].RigidBody._vf.inertia[6] + CollidableShapes[cs].RigidBody._vf.inertia[7] + CollidableShapes[cs].RigidBody._vf.inertia[8] == 1){
-                                localInertia = new Ammo.btVector3(0,0,0);
-                            }
-                            else{
-                                localInertia = new Ammo.btVector3(
-                                        CollidableShapes[cs].RigidBody._vf.inertia[0] + CollidableShapes[cs].RigidBody._vf.inertia[1] + CollidableShapes[cs].RigidBody._vf.inertia[2],
-                                        CollidableShapes[cs].RigidBody._vf.inertia[3] + CollidableShapes[cs].RigidBody._vf.inertia[4] + CollidableShapes[cs].RigidBody._vf.inertia[5],
-                                        CollidableShapes[cs].RigidBody._vf.inertia[6] + CollidableShapes[cs].RigidBody._vf.inertia[7] + CollidableShapes[cs].RigidBody._vf.inertia[8]);
-                            }
-                        }
-                        else{
-                            localInertia = new Ammo.btVector3(0,0,0);
-                        }
-                        cylinderShape = new Ammo.btCylinderShape(new Ammo.btVector3(CollidableShapes[cs].CollidableShape._x3domNode._cf.shape._x3domNode._cf.geometry.node._vf.radius,
-                                CollidableShapes[cs].CollidableShape._x3domNode._cf.shape._x3domNode._cf.geometry.node._vf.height/2,
-                            CollidableShapes[cs].CollidableShape._x3domNode._cf.shape._x3domNode._cf.geometry.node._vf.radius));
-                        cylinderShape.calculateLocalInertia(mass, localInertia);
-                        cylinderShape.setMargin(CollidableShapes[cs].RigidBodyCollection._x3domNode._vf.contactSurfaceThickness);
-                        motionState = new Ammo.btDefaultMotionState(startTransform);
-                        rbInfo = new Ammo.btRigidBodyConstructionInfo(mass, motionState, cylinderShape, localInertia);
-                        rbInfo.m_friction = CollidableShapes[cs].CollisionCollection._x3domNode._vf.frictionCoefficients.x;
-                        rbInfo.m_rollingFriction = CollidableShapes[cs].CollisionCollection._x3domNode._vf.frictionCoefficients.y;
-                        cylinderAmmo = new Ammo.btRigidBody(rbInfo);
-                        if(CollidableShapes[cs].RigidBody._vf.autoDamp){
-                            cylinderAmmo.setDamping(CollidableShapes[cs].RigidBody._vf.linearDampingFactor, CollidableShapes[cs].RigidBody._vf.angularDampingFactor);
-                        }
-                        else{
-                            cylinderAmmo.setDamping(0,0);
-                        }
-                        cylinderAmmo.setAngularVelocity(new Ammo.btVector3(	CollidableShapes[cs].RigidBody._vf.angularVelocity.x,
-                            CollidableShapes[cs].RigidBody._vf.angularVelocity.y,
-                            CollidableShapes[cs].RigidBody._vf.angularVelocity.z));
-                        cylinderAmmo.setLinearVelocity(new Ammo.btVector3(	CollidableShapes[cs].RigidBody._vf.linearVelocity.x,
-                            CollidableShapes[cs].RigidBody._vf.linearVelocity.y,
-                            CollidableShapes[cs].RigidBody._vf.linearVelocity.z));
-                        if(CollidableShapes[cs].CollisionCollection._x3domNode._vf.bounce != null){
-                            cylinderAmmo.setRestitution(CollidableShapes[cs].CollisionCollection._x3domNode._vf.bounce);
-                        }
-                        else{
-                            cylinderAmmo.setRestitution(1.0);
-                        }
-                        if(CollidableShapes[cs].CollisionCollection._x3domNode._vf.frictionCoefficients != null){
-                            cylinderAmmo.setFriction(CollidableShapes[cs].CollisionCollection._x3domNode._vf.frictionCoefficients.y);
-                        }
-                        else{
-                            cylinderAmmo.setFriction(1);
-                        }
-                        if(CollidableShapes[cs].RigidBody._vf.disableLinearSpeed && CollidableShapes[cs].RigidBody._vf.disableAngularSpeed){
-                            cylinderAmmo.setSleepingThresholds(CollidableShapes[cs].RigidBody._vf.disableLinearSpeed, CollidableShapes[cs].RigidBody._vf.disableAngularSpeed);
-                        }
-                        if(CollidableShapes[cs].RigidBody._vf.useGlobalGravity){
-                            cylinderAmmo.setGravity(new Ammo.btVector3(	CollidableShapes[cs].RigidBodyCollection._x3domNode._vf.gravity.x,
-                                CollidableShapes[cs].RigidBodyCollection._x3domNode._vf.gravity.y,
-                                CollidableShapes[cs].RigidBodyCollection._x3domNode._vf.gravity.z));
-                            cylinderAmmo.setFlags(0);
-                        }
-                        else{
-                            cylinderAmmo.setFlags(1);
-                        }
-                        cylinderAmmo.setCenterOfMassTransform(centerOfMass);
-                        if(UpdateRigidbody != null){
-                            bulletWorld.removeRigidBody(rigidbodies[UpdateRigidbody]);
-                            bulletWorld.addRigidBody( cylinderAmmo );
-                            cylinderAmmo.geometry = cylinder;
-                            rigidbodies.splice(UpdateRigidbody,1,cylinderAmmo);
-                        }
-                        else{
-                            bulletWorld.addRigidBody( cylinderAmmo );
-                            cylinderAmmo.geometry = cylinder;
-                            rigidbodies.push( cylinderAmmo );
-                        }
-                    }
-                        break;
-
-                    case "cone":{
-
-                        var cone = CollidableShapes[cs];
-
-                        if(!CollidableShapes[cs].RigidBody._vf.enabled || CollidableShapes[cs].RigidBody._vf.fixed){
-                            mass = 0;
-                        }
-                        else{
-                            mass = CollidableShapes[cs].RigidBody._vf.mass;
-                        }
-                        startTransform = new Ammo.btTransform();
-                        startTransform.setIdentity();
-                        startTransform.setBasis(CollidableShapes[cs].RigidBody._vf.inertia);
-                        startTransform.setOrigin(new Ammo.btVector3(	CollidableShapes[cs].CollidableShape._x3domNode._vf.translation.x,
-                            CollidableShapes[cs].CollidableShape._x3domNode._vf.translation.y,
-                            CollidableShapes[cs].CollidableShape._x3domNode._vf.translation.z));
-                        if(CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.x == 0
-                            && CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.y == 0
-                            && CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.z == 0
-                            && CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.w == 1
-                            ){
-                            startTransform.setRotation(new Ammo.btQuaternion(0,0,1,0));
-                        }
-                        else{
-                            CollidableShapes[cs].Transform._x3domNode._vf.rotation = CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation;
-                            startTransform.setRotation(new Ammo.btQuaternion(	CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.x,
-                                CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.y,
-                                CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.z,
-                                CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.w));
-                        }
-                        if(CollidableShapes[cs].RigidBody._vf.centerOfMass != null){
-                            centerOfMass = 	new Ammo.btTransform(startTransform.getRotation(),
-                                new Ammo.btVector3(	CollidableShapes[cs].CollidableShape._x3domNode._vf.translation.x+CollidableShapes[cs].RigidBody._vf.centerOfMass.x,
-                                        CollidableShapes[cs].CollidableShape._x3domNode._vf.translation.y+CollidableShapes[cs].RigidBody._vf.centerOfMass.y,
-                                        CollidableShapes[cs].CollidableShape._x3domNode._vf.translation.z+CollidableShapes[cs].RigidBody._vf.centerOfMass.z));
-                        }
-                        else{
-                            centerOfMass = startTransform;
-                        }
-                        if(CollidableShapes[cs].RigidBody._vf.inertia){
-                            if(CollidableShapes[cs].RigidBody._vf.inertia[0] + CollidableShapes[cs].RigidBody._vf.inertia[1] + CollidableShapes[cs].RigidBody._vf.inertia[2] ==
-                                CollidableShapes[cs].RigidBody._vf.inertia[3] + CollidableShapes[cs].RigidBody._vf.inertia[4] + CollidableShapes[cs].RigidBody._vf.inertia[5] ==
-                                CollidableShapes[cs].RigidBody._vf.inertia[6] + CollidableShapes[cs].RigidBody._vf.inertia[7] + CollidableShapes[cs].RigidBody._vf.inertia[8] == 1){
-                                localInertia = new Ammo.btVector3(0,0,0);
-                            }
-                            else{
-                                localInertia = new Ammo.btVector3(
-                                        CollidableShapes[cs].RigidBody._vf.inertia[0] + CollidableShapes[cs].RigidBody._vf.inertia[1] + CollidableShapes[cs].RigidBody._vf.inertia[2],
-                                        CollidableShapes[cs].RigidBody._vf.inertia[3] + CollidableShapes[cs].RigidBody._vf.inertia[4] + CollidableShapes[cs].RigidBody._vf.inertia[5],
-                                        CollidableShapes[cs].RigidBody._vf.inertia[6] + CollidableShapes[cs].RigidBody._vf.inertia[7] + CollidableShapes[cs].RigidBody._vf.inertia[8]);
-                            }
-                        }
-                        else{
-                            localInertia = new Ammo.btVector3(0,0,0);
-                        }
-                        coneShape = new Ammo.btConeShape(	CollidableShapes[cs].CollidableShape._x3domNode._cf.shape._x3domNode._cf.geometry.node._vf.radius,
-                            CollidableShapes[cs].CollidableShape._x3domNode._cf.shape._x3domNode._cf.geometry.node._vf.height);
-                        coneShape.setConeUpIndex(1);
-                        coneShape.setMargin(CollidableShapes[cs].RigidBodyCollection._x3domNode._vf.contactSurfaceThickness);
-                        coneShape.calculateLocalInertia( mass, localInertia );
-                        motionState = new Ammo.btDefaultMotionState( startTransform);
-                        rbInfo = new Ammo.btRigidBodyConstructionInfo( mass, motionState, coneShape, localInertia );
-                        rbInfo.m_friction = CollidableShapes[cs].CollisionCollection._x3domNode._vf.frictionCoefficients.x;
-                        rbInfo.m_rollingFriction = CollidableShapes[cs].CollisionCollection._x3domNode._vf.frictionCoefficients.y;
-                        coneAmmo = new Ammo.btRigidBody( rbInfo );
-                        if(CollidableShapes[cs].RigidBody._vf.autoDamp){
-                            coneAmmo.setDamping(CollidableShapes[cs].RigidBody._vf.linearDampingFactor, CollidableShapes[cs].RigidBody._vf.angularDampingFactor);
-                        }
-                        else{
-                            coneAmmo.setDamping(0,0);
-                        }
-                        coneAmmo.setAngularVelocity(new Ammo.btVector3(	CollidableShapes[cs].RigidBody._vf.angularVelocity.x,
-                            CollidableShapes[cs].RigidBody._vf.angularVelocity.y,
-                            CollidableShapes[cs].RigidBody._vf.angularVelocity.z));
-                        coneAmmo.setLinearVelocity(new Ammo.btVector3(	CollidableShapes[cs].RigidBody._vf.linearVelocity.x,
-                            CollidableShapes[cs].RigidBody._vf.linearVelocity.y,
-                            CollidableShapes[cs].RigidBody._vf.linearVelocity.z));
-                        if(CollidableShapes[cs].CollisionCollection._x3domNode._vf.bounce != null){
-                            coneAmmo.setRestitution(CollidableShapes[cs].CollisionCollection._x3domNode._vf.bounce);
-                        }
-                        else{
-                            coneAmmo.setRestitution(1.0);
-                        }
-                        if(CollidableShapes[cs].CollisionCollection._x3domNode._vf.frictionCoefficients != null){
-                            coneAmmo.setFriction(CollidableShapes[cs].CollisionCollection._x3domNode._vf.frictionCoefficients.y);
-                        }
-                        else{
-                            coneAmmo.setFriction(1);
-                        }
-                        if(CollidableShapes[cs].RigidBody._vf.disableLinearSpeed && CollidableShapes[cs].RigidBody._vf.disableAngularSpeed){
-                            coneAmmo.setSleepingThresholds(CollidableShapes[cs].RigidBody._vf.disableLinearSpeed, CollidableShapes[cs].RigidBody._vf.disableAngularSpeed);
-                        }
-                        if(CollidableShapes[cs].RigidBody._vf.useGlobalGravity){
-                            coneAmmo.setGravity(new Ammo.btVector3(	CollidableShapes[cs].RigidBodyCollection._x3domNode._vf.gravity.x,
-                                CollidableShapes[cs].RigidBodyCollection._x3domNode._vf.gravity.y,
-                                CollidableShapes[cs].RigidBodyCollection._x3domNode._vf.gravity.z));
-                            coneAmmo.setFlags(0);
-                        }
-                        else{
-                            coneAmmo.setFlags(1);
-                        }
-                        coneAmmo.setCenterOfMassTransform(centerOfMass);
-                        if(UpdateRigidbody != null){
-                            bulletWorld.removeRigidBody(rigidbodies[UpdateRigidbody]);
-                            bulletWorld.addRigidBody( coneAmmo );
-                            coneAmmo.geometry = cone;
-                            rigidbodies.splice(UpdateRigidbody,1,coneAmmo);
-                        }
-                        else{
-                            bulletWorld.addRigidBody( coneAmmo );
-                            coneAmmo.geometry = cone;
-                            rigidbodies.push( coneAmmo );
-                        }
-                    }
-                        break;
-
-                    case "indexedfaceset":{
-                        var indexedfaceset = CollidableShapes[cs];
-                        if(!CollidableShapes[cs].RigidBody._vf.enabled || CollidableShapes[cs].RigidBody._vf.fixed){
-                            mass = 0;
-                        }
-                        else{
-                            mass = CollidableShapes[cs].RigidBody._vf.mass;
-                        }
-                        startTransform = new Ammo.btTransform();
-                        startTransform.setIdentity();
-                        startTransform.setBasis(CollidableShapes[cs].RigidBody._vf.inertia);
-                        startTransform.setOrigin(new Ammo.btVector3(	CollidableShapes[cs].CollidableShape._x3domNode._vf.translation.x,
-                            CollidableShapes[cs].CollidableShape._x3domNode._vf.translation.y,
-                            CollidableShapes[cs].CollidableShape._x3domNode._vf.translation.z));
-                        if(CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.x == 0
-                            && CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.y == 0
-                            && CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.z == 0
-                            && CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.w == 1
-                            ){
-                            startTransform.setRotation(new Ammo.btQuaternion(0,0,1,0));
-                        }
-                        else{
-                            CollidableShapes[cs].Transform._x3domNode._vf.rotation = CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation;
-                            startTransform.setRotation(new Ammo.btQuaternion(	CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.x,
-                                CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.y,
-                                CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.z,
-                                CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.w));
-                        }
-                        if(CollidableShapes[cs].RigidBody._vf.centerOfMass != null){
-                            centerOfMass = 	new Ammo.btTransform(startTransform.getRotation(),
-                                new Ammo.btVector3(	CollidableShapes[cs].CollidableShape._x3domNode._vf.translation.x+CollidableShapes[cs].RigidBody._vf.centerOfMass.x,
-                                        CollidableShapes[cs].CollidableShape._x3domNode._vf.translation.y+CollidableShapes[cs].RigidBody._vf.centerOfMass.y,
-                                        CollidableShapes[cs].CollidableShape._x3domNode._vf.translation.z+CollidableShapes[cs].RigidBody._vf.centerOfMass.z));
-                        }
-                        else{
-                            centerOfMass = startTransform;
-                        }
-                        if(CollidableShapes[cs].RigidBody._vf.inertia){
-                            if(CollidableShapes[cs].RigidBody._vf.inertia[0] + CollidableShapes[cs].RigidBody._vf.inertia[1] + CollidableShapes[cs].RigidBody._vf.inertia[2] ==
-                                CollidableShapes[cs].RigidBody._vf.inertia[3] + CollidableShapes[cs].RigidBody._vf.inertia[4] + CollidableShapes[cs].RigidBody._vf.inertia[5] ==
-                                CollidableShapes[cs].RigidBody._vf.inertia[6] + CollidableShapes[cs].RigidBody._vf.inertia[7] + CollidableShapes[cs].RigidBody._vf.inertia[8] == 1){
-                                localInertia = new Ammo.btVector3(0,0,0);
-                            }
-                            else{
-                                localInertia = new Ammo.btVector3(
-                                        CollidableShapes[cs].RigidBody._vf.inertia[0] + CollidableShapes[cs].RigidBody._vf.inertia[1] + CollidableShapes[cs].RigidBody._vf.inertia[2],
-                                        CollidableShapes[cs].RigidBody._vf.inertia[3] + CollidableShapes[cs].RigidBody._vf.inertia[4] + CollidableShapes[cs].RigidBody._vf.inertia[5],
-                                        CollidableShapes[cs].RigidBody._vf.inertia[6] + CollidableShapes[cs].RigidBody._vf.inertia[7] + CollidableShapes[cs].RigidBody._vf.inertia[8]);
-                            }
-                        }
-                        else{
-                            localInertia = new Ammo.btVector3(0,0,0);
-                        }
-                        var convexHullShape = new Ammo.btConvexHullShape();
-                        for(var p in CollidableShapes[cs].CollidableShape._x3domNode._cf.shape._x3domNode._cf.geometry.node._cf.coord.node._vf.point){
-                            convexHullShape.addPoint(new Ammo.btVector3(CollidableShapes[cs].CollidableShape._x3domNode._cf.shape._x3domNode._cf.geometry.node._cf.coord.node._vf.point[p].x,
-                                    CollidableShapes[cs].CollidableShape._x3domNode._cf.shape._x3domNode._cf.geometry.node._cf.coord.node._vf.point[p].y,
-                                    CollidableShapes[cs].CollidableShape._x3domNode._cf.shape._x3domNode._cf.geometry.node._cf.coord.node._vf.point[p].z),
-                                true);
-                        }
-                        var compoundShape = new Ammo.btCompoundShape();
-                        compoundShape.addChildShape(startTransform, convexHullShape);
-                        compoundShape.setMargin(CollidableShapes[cs].RigidBodyCollection._x3domNode._vf.contactSurfaceThickness);
-                        compoundShape.createAabbTreeFromChildren();
-                        compoundShape.updateChildTransform(0, new Ammo.btTransform(new Ammo.btQuaternion(0,0,0,1), new Ammo.btVector3(0,0,0)),true);
-                        compoundShape.calculateLocalInertia( mass, localInertia );
-                        motionState = new Ammo.btDefaultMotionState( startTransform);
-                        rbInfo = new Ammo.btRigidBodyConstructionInfo( mass, motionState, compoundShape, localInertia );
-                        rbInfo.m_friction = CollidableShapes[cs].CollisionCollection._x3domNode._vf.frictionCoefficients.x;
-                        rbInfo.m_rollingFriction = CollidableShapes[cs].CollisionCollection._x3domNode._vf.frictionCoefficients.y;
-                        indexedfacesetAmmo = new Ammo.btRigidBody( rbInfo );
-                        if(CollidableShapes[cs].RigidBody._vf.autoDamp){
-                            indexedfacesetAmmo.setDamping(CollidableShapes[cs].RigidBody._vf.linearDampingFactor, CollidableShapes[cs].RigidBody._vf.angularDampingFactor);
-                        }
-                        else{
-                            indexedfacesetAmmo.setDamping(0,0);
-                        }
-                        indexedfacesetAmmo.setAngularVelocity(new Ammo.btVector3(	CollidableShapes[cs].RigidBody._vf.angularVelocity.x,
-                            CollidableShapes[cs].RigidBody._vf.angularVelocity.y,
-                            CollidableShapes[cs].RigidBody._vf.angularVelocity.z));
-                        indexedfacesetAmmo.setLinearVelocity(new Ammo.btVector3(	CollidableShapes[cs].RigidBody._vf.linearVelocity.x,
-                            CollidableShapes[cs].RigidBody._vf.linearVelocity.y,
-                            CollidableShapes[cs].RigidBody._vf.linearVelocity.z));
-                        if(CollidableShapes[cs].CollisionCollection._x3domNode._vf.bounce != null){
-                            indexedfacesetAmmo.setRestitution(CollidableShapes[cs].CollisionCollection._x3domNode._vf.bounce);
-                        }
-                        else{
-                            indexedfacesetAmmo.setRestitution(1.0);
-                        }
-                        if(CollidableShapes[cs].CollisionCollection._x3domNode._vf.frictionCoefficients != null){
-                            indexedfacesetAmmo.setFriction(CollidableShapes[cs].CollisionCollection._x3domNode._vf.frictionCoefficients.y);
-                        }
-                        else{
-                            indexedfacesetAmmo.setFriction(1);
-                        }
-                        if(CollidableShapes[cs].RigidBody._vf.disableLinearSpeed && CollidableShapes[cs].RigidBody._vf.disableAngularSpeed){
-                            indexedfacesetAmmo.setSleepingThresholds(CollidableShapes[cs].RigidBody._vf.disableLinearSpeed, CollidableShapes[cs].RigidBody._vf.disableAngularSpeed);
-                        }
-                        if(CollidableShapes[cs].RigidBody._vf.useGlobalGravity){
-                            indexedfacesetAmmo.setGravity(new Ammo.btVector3(	CollidableShapes[cs].RigidBodyCollection._x3domNode._vf.gravity.x,
-                                CollidableShapes[cs].RigidBodyCollection._x3domNode._vf.gravity.y,
-                                CollidableShapes[cs].RigidBodyCollection._x3domNode._vf.gravity.z));
-                            indexedfacesetAmmo.setFlags(0);
-                        }
-                        else{
-                            indexedfacesetAmmo.setFlags(1);
-                        }
-                        indexedfacesetAmmo.setCenterOfMassTransform(centerOfMass);
-                        if(UpdateRigidbody != null){
-                            bulletWorld.removeRigidBody(rigidbodies[UpdateRigidbody]);
-                            bulletWorld.addRigidBody( indexedfacesetAmmo );
-                            indexedfacesetAmmo.geometry = indexedfaceset;
-                            rigidbodies.splice(UpdateRigidbody,1,indexedfacesetAmmo);
-                        }
-                        else{
-                            bulletWorld.addRigidBody( indexedfacesetAmmo );
-                            indexedfacesetAmmo.geometry = indexedfaceset;
-                            rigidbodies.push( indexedfacesetAmmo );
-                        }
-                    }
-                        break;
-
-                    case "indexedtriangleset":{
-
-                        var triangleset = CollidableShapes[cs];
-                        if(!CollidableShapes[cs].RigidBody._vf.enabled || CollidableShapes[cs].RigidBody._vf.fixed){
-                            mass = 0;
-                        }
-                        else{
-                            mass = CollidableShapes[cs].RigidBody._vf.mass;
-                        }
-                        startTransform = new Ammo.btTransform();
-                        startTransform.setIdentity();
-                        startTransform.setBasis(CollidableShapes[cs].RigidBody._vf.inertia);
-                        startTransform.setOrigin(new Ammo.btVector3(	CollidableShapes[cs].CollidableShape._x3domNode._vf.translation.x,
-                            CollidableShapes[cs].CollidableShape._x3domNode._vf.translation.y,
-                            CollidableShapes[cs].CollidableShape._x3domNode._vf.translation.z));
-                        if(CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.x == 0
-                            && CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.y == 0
-                            && CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.z == 0
-                            && CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.w == 1
-                            ){
-                            startTransform.setRotation(new Ammo.btQuaternion(0,0,1,0));
-                        }
-                        else{
-                            CollidableShapes[cs].Transform._x3domNode._vf.rotation = CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation;
-                            startTransform.setRotation(new Ammo.btQuaternion(	CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.x,
-                                CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.y,
-                                CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.z,
-                                CollidableShapes[cs].CollidableShape._x3domNode._vf.rotation.w));
-                        }
-                        if(CollidableShapes[cs].RigidBody._vf.centerOfMass != null){
-                            centerOfMass = 	new Ammo.btTransform(startTransform.getRotation(),
-                                new Ammo.btVector3(	CollidableShapes[cs].CollidableShape._x3domNode._vf.translation.x+CollidableShapes[cs].RigidBody._vf.centerOfMass.x,
-                                        CollidableShapes[cs].CollidableShape._x3domNode._vf.translation.y+CollidableShapes[cs].RigidBody._vf.centerOfMass.y,
-                                        CollidableShapes[cs].CollidableShape._x3domNode._vf.translation.z+CollidableShapes[cs].RigidBody._vf.centerOfMass.z));
-                        }
-                        else{
-                            centerOfMass = startTransform;
-                        }
-                        if(CollidableShapes[cs].RigidBody._vf.inertia){
-                            if(CollidableShapes[cs].RigidBody._vf.inertia[0] + CollidableShapes[cs].RigidBody._vf.inertia[1] + CollidableShapes[cs].RigidBody._vf.inertia[2] ==
-                                CollidableShapes[cs].RigidBody._vf.inertia[3] + CollidableShapes[cs].RigidBody._vf.inertia[4] + CollidableShapes[cs].RigidBody._vf.inertia[5] ==
-                                CollidableShapes[cs].RigidBody._vf.inertia[6] + CollidableShapes[cs].RigidBody._vf.inertia[7] + CollidableShapes[cs].RigidBody._vf.inertia[8] == 1){
-                                localInertia = new Ammo.btVector3(0,0,0);
-                            }
-                            else{
-                                localInertia = new Ammo.btVector3(
-                                        CollidableShapes[cs].RigidBody._vf.inertia[0] + CollidableShapes[cs].RigidBody._vf.inertia[1] + CollidableShapes[cs].RigidBody._vf.inertia[2],
-                                        CollidableShapes[cs].RigidBody._vf.inertia[3] + CollidableShapes[cs].RigidBody._vf.inertia[4] + CollidableShapes[cs].RigidBody._vf.inertia[5],
-                                        CollidableShapes[cs].RigidBody._vf.inertia[6] + CollidableShapes[cs].RigidBody._vf.inertia[7] + CollidableShapes[cs].RigidBody._vf.inertia[8]);
-                            }
-                        }
-                        else{
-                            localInertia = new Ammo.btVector3(0,0,0);
-                        }
-                        var convexHullShape = new Ammo.btConvexHullShape();
-                        for(var p in CollidableShapes[cs].CollidableShape._x3domNode._cf.shape._x3domNode._cf.geometry.node._cf.coord.node._vf.point){
-                            convexHullShape.addPoint(new Ammo.btVector3(CollidableShapes[cs].CollidableShape._x3domNode._cf.shape._x3domNode._cf.geometry.node._cf.coord.node._vf.point[p].x,
-                                CollidableShapes[cs].CollidableShape._x3domNode._cf.shape._x3domNode._cf.geometry.node._cf.coord.node._vf.point[p].y,
-                                CollidableShapes[cs].CollidableShape._x3domNode._cf.shape._x3domNode._cf.geometry.node._cf.coord.node._vf.point[p].z), true);
-                        }
-                        var compoundShape = new Ammo.btCompoundShape();
-                        compoundShape.addChildShape(startTransform, convexHullShape);
-                        compoundShape.setMargin(CollidableShapes[cs].RigidBodyCollection._x3domNode._vf.contactSurfaceThickness);
-                        compoundShape.createAabbTreeFromChildren();
-                        compoundShape.updateChildTransform(0, new Ammo.btTransform(new Ammo.btQuaternion(0,0,0,1), new Ammo.btVector3(0,0,0)),true);
-                        compoundShape.calculateLocalInertia( mass, localInertia );
-                        motionState = new Ammo.btDefaultMotionState( startTransform);
-                        rbInfo = new Ammo.btRigidBodyConstructionInfo( mass, motionState, compoundShape, localInertia );
-                        rbInfo.m_friction = CollidableShapes[cs].CollisionCollection._x3domNode._vf.frictionCoefficients.x;
-                        rbInfo.m_rollingFriction = CollidableShapes[cs].CollisionCollection._x3domNode._vf.frictionCoefficients.y;
-                        trianglesetAmmo = new Ammo.btRigidBody( rbInfo );
-                        if(CollidableShapes[cs].RigidBody._vf.autoDamp){
-                            trianglesetAmmo.setDamping(CollidableShapes[cs].RigidBody._vf.linearDampingFactor, CollidableShapes[cs].RigidBody._vf.angularDampingFactor);
-                        }
-                        else{
-                            trianglesetAmmo.setDamping(0,0);
-                        }
-                        trianglesetAmmo.setAngularVelocity(new Ammo.btVector3(	CollidableShapes[cs].RigidBody._vf.angularVelocity.x,
-                            CollidableShapes[cs].RigidBody._vf.angularVelocity.y,
-                            CollidableShapes[cs].RigidBody._vf.angularVelocity.z));
-                        trianglesetAmmo.setLinearVelocity(new Ammo.btVector3(	CollidableShapes[cs].RigidBody._vf.linearVelocity.x,
-                            CollidableShapes[cs].RigidBody._vf.linearVelocity.y,
-                            CollidableShapes[cs].RigidBody._vf.linearVelocity.z));
-                        if(CollidableShapes[cs].CollisionCollection._x3domNode._vf.bounce != null){
-                            trianglesetAmmo.setRestitution(CollidableShapes[cs].CollisionCollection._x3domNode._vf.bounce);
-                        }
-                        else{
-                            trianglesetAmmo.setRestitution(1.0);
-                        }
-                        if(CollidableShapes[cs].CollisionCollection._x3domNode._vf.frictionCoefficients != null){
-                            trianglesetAmmo.setFriction(CollidableShapes[cs].CollisionCollection._x3domNode._vf.frictionCoefficients.y);
-                        }
-                        else{
-                            trianglesetAmmo.setFriction(1);
-                        }
-                        if(CollidableShapes[cs].RigidBody._vf.disableLinearSpeed && CollidableShapes[cs].RigidBody._vf.disableAngularSpeed){
-                            trianglesetAmmo.setSleepingThresholds(CollidableShapes[cs].RigidBody._vf.disableLinearSpeed, CollidableShapes[cs].RigidBody._vf.disableAngularSpeed);
-                        }
-                        if(CollidableShapes[cs].RigidBody._vf.useGlobalGravity){
-                            trianglesetAmmo.setGravity(new Ammo.btVector3(	CollidableShapes[cs].RigidBodyCollection._x3domNode._vf.gravity.x,
-                                CollidableShapes[cs].RigidBodyCollection._x3domNode._vf.gravity.y,
-                                CollidableShapes[cs].RigidBodyCollection._x3domNode._vf.gravity.z));
-                            trianglesetAmmo.setFlags(0);
-                        }
-                        else{
-                            trianglesetAmmo.setFlags(1);
-                        }
-                        trianglesetAmmo.setCenterOfMassTransform(centerOfMass);
-                        if(UpdateRigidbody != null){
-                            bulletWorld.removeRigidBody(rigidbodies[UpdateRigidbody]);
-                            bulletWorld.addRigidBody( trianglesetAmmo );
-                            trianglesetAmmo.geometry = triangleset;
-                            rigidbodies.splice(UpdateRigidbody,1,trianglesetAmmo);
-                        }
-                        else{
-                            bulletWorld.addRigidBody( trianglesetAmmo );
-                            trianglesetAmmo.geometry = triangleset;
-                            rigidbodies.push( trianglesetAmmo );
-                        }
-                    }
-                        break;
-                }
-            }
-        }
-        CreateJoints();
-        MakeUpdateList();
-    };
-
-
-//	###############################################################
-//	############	CREATE&DESCRIBE JOINTS IN BULLET	###########
-//	###############################################################
-
-    CreateJoints = function(){
-        if(UpdateRigidbody != null){
-            var constraintNum = bulletWorld.getNumConstraints();
-            for(cn = constraintNum; cn >= 0; cn--){
-                var constr = bulletWorld.getConstraint(cn);
-                bulletWorld.removeConstraint(constr);
-            }
-        }
-        for(var js in JointShapes){
-            if(JointShapes[js].Joint._xmlNode.nodeName){
-                switch(JointShapes[js].Joint._xmlNode.nodeName.toLowerCase()){
-                    case "balljoint":{
-                        for (var j in rigidbodies) {
-                            if(rigidbodies[j].geometry.RigidBody._DEF && rigidbodies[j].geometry.RigidBody._DEF == JointShapes[js].Joint._cf.body1.node._DEF){
-                                var object1 = rigidbodies[j];
-                            }
-                            if(rigidbodies[j].geometry.RigidBody._DEF && rigidbodies[j].geometry.RigidBody._DEF == JointShapes[js].Joint._cf.body2.node._DEF){
-                                var object2 = rigidbodies[j];
-                            }
-                        }
-                        if(object1 && object2){
-                            var newBallJoint = new Ammo.btPoint2PointConstraint(object1, object2,
-                                new Ammo.btVector3(JointShapes[js].Joint._vf.anchorPoint.x, JointShapes[js].Joint._vf.anchorPoint.y, JointShapes[js].Joint._vf.anchorPoint.z),
-                                new Ammo.btVector3(-JointShapes[js].Joint._vf.anchorPoint.x, -JointShapes[js].Joint._vf.anchorPoint.y, -JointShapes[js].Joint._vf.anchorPoint.z));
-                            bulletWorld.addConstraint(newBallJoint);
-                        }
-                    }
-                        break;
-
-                    case "sliderjoint":{
-                        for ( j = 0; j < rigidbodies.length; j++ ) {
-                            if(rigidbodies[j].geometry.RigidBody._DEF && rigidbodies[j].geometry.RigidBody._DEF == JointShapes[js].Joint._cf.body1.node._DEF){
-                                var object1 = rigidbodies[j];
-                            }
-                            if(rigidbodies[j].geometry.RigidBody._DEF && rigidbodies[j].geometry.RigidBody._DEF == JointShapes[js].Joint._cf.body2.node._DEF){
-                                var object2 = rigidbodies[j];
-                            }
-                        }
-                        if(object1 && object2){
-                            var newSliderJoint = new Ammo.btSliderConstraint(object1, object2, object1.getWorldTransform(), object2.getWorldTransform(), true);
-                            newSliderJoint.setFrames(object1.getWorldTransform(), object2.getWorldTransform());
-                            bulletWorld.addConstraint(newSliderJoint);
-                        }
-                    }
-                        break;
-
-                    case "universaljoint":{
-                        for ( j = 0; j < rigidbodies.length; j++ ) {
-                            if(rigidbodies[j].geometry.RigidBody._DEF && rigidbodies[j].geometry.RigidBody._DEF == JointShapes[js].Joint._cf.body1.node._DEF){
-                                var object1 = rigidbodies[j];
-                            }
-                            if(rigidbodies[j].geometry.RigidBody._DEF && rigidbodies[j].geometry.RigidBody._DEF == JointShapes[js].Joint._cf.body2.node._DEF){
-                                var object2 = rigidbodies[j];
-                            }
-                        }
-                        if(object1 && object2){
-                            var newUniversalJoint = new btUniversalConstraint(object1, object2,
-                                new Ammo.btVector3(JointShapes[js].Joint._vf.anchorPoint.x, JointShapes[js].Joint._vf.anchorPoint.y, JointShapes[js].Joint._vf.anchorPoint.z),
-                                new Ammo.btVector3(JointShapes[js].Joint._vf.axis1.x, JointShapes[js].Joint._vf.axis1.y, JointShapes[js].Joint._vf.axis1.z),
-                                new Ammo.btVector3(JointShapes[js].Joint._vf.axis2.x, JointShapes[js].Joint._vf.axis2.y, JointShapes[js].Joint._vf.axis2.z));
-                            bulletWorld.addConstraint( newUniversalJoint );
-                        }
-                    }
-                        break;
-
-                    case "motorjoint":{
-                        for ( j = 0; j < rigidbodies.length; j++ ) {
-                            if(rigidbodies[j].geometry.RigidBody._DEF && rigidbodies[j].geometry.RigidBody._DEF == JointShapes[js].Joint._cf.body1.node._DEF){
-                                var object1 = rigidbodies[j];
-                                rigidbodies[j].geometry.isMotor = true;
-                                rigidbodies[j].geometry.torque = new x3dom.fields.SFVec3f(	JointShapes[js].Joint._vf.axis2Torque * JointShapes[js].Joint._vf.motor2Axis.x,
-                                        JointShapes[js].Joint._vf.axis2Torque * JointShapes[js].Joint._vf.motor2Axis.y,
-                                        JointShapes[js].Joint._vf.axis2Torque * JointShapes[js].Joint._vf.motor2Axis.z);
-                            }
-                            if(rigidbodies[j].geometry.RigidBody._DEF && rigidbodies[j].geometry.RigidBody._DEF == JointShapes[js].Joint._cf.body2.node._DEF){
-                                var object2 = rigidbodies[j];
-                                rigidbodies[j].geometry.isMotor = true;
-                                rigidbodies[j].geometry.torque = new x3dom.fields.SFVec3f(	JointShapes[js].Joint._vf.axis3Torque * JointShapes[js].Joint._vf.motor3Axis.x,
-                                        JointShapes[js].Joint._vf.axis3Torque * JointShapes[js].Joint._vf.motor3Axis.y,
-                                        JointShapes[js].Joint._vf.axis3Torque * JointShapes[js].Joint._vf.motor3Axis.z);
-                            }
-                        }
-                        if(object1 && object2){
-                            var newGearJoint = new btGeneric6DofConstraint(	object1, object2, object1.getWorldTransform(), object2.getWorldTransform(), true );
-                            /*
-                             For each axis, if
-                             lower limit = upper limit, The axis is locked
-                             lower limit < upper limit, The axis is limited between the specified values
-                             lower limit > upper limit, The axis is free and has no limits
-                             */
-                            if(JointShapes[js].Joint._vf.motor3Axis.x != 0){
-                                newGearJoint.getRotationalLimitMotor(0).m_enableMotor = true;
-                                newGearJoint.getRotationalLimitMotor(0).m_targetVelocity = JointShapes[js].Joint._vf.axis1Torque;
-                                newGearJoint.getRotationalLimitMotor(0).m_maxMotorForce = 100.0;
-                                newGearJoint.getRotationalLimitMotor(0).m_loLimit = 0.0;
-                                newGearJoint.getRotationalLimitMotor(0).m_hiLimit = 10.0;
-                            }
-                            else{
-                                newGearJoint.getRotationalLimitMotor(0).m_enableMotor = false;
-                                newGearJoint.getRotationalLimitMotor(0).m_targetVelocity = 0;
-                                newGearJoint.getRotationalLimitMotor(0).m_maxMotorForce = 0.0;
-                                newGearJoint.getRotationalLimitMotor(0).m_loLimit = 0.0;
-                                newGearJoint.getRotationalLimitMotor(0).m_hiLimit = 0.0;
-                            }
-                            if(JointShapes[js].Joint._vf.motor3Axis.y != 0){
-                                newGearJoint.getRotationalLimitMotor(1).m_enableMotor = true;
-                                newGearJoint.getRotationalLimitMotor(1).m_targetVelocity = JointShapes[js].Joint._vf.axis2Torque;
-                                newGearJoint.getRotationalLimitMotor(1).m_maxMotorForce = 100.0;
-                                newGearJoint.getRotationalLimitMotor(1).m_loLimit = 0.0;
-                                newGearJoint.getRotationalLimitMotor(1).m_hiLimit = 10.0;
-                            }
-                            else{
-                                newGearJoint.getRotationalLimitMotor(1).m_enableMotor = false;
-                                newGearJoint.getRotationalLimitMotor(1).m_targetVelocity = 0;
-                                newGearJoint.getRotationalLimitMotor(1).m_maxMotorForce = 0.0;
-                                newGearJoint.getRotationalLimitMotor(1).m_loLimit = 0.0;
-                                newGearJoint.getRotationalLimitMotor(1).m_hiLimit = 0.0;
-                            }
-                            if(JointShapes[js].Joint._vf.motor3Axis.z != 0){
-                                newGearJoint.getRotationalLimitMotor(2).m_enableMotor = true;
-                                newGearJoint.getRotationalLimitMotor(2).m_targetVelocity = JointShapes[js].Joint._vf.axis3Torque;
-                                newGearJoint.getRotationalLimitMotor(2).m_maxMotorForce = 100.0;
-                                newGearJoint.getRotationalLimitMotor(2).m_loLimit = 0.0;
-                                newGearJoint.getRotationalLimitMotor(2).m_hiLimit = 10.0;
-                            }
-                            else{
-                                newGearJoint.getRotationalLimitMotor(2).m_enableMotor = false;
-                                newGearJoint.getRotationalLimitMotor(2).m_targetVelocity = 0;
-                                newGearJoint.getRotationalLimitMotor(2).m_maxMotorForce = 0.0;
-                                newGearJoint.getRotationalLimitMotor(2).m_loLimit = 0.0;
-                                newGearJoint.getRotationalLimitMotor(2).m_hiLimit = 0.0;
-                            }
-                            newGearJoint.enableFeedback(true);
-                            bulletWorld.addConstraint( newGearJoint, true);
-                        }
-                    }
-                        break;
-
-                    case "singleaxishingejoint":{
-                        for ( j = 0; j < rigidbodies.length; j++ ) {
-                            if(rigidbodies[j].geometry.RigidBody._DEF && rigidbodies[j].geometry.RigidBody._DEF == JointShapes[js].Joint._cf.body1.node._DEF){
-                                var object1 = rigidbodies[j];
-                            }
-                            if(rigidbodies[j].geometry.RigidBody._DEF && rigidbodies[j].geometry.RigidBody._DEF == JointShapes[js].Joint._cf.body2.node._DEF){
-                                var object2 = rigidbodies[j];
-                            }
-                        }
-                        if(object1 && object2){
-                            var newSingleHingeJoint = new btHingeConstraint(object1, object2,
-                                new Ammo.btVector3(JointShapes[js].Joint._vf.anchorPoint.x, JointShapes[js].Joint._vf.anchorPoint.y, JointShapes[js].Joint._vf.anchorPoint.z),
-                                new Ammo.btVector3(-JointShapes[js].Joint._vf.anchorPoint.x, -JointShapes[js].Joint._vf.anchorPoint.y, -JointShapes[js].Joint._vf.anchorPoint.z),
-                                new Ammo.btVector3(JointShapes[js].Joint._vf.axis.x, JointShapes[js].Joint._vf.axis.y, JointShapes[js].Joint._vf.axis.z),
-                                new Ammo.btVector3(JointShapes[js].Joint._vf.axis.x, JointShapes[js].Joint._vf.axis.y, JointShapes[js].Joint._vf.axis.z),
-                                false );
-                            newSingleHingeJoint.setLimit(JointShapes[js].Joint._vf.minAngle, JointShapes[js].Joint._vf.maxAngle, 0.9, 0.3, 1.0);
-                            bulletWorld.addConstraint(newSingleHingeJoint);
-                        }
-                    }
-                        break;
-
-                    case "doubleaxishingejoint":{
-                        for ( j = 0; j < rigidbodies.length; j++ ) {
-                            if(rigidbodies[j].geometry.RigidBody._DEF && rigidbodies[j].geometry.RigidBody._DEF == JointShapes[js].Joint._cf.body1.node._DEF){
-                                var object1 = rigidbodies[j];
-                            }
-                            if(rigidbodies[j].geometry.RigidBody._DEF && rigidbodies[j].geometry.RigidBody._DEF == JointShapes[js].Joint._cf.body2.node._DEF){
-                                var object2 = rigidbodies[j];
-                            }
-                        }
-                        if(object1 && object2){
-                            var newDoubleHingeJoint = new btHingeConstraint(object1, object2,
-                                new Ammo.btVector3(JointShapes[js].Joint._vf.anchorPoint.x, JointShapes[js].Joint._vf.anchorPoint.y, JointShapes[js].Joint._vf.anchorPoint.z),
-                                new Ammo.btVector3(-JointShapes[js].Joint._vf.anchorPoint.x, -JointShapes[js].Joint._vf.anchorPoint.y, -JointShapes[js].Joint._vf.anchorPoint.z),
-                                new Ammo.btVector3(JointShapes[js].Joint._vf.axis1.x, JointShapes[js].Joint._vf.axis1.y, JointShapes[js].Joint._vf.axis1.z),
-                                new Ammo.btVector3(JointShapes[js].Joint._vf.axis2.x, JointShapes[js].Joint._vf.axis2.y, JointShapes[js].Joint._vf.axis2.z),
-                                false );
-                            newDoubleHingeJoint.setLimit(JointShapes[js].Joint._vf.minAngle1, JointShapes[js].Joint._vf.maxAngle1, 0.9, 0.3, 1.0);
-                            bulletWorld.addConstraint( newDoubleHingeJoint, true);
-                        }
-                    }
-                        break;
-                }
-            }
-        }
-    };
-
-    MakeUpdateList = function(){
-        for(var r = 0; r < rigidbodies.length; r++ ){
-            if(!drag && rigidbodies[r].geometry.createRigid){
-                rigidbodies[r].geometry.createRigid = false;
-            }
-        }
-        for(var r = 0; r < JointShapes.length; r++ ){
-            if(!drag && JointShapes[r].createJoint){
-                JointShapes[r].createJoint = false;
-            }
-        }
-        building_constraints = false;
-    };
-
-    CreateInteractiveObjects = function(){
-        if (x3dWorld) {
-            x3dWorld.parentElement.addEventListener('mouseup', MouseControlStop, false);
-            x3dWorld.parentElement.addEventListener('mousedown', MouseControlStart, false);
-            x3dWorld.parentElement.addEventListener('mousemove', MouseControlMove, false);
-            for (var t in interactiveTransforms) {
-                for (var cs in CollidableShapes) {
-                    if (CollidableShapes[cs].Transform._x3domNode._DEF == interactiveTransforms[t]._x3domNode._DEF) {
-                        if (!CollidableShapes[cs].RigidBody._vf.fixed) {
-                            interactiveTransforms[t].addEventListener('mousedown', MouseControlStart, false);
-                            interactiveTransforms[t].addEventListener('mousemove', MouseControlMove, false);
-                            new x3dom.Moveable(x3dWorld.parentElement, interactiveTransforms[t], null, 0);
-                        }
-                    }
-                }
-            }
-        }
-    };
-
-    UpdateConstraints = function(){
-        if(drag && building_constraints == false){
-            for(var r = 0; r < rigidbodies.length; r++){
-                if(rigidbodies[r].geometry.Transform){
-                    if(rigidbodies[r].geometry.Transform._x3domNode._DEF == mousePickObject._DEF){
-                        UpdateRigidbody = r;
-                    }
-                }
-            }
-            CreateRigidbodies();
-        }
-        else{
-            clearInterval(intervalVar);
-            CreateRigidbodies();
-            UpdateRigidbody = null;
-            mousePickObject = null;
-        }
-    };
-
-    MouseControlMove = function(e){
-        if(e.hitPnt){
-            mousePos = new x3dom.fields.SFVec3f.parse(e.hitPnt);
-        }
-    };
-
-    MouseControlStart = function(e){
-        if(!drag){
-            drag = true;
-            if(e.hitObject){
-                for(var pn in e.hitObject._x3domNode._parentNodes){
-                    if(x3dom.isa(e.hitObject._x3domNode._parentNodes[pn], x3dom.nodeTypes.Transform)){
-                        mousePickObject = e.hitObject._x3domNode._parentNodes[pn];
-                    }
-                }
-            }
-            if(mousePickObject){
-                for (var r in rigidbodies){
-                    if(rigidbodies[r] && rigidbodies[r].geometry.Transform._x3domNode._DEF == mousePickObject._DEF){
-                        rigidbodies[r].activate(false);
-                        rigidbodies[r].geometry.createRigid = true;
-                        intervalVar=setInterval(UpdateConstraints, 1);
-                    }
-                }
-            }
-            else{
-                drag = false;
-                mousePickObject = null;
-            }
-        }
-    };
-
-    MouseControlStop = function(e){
-        if(drag){
-            drag = false;
-        }
-    };
-
-//	###############################################################
-//	####################	UPDATE RIGIDBODIES	###################
-//	##########	CALCULATE RIGIDBODY POSITION&ROTATION	###########
-
-    updateRigidbodies = function(){
-        bulletWorld.stepSimulation(1/60, 100);
-        var r, transform = new Ammo.btTransform(), origin = new Ammo.btVector3(), rotation = new Ammo.btQuaternion();
-        for(r = 0; r < rigidbodies.length; r++){
-            if(!rigidbodies[r].geometry.createRigid){
-                rigidbodies[r].getMotionState().getWorldTransform( transform );
-                origin = transform.getOrigin();
-                rigidbodies[r].geometry.CollidableShape._x3domNode._vf.translation.x = origin.x();
-                rigidbodies[r].geometry.CollidableShape._x3domNode._vf.translation.y = origin.y();
-                rigidbodies[r].geometry.CollidableShape._x3domNode._vf.translation.z = origin.z();
-                rotation = transform.getRotation();
-                rigidbodies[r].geometry.CollidableShape._x3domNode._vf.rotation.x = rotation.x();
-                rigidbodies[r].geometry.CollidableShape._x3domNode._vf.rotation.y = rotation.y();
-                rigidbodies[r].geometry.CollidableShape._x3domNode._vf.rotation.z = rotation.z();
-                rigidbodies[r].geometry.CollidableShape._x3domNode._vf.rotation.w = rotation.w();
-            }
-            else{
-                if(mousePos){
-                    //CALCULATE RIGIDBODY POSITION FROM MOUSE POSITION
-                    rigidbodies[r].getMotionState().getWorldTransform( transform );
-                    transform.setOrigin(new Ammo.btVector3(mousePos.x, mousePos.y, mousePos.z));
-                    origin = transform.getOrigin();
-                    rigidbodies[r].geometry.CollidableShape._x3domNode._vf.translation.x = origin.x();
-                    rigidbodies[r].geometry.CollidableShape._x3domNode._vf.translation.y = origin.y();
-                    rigidbodies[r].geometry.CollidableShape._x3domNode._vf.translation.z = origin.z();
-                }
-            }
-
-            //SET RIGIDBODY POSITION + ROTATION
-            for (var x in x3dWorld.children){
-                if(x3dWorld.children[x].nodeName && x3dWorld.children[x].nodeName.toLowerCase() == "group"){
-                    for(var c in x3dWorld.children[x].childNodes){
-                        if(x3dWorld.children[x].childNodes.hasOwnProperty(c) && x3dWorld.children[x].childNodes[c] != null){
-                            UpdateTransforms(x3dWorld.children[x].childNodes[c], rigidbodies[r]);
-                        }
-                    }
-                }
-                else{
-                    UpdateTransforms(x3dWorld.children[x], rigidbodies[r]);
-                }
-            }
-
-            if(rigidbodies[r].geometry.isMotor == true){
-                rigidbodies[r].applyTorque(new Ammo.btVector3(rigidbodies[r].geometry.torque.x, rigidbodies[r].geometry.torque.y, rigidbodies[r].geometry.torque.z));
-            }
-            if(rigidbodies[r].geometry.RigidBody._vf.torques.length > 0){
-                for(var num in rigidbodies[r].geometry.RigidBody._vf.torques){
-                    rigidbodies[r].applyTorque(new Ammo.btVector3(rigidbodies[r].geometry.RigidBody._vf.torques[num].x, rigidbodies[r].geometry.RigidBody._vf.torques[num].y, rigidbodies[r].geometry.RigidBody._vf.torques[num].z));
-                }
-            }
-        }
-    };
-
-    function UpdateTransforms(a, b){
-        if(x3dom.isa(a._x3domNode, x3dom.nodeTypes.Transform)){
-            if(b.geometry.isInline){
-                if(a == b.geometry.inlineExternalTransform){
-                    if(b.geometry.inlineInternalTransform){
-                        b.geometry.inlineInternalTransform.translation = b.geometry.CollidableShape._x3domNode._vf.translation;
-                        b.geometry.inlineInternalTransform.rotation = b.geometry.CollidableShape._x3domNode._vf.rotation;
-                    }
-                }
-            }
-            else{
-                if(b.geometry.Transform){
-                    if(b.geometry.Transform._x3domNode._DEF == a._x3domNode._DEF){
-                        a.translation = b.geometry.CollidableShape._x3domNode._vf.translation;
-                        a.rotation = b.geometry.CollidableShape._x3domNode._vf.rotation;
-                    }
-                }
-            }
-        }
-    }
-
-    function InlineObjectList(a, b){
-        for(var x in a.children){
-            CreateX3DCollidableShape(a.children[x], b);
-        }
-        b.translation = new x3dom.fields.SFVec3f(0,0,0);
-    }
-
-    main = function main(){
-        updateRigidbodies();
-        window.requestAnimFrame(main);
-        if(document.readyState === "complete" && !inlineLoad && inline_x3dList.length){
-            for(var x in inline_x3dList){
-                if(inline_x3dList[x]._x3domNode._cf.children.nodes[0]._xmlNode._x3domNode._childNodes[0]){
-                    inlineLoad = true;
-                    InlineObjectList(inline_x3dList[x]._x3domNode._cf.children.nodes[0]._xmlNode._x3domNode._childNodes[0]._xmlNode, inline_x3dList[x]);
-                    CreateRigidbodies();
-                }
-            }
-        }
-    };
-
-    window.onload = function(){
-        ParseX3DElement();
-        initScene();
-        requestAnimFrame(main);
-        if(!inline_x3dList.length){
-            CreateRigidbodies();
-        }
-        CreateInteractiveObjects();
-    }
-
-})();
-
-
-window['requestAnimFrame'] = (function(){
-    return  window.requestAnimationFrame       ||
-        window.webkitRequestAnimationFrame ||
-        window.mozRequestAnimationFrame    ||
-        window.oRequestAnimationFrame      ||
-        window.msRequestAnimationFrame     ||
-        function(/* function */ callback, /* DOMElement */ element){
-            window.setTimeout(callback, 1000 / 60);
-        };
-})();
-/** @namespace x3dom.nodeTypes */
-/*
- * X3DOM JavaScript Library
- * http://www.x3dom.org
- *
- * (C)2009 Fraunhofer IGD, Darmstadt, Germany
- * Dual licensed under the MIT and GPL
- */
-
-
-//	### RigidBodyCollection ###
-x3dom.registerNodeType(
-    "RigidBodyCollection",
-    "RigidBodyPhysics",
-    defineClass(x3dom.nodeTypes.X3DChildNode ,
-
-        /**
-         * Constructor for RigidBodyCollection
-         * @constructs x3dom.nodeTypes.RigidBodyCollection
-         * @x3d 3.3
-         * @component RigidBodyPhysics
-         * @status experimental
-         * @extends x3dom.nodeTypes.X3DChildNode
-         * @param {Object} [ctx=null] - context object, containing initial settings like namespace
-         * @classdesc The RigidBodyCollection node represents a system of bodies that will interact within a single
-         *  physics model. The collection is not a renderable part of the scene graph nor are its children as a typical
-         *  model may need to represent the geometry for physics separately, and in less detail, than those needed for
-         *  visuals.
-         */
-        function(ctx){
-            x3dom.nodeTypes.RigidBodyCollection.superClass.call(this, ctx);
-
-            /**
-             * The disable fields define conditions for when the body ceases to considered as part of the rigid body
-             *  calculations and should be considered as at rest.
-             * @var {x3dom.fields.SFBool} autoDisable
-             * @memberof x3dom.nodeTypes.RigidBodyCollection
-             * @initvalue false
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFBool(ctx, 'autoDisable', false);
-
-            /**
-             * The constantForceMix field can be used to apply damping to the calculations by violating the normal
-             *  constraints by applying a small, constant force to those calculations. This allows joints and bodies to
-             *  be a fraction springy, as well as helping to eliminate numerical instability. The larger the value, the
-             *  more soft each of the constraints being evaluated. A value of zero indicates hard constraints so that
-             *  everything is exactly honoured. By combining the errorCorrection and constantForceMix fields, various
-             *  effects, such as spring-driven or spongy connections, can be emulated.
-             * @var {x3dom.fields.SFFloat} constantForceMix
-             * @memberof x3dom.nodeTypes.RigidBodyCollection
-             * @initvalue 0.0001
-             * @range [0, inf)
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'constantForceMix', 0.0001);
-
-            /**
-             * The contactSurfaceThickness field represents how far bodies may interpenetrate after a collision. This
-             *  allows simulation of softer bodies that may deform somewhat during collision. The default value is zero.
-             * @var {x3dom.fields.SFFloat} contactSurfaceThickness
-             * @memberof x3dom.nodeTypes.RigidBodyCollection
-             * @initvalue 0
-             * @range [0, inf)
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'contactSurfaceThickness', 0);
-
-            /**
-             * The disable fields define conditions for when the body ceases to considered as part of the rigid body
-             *  calculations and should be considered as at rest.
-             * @var {x3dom.fields.SFFloat} disableAngularSpeed
-             * @memberof x3dom.nodeTypes.RigidBodyCollection
-             * @initvalue 0
-             * @range [0, inf)
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'disableAngularSpeed', 0);
-
-            /**
-             * The disable fields define conditions for when the body ceases to considered as part of the rigid body
-             *  calculations and should be considered as at rest.
-             * @var {x3dom.fields.SFFloat} disableLinearSpeed
-             * @memberof x3dom.nodeTypes.RigidBodyCollection
-             * @initvalue 0
-             * @range [0, inf)
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'disableLinearSpeed', 0);
-
-            /**
-             * The disable fields define conditions for when the body ceases to considered as part of the rigid body
-             *  calculations and should be considered as at rest.
-             * @var {x3dom.fields.SFFloat} disableTime
-             * @memberof x3dom.nodeTypes.RigidBodyCollection
-             * @initvalue 0
-             * @range [0, inf)
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'disableTime', 0);
-
-            /**
-             * The enabled field is used to control whether the physics model for this collection should be run this
-             *  frame.
-             * @var {x3dom.fields.SFBool} enabled
-             * @memberof x3dom.nodeTypes.RigidBodyCollection
-             * @initvalue true
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFBool(ctx, 'enabled', true);
-
-            /**
-             * The errorCorrection field describes how quickly the system should resolve intersection errors due to
-             *  floating point inaccuracies. This value ranges between 0 and 1. A value of 0 means no correction at all
-             *   while a value of 1 indicates that all errors should be corrected in a single step.
-             * @var {x3dom.fields.SFFloat} errorCorrection
-             * @memberof x3dom.nodeTypes.RigidBodyCollection
-             * @initvalue 0.8
-             * @range [0,1]
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'errorCorrection', 0.8);
-
-            /**
-             * The gravity field indicates direction and strength (in acceleration base units) of the local gravity
-             *  vector for this collection of bodies. The default gravity is standard earth gravity of 9.8
-             *  meters/second2 downwards.
-             * @var {x3dom.fields.SFVec3f} gravity
-             * @memberof x3dom.nodeTypes.RigidBodyCollection
-             * @initvalue 0,-9.8,0
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFVec3f(ctx, 'gravity', 0,-9.8,0);
-
-            /**
-             * The iterations field is used to control how many iterations over the collections of joints and bodies are
-             *  to be performed each time the model is evaluated. Rigid body physics is a process of iterative
-             *  refinement in order to maintain reasonable performance. As the number of iterations grow, the more
-             *  stable the final results are at the cost of increasing evaluation time. Since maintaining real-time
-             *  performance is a trade off between accuracy and frame rate, this setting allows the user to control that
-             *  trade off to a limited extent.
-             * @var {x3dom.fields.SFInt32} iterations
-             * @memberof x3dom.nodeTypes.RigidBodyCollection
-             * @initvalue 1
-             * @range [0,inf)
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFInt32(ctx, 'iterations', 1);
-
-            /**
-             * Maximal correction speed.
-             * @var {x3dom.fields.SFFloat} maxCorrectionSpeed
-             * @memberof x3dom.nodeTypes.RigidBodyCollection
-             * @initvalue -1
-             * @range [0, inf) or -1
-             * @field x3dom
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'maxCorrectionSpeed', -1);
-
-            /**
-             * The preferAccuracy field is used to provide a performance hint to the underlying evaluation about whether
-             *  the user prefers to have very accurate models or fast models. Accuracy comes at a large penalty in both
-             *  speed and memory usage, but may not be needed most of the time. The default setting is to optimize for
-             *  speed rather than accuracy.
-             * @var {x3dom.fields.SFBool} preferAccuracy
-             * @memberof x3dom.nodeTypes.RigidBodyCollection
-             * @initvalue false
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFBool(ctx, 'preferAccuracy', false);
-
-            /**
-             * The bodies field contains a collection of the top-level nodes that comprise a set of bodies that should
-             *  be evaluated as a single set of interactions.
-             * @var {x3dom.fields.MFNode} bodies
-             * @memberof x3dom.nodeTypes.RigidBodyCollection
-             * @initvalue x3dom.nodeTypes.RigidBody
-             * @field x3d
-             * @instance
-             */
-            this.addField_MFNode('bodies', x3dom.nodeTypes.RigidBody);
-
-            /**
-             * The joints field is used to register all the joints between the bodies contained in this collection. If a
-             *  joint is connected between bodies in two different collections, the result is implementation-dependent.
-             *  If a joint instance is registered with more than one collection, the results are implementation
-             *  dependent. Joints not registered with any collection are not evaluated.
-             * @var {x3dom.fields.MFNode} joints
-             * @memberof x3dom.nodeTypes.RigidBodyCollection
-             * @initvalue x3dom.nodeTypes.X3DRigidJointNode
-             * @field x3d
-             * @instance
-             */
-            this.addField_MFNode('joints', x3dom.nodeTypes.X3DRigidJointNode);
-
-        },
-        {
-            nodeChanged: function(){
-                if(!this._cf.joints.nodes){
-                    for(var x in this._xmlNode.children){
-                        if(x3dom.isa(this._xmlNode.children[x]._x3domNode, x3dom.nodeTypes.X3DRigidJointNode)){
-                            this._cf.joints = this._xmlNode.children[x];
-                        }
-                    }
-                }
-                if(!this._cf.bodies.nodes){
-                    for(var x in this._xmlNode.children){
-                        if(x3dom.isa(this._xmlNode.children[x]._x3domNode, x3dom.nodeTypes.RigidBody)){
-                            this._cf.bodies = this._xmlNode.children[x];
-                        }
-                    }
-                }
-                //x3dom.debug.logInfo('RigidBodyCollection: ');
-            }
-        }
-    )
-);
-/** @namespace x3dom.nodeTypes */
-/*
- * X3DOM JavaScript Library
- * http://www.x3dom.org
- *
- * (C)2009 Fraunhofer IGD, Darmstadt, Germany
- * Dual licensed under the MIT and GPL
- */
-
-//	### RigidBody ###
-x3dom.registerNodeType(
-    "RigidBody",
-    "RigidBodyPhysics",
-    defineClass(x3dom.nodeTypes.X3DNode,
-
-        /**
-         * Constructor for RigidBody
-         * @constructs x3dom.nodeTypes.RigidBody
-         * @x3d 3.3
-         * @component RigidBodyPhysics
-         * @status experimental
-         * @extends x3dom.nodeTypes.X3DNode
-         * @param {Object} [ctx=null] - context object, containing initial settings like namespace
-         * @classdesc The RigidBody node describes a body and its properties that can be affected by the physics model.
-         *  A body is modelled as a collection of shapes that describe mass distribution rather than renderable
-         *  geometry. Bodies are connected together using Joints and are represented by geometry.
-         */
-        function(ctx){
-            x3dom.nodeTypes.RigidBody.superClass.call(this, ctx);
-
-            /**
-             * Angular damping factor.
-             * @var {x3dom.fields.SFFloat} angularDampingFactor
-             * @memberof x3dom.nodeTypes.RigidBody
-             * @initvalue 0.001
-             * @range [0,1]
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'angularDampingFactor', 0.001);
-
-            /**
-             * The velocity fields are used to provide a constant velocity value to the object every frame. If both
-             *  forces and velocity are defined, the velocity is used only on the first frame that the node is active,
-             *  and then the forces are applied.
-             * @var {x3dom.fields.SFVec3f} angularVelocity
-             * @memberof x3dom.nodeTypes.RigidBody
-             * @initvalue 0,0,0
-             * @field x3d
-             * @instance
-             */
-                this.addField_SFVec3f(ctx, 'angularVelocity', 0,0,0);
-
-            /**
-             * The application of damping is controlled through the use of the autoDamp field. When the value is FALSE,
-             *  no damping is applied. When the value is TRUE, rotational and translational damping is calculated and
-             *  applied.
-             * @var {x3dom.fields.SFBool} autoDamp
-             * @memberof x3dom.nodeTypes.RigidBody
-             * @initvalue false
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFBool(ctx, 'autoDamp', false);
-
-            /**
-             * By default, this automatic disabling is turned off. It may be enabled by setting the autoDisable field
-             *  to TRUE.
-             * @var {x3dom.fields.SFBool} autoDisable
-             * @memberof x3dom.nodeTypes.RigidBody
-             * @initvalue false
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFBool(ctx, 'autoDisable', false);
-
-            /**
-             * Center of mass for calculations
-             * @var {x3dom.fields.SFVec3f} centerOfMass
-             * @memberof x3dom.nodeTypes.RigidBody
-             * @initvalue 0,0,0
-             * @range (-inf, inf)
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFVec3f(ctx, 'centerOfMass', 0,0,0);
-
-            /**
-             * The disable fields define conditions for when the body ceases to considered as part of the rigid body
-             *  calculations and should be considered as at rest.
-             * @var {x3dom.fields.SFFloat} disableAngularSpeed
-             * @memberof x3dom.nodeTypes.RigidBody
-             * @initvalue 0
-             * @range [0,inf)
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'disableAngularSpeed', 0);
-
-            /**
-             * The disable fields define conditions for when the body ceases to considered as part of the rigid body
-             *  calculations and should be considered as at rest.
-             * @var {x3dom.fields.SFFloat} disableLinearSpeed
-             * @memberof x3dom.nodeTypes.RigidBody
-             * @initvalue 0
-             * @range [0,inf)
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'disableLinearSpeed', 0);
-
-            /**
-             * The disable fields define conditions for when the body ceases to considered as part of the rigid body
-             *  calculations and should be considered as at rest.
-             * @var {x3dom.fields.SFFloat} disableTime
-             * @memberof x3dom.nodeTypes.RigidBody
-             * @initvalue 0
-             * @range [0,inf)
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'disableTime', 0);
-
-            /**
-             * The enabled field controls whether the information in this node is submitted to the physics engine for
-             *  processing. If the enabled field is set TRUE, the node is submitted to the physics engine. If the
-             *  enabled field is set FALSE, the node is not submitted to the physics engine for processing.
-             * @var {x3dom.fields.SFBool} enabled
-             * @memberof x3dom.nodeTypes.RigidBody
-             * @initvalue true
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFBool(ctx, 'enabled', true);
-
-            /**
-             * The finiteRotationAxis field specifies a vector around which the object rotates.
-             * @var {x3dom.fields.SFVec3f} finiteRotationAxis
-             * @memberof x3dom.nodeTypes.RigidBody
-             * @initvalue 0,0,0
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFVec3f(ctx, 'finiteRotationAxis', 0,0,0);
-
-            /**
-             * The fixed field is used to indicate that this body does not move. Any calculations involving collisions
-             *  with this body should take into account that this body does not move. This is useful for representing
-             *  objects such as the ground, walls etc that can be collided with, have an effect on other objects, but
-             *  are not capable of moving themselves.
-             * @var {x3dom.fields.SFBool} fixed
-             * @memberof x3dom.nodeTypes.RigidBody
-             * @initvalue false
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFBool(ctx, 'fixed', false);
-
-            /**
-             * The torques and forces fields define zero or more sets of torque and force values that are applied to the
-             *  object every frame. These are continuously applied until reset to zero by the user.
-             * @var {x3dom.fields.MFVec3f} forces
-             * @memberof x3dom.nodeTypes.RigidBody
-             * @initvalue []
-             * @field x3d
-             * @instance
-             */
-            this.addField_MFVec3f(ctx, 'forces', []);
-
-            /**
-             * The inertia field represents a 3x2 inertia tensor matrix. If the set values are less than six items, the
-             *  results are implementation dependent. If the value set is greater than six values, only the first six
-             *  values of the array are used.
-             * @var {x3dom.fields.MFFloat} inertia
-             * @memberof x3dom.nodeTypes.RigidBody
-             * @initvalue [1,0,0,0,1,0,0,0,1]
-             * @field x3d
-             * @instance
-             */
-            this.addField_MFFloat(ctx, 'inertia', [1, 0, 0, 0, 1, 0, 0, 0, 1]);
-
-            /**
-             * Linear damping factor.
-             * @var {x3dom.fields.SFFloat} linearDampingFactor
-             * @memberof x3dom.nodeTypes.RigidBody
-             * @initvalue 0.001
-             * @range [0,1]
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'linearDampingFactor', 0.001);
-
-            /**
-             * Linear velocity.
-             * @var {x3dom.fields.SFVec3f} linearVelocity
-             * @memberof x3dom.nodeTypes.RigidBody
-             * @initvalue 0,0,0
-             * @range (-inf, inf)
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFVec3f(ctx, 'linearVelocity', 0,0,0);
-
-            /**
-             * The mass field indicates the mass of the body in mass base units. All bodies shall have a non-zero mass,
-             *  with the default value of 1 mass base unit.
-             * @var {x3dom.fields.SFFloat} mass
-             * @memberof x3dom.nodeTypes.RigidBody
-             * @initvalue 1
-             * @range [0,inf)
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'mass', 1);
-
-            /**
-             * The position and orientation fields are used to set the initial conditions of this body's location in
-             *  world space. After the initial conditions have been set, these fields are used to report the current
-             *  information based on the most recent physics model evaluation.
-             * @var {x3dom.fields.SFRotation} orientation
-             * @memberof x3dom.nodeTypes.RigidBody
-             * @initvalue 0,0,1,0
-             * @range [0,1]
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFRotation(ctx, 'orientation', 0,0,1,0);
-
-            /**
-             * The position and orientation fields are used to set the initial conditions of this body's location in
-             *  world space. After the initial conditions have been set, these fields are used to report the current
-             *  information based on the most recent physics model evaluation.
-             * @var {x3dom.fields.SFVec3f} position
-             * @memberof x3dom.nodeTypes.RigidBody
-             * @initvalue 0,0,0
-             * @range (-inf, inf)
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFVec3f(ctx, 'position', 0,0,0);
-
-            /**
-             * The torques and forces fields define zero or more sets of torque and force values that are applied to the
-             *  object every frame. These are continuously applied until reset to zero by the user.
-             * @var {x3dom.fields.MFVec3f} torques
-             * @memberof x3dom.nodeTypes.RigidBody
-             * @initvalue []
-             * @field x3d
-             * @instance
-             */
-            this.addField_MFVec3f(ctx, 'torques', []);
-
-            /**
-             * The useFiniteRotation field is used to influence the way the body's rotation is calculated. In very fast
-             *  rotating objects, such as a wheel of a car, an infinitely small time step can cause the modelling to
-             *  explode. The default value is to use the faster infinite mode.
-             * @var {x3dom.fields.SFBool} useFiniteRotation
-             * @memberof x3dom.nodeTypes.RigidBody
-             * @initvalue false
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFBool(ctx, 'useFiniteRotation', false);
-
-            /**
-             * The useGlobalGravity field is used to indicate whether this particular body should be influenced by the
-             *  containing RigidBodyCollection's gravity setting. A value of TRUE indicates that the gravity is used, a
-             *  value of FALSE indicates that it is not used. This only applies to this body instance. Contained
-             *  sub-bodies shall not be affected by this setting.
-             * @var {x3dom.fields.SFBool} useGlobalGravity
-             * @memberof x3dom.nodeTypes.RigidBody
-             * @initvalue true
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFBool(ctx, 'useGlobalGravity', true);
-
-            /**
-             * The massDensityModel field is used to describe the geometry type and dimensions used to calculate the
-             *  mass density in the physics model. This geometry has no renderable property, other than for defining the
-             *  model of the mass density. It is not rendered, nor modified by the physics model.
-             * @var {x3dom.fields.MFNode} massDensityModel
-             * @memberof x3dom.nodeTypes.RigidBody
-             * @initvalue x3dom.nodeTypes.Shape
-             * @field x3d
-             * @instance
-             */
-            this.addField_MFNode('massDensityModel', x3dom.nodeTypes.Shape);
-
-
-            /**
-             * The geometry field is used to connect the body modelled by the physics engine implementation to the real
-             *  geometry of the scene through the use of collidable nodes. This allows the geometry to be connected
-             *  directly to the physics model as well as collision detection. Collidable nodes have their location set
-             *  to the same location as the body instance in which they are located. Their position and location are not
-             *  relative to this object, unless otherwise defined.
-             * @var {x3dom.fields.MFNode} geometry
-             * @memberof x3dom.nodeTypes.RigidBody
-             * @initvalue x3dom.nodeTypes.X3DNBodyCollidableNode
-             * @field x3dom
-             * @instance
-             */
-            this.addField_MFNode('geometry', x3dom.nodeTypes.X3DNBodyCollidableNode);
-
-        },
-        {
-            nodeChanged: function(){
-                if(!this._cf.geometry.nodes){
-                    for(var x in this._xmlNode.children){
-                        if(x3dom.isa(this._xmlNode.children[x]._x3domNode, x3dom.nodeTypes.X3DNBodyCollidableNode)){
-                            this._cf.geometry = this._xmlNode.children[x];
-                        }
-                    }
-                }
-                if(!this._cf.massDensityModel.nodes){
-                    for(var x in this._xmlNode.children){
-                        if(x3dom.isa(this._xmlNode.children[x]._x3domNode, x3dom.nodeTypes.Shape)){
-                            this._cf.massDensityModel = this._xmlNode.children[x];
-                        }
-                    }
-                }
-                //x3dom.debug.logInfo('RigidBody: ');
-            }
-        }
-    )
-);
-/** @namespace x3dom.nodeTypes */
-/*
- * X3DOM JavaScript Library
- * http://www.x3dom.org
- *
- * (C)2009 Fraunhofer IGD, Darmstadt, Germany
- * Dual licensed under the MIT and GPL
- */
-
-//	### X3DNBodyCollidableNode ###
-x3dom.registerNodeType(
-    "X3DNBodyCollidableNode",
-    "RigidBodyPhysics",
-    defineClass(x3dom.nodeTypes.X3DBoundedObject,
-
-        /**
-         * Constructor for X3DNBodyCollidableNode
-         * @constructs x3dom.nodeTypes.X3DNBodyCollidableNode
-         * @x3d 3.3
-         * @component RigidBodyPhysics
-         * @status full
-         * @extends x3dom.nodeTypes.X3DBoundedObject
-         * @param {Object} [ctx=null] - context object, containing initial settings like namespace
-         * @classdesc The X3DNBodyCollidableNode abstract node type represents objects that act as the interface between
-         *  the rigid body physics, collision geometry proxy, and renderable objects in the scene graph hierarchy.
-         */
-        function(ctx){
-            x3dom.nodeTypes.X3DNBodyCollidableNode.superClass.call(this, ctx);
-
-            /**
-             * The enabled field is used to specify whether a collidable object is eligible for collision detection
-             *  interactions.
-             * @var {x3dom.fields.SFBool} enabled
-             * @memberof x3dom.nodeTypes.X3DNBodyCollidableNode
-             * @initvalue true
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFBool(ctx, 'enabled', true);
-
-            /**
-             * The rotation field defines rotation about the body's center that the collidable node occupies.
-             * @var {x3dom.fields.SFRotation} rotation
-             * @memberof x3dom.nodeTypes.X3DNBodyCollidableNode
-             * @initvalue 0,0,1,0
-             * @range [0,1]
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFRotation(ctx, 'rotation', 0,0,1,0);
-
-            /**
-             * The translation field defines an offset from the body's center that the collidable node occupies. This
-             *  can be used to place the collidable geometry in a different location relative to the actual rigid body
-             *  that has the physics model being applied.
-             * @var {x3dom.fields.SFVec3f} translation
-             * @memberof x3dom.nodeTypes.X3DNBodyCollidableNode
-             * @initvalue 0,0,0
-             * @range (-inf, inf)
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFVec3f(ctx, 'translation', 0,0,0);
-
-            },
-            {
-                nodeChanged: function()
-                {
-                    //x3dom.debug.logInfo('X3DNBodyCollidableNode: ');
-                }
-            }
-    )
-);
-/** @namespace x3dom.nodeTypes */
-/*
- * X3DOM JavaScript Library
- * http://www.x3dom.org
- *
- * (C)2009 Fraunhofer IGD, Darmstadt, Germany
- * Dual licensed under the MIT and GPL
- */
-
-//	### CollidableShape ###
-x3dom.registerNodeType(
-    "CollidableShape",
-    "RigidBodyPhysics",
-    defineClass(x3dom.nodeTypes.X3DNBodyCollidableNode,
-
-        /**
-         * Constructor for CollidableShape
-         * @constructs x3dom.nodeTypes.CollidableShape
-         * @x3d 3.3
-         * @component RigidBodyPhysics
-         * @status experimental
-         * @extends x3dom.nodeTypes.X3DNBodyCollidableNode
-         * @param {Object} [ctx=null] - context object, containing initial settings like namespace
-         * @classdesc The CollidableShape node represents the glue between the collision detection system, the rigid
-         *  body model, and the renderable scene graph. Its job is to take a single piece of geometry wrapped in a Shape
-         *  node and provide a way for the physics model body to move the geometry. In addition, it allows the collision
-         *  detection system to determine the location of the geometry primitives that it uses for collision management.
-         *  When placed under a part of the transformation hierarchy, it can be used to visually represent the movement
-         *  of the object.
-         */
-        function(ctx){
-            x3dom.nodeTypes.CollidableShape.superClass.call(this, ctx);
-
-           /**
-             * Transformation child node.
-             * @var {x3dom.fields.SFNode} transform
-             * @memberof x3dom.nodeTypes.CollidableShape
-             * @initvalue x3dom.nodeTypes.Transform
-             * @field x3dom
-             * @instance
-             */
-            this.addField_SFNode('transform', x3dom.nodeTypes.Transform);
-
-            /**
-             * The shape field uses the geometry proxy for specifying which geometry best represents the collidable
-             * object.
-             * @var {x3dom.fields.SFNode} shape
-             * @memberof x3dom.nodeTypes.CollidableShape
-             * @initvalue x3dom.nodeTypes.Shape
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFNode('shape', x3dom.nodeTypes.Shape);
-
-        },
-        {
-            nodeChanged: function(){
-                if(!this._cf.transform.node){
-                    for(var x in this._xmlNode.children){
-                        if(x3dom.isa(this._xmlNode.children[x]._x3domNode, x3dom.nodeTypes.Transform)){
-                            this._cf.transform = this._xmlNode.children[x];
-                        }
-                    }
-                }
-                if(!this._cf.shape.node){
-                    for(var x in this._xmlNode.children){
-                        if(x3dom.isa(this._xmlNode.children[x]._x3domNode, x3dom.nodeTypes.Shape)){
-                            this._cf.shape = this._xmlNode.children[x];
-                        }
-                    }
-                }
-                //x3dom.debug.logInfo('CollidableShape: ');
-            }
-        }
-    )
-);
-/** @namespace x3dom.nodeTypes */
-/*
- * X3DOM JavaScript Library
- * http://www.x3dom.org
- *
- * (C)2009 Fraunhofer IGD, Darmstadt, Germany
- * Dual licensed under the MIT and GPL
- */
-
-//	### CollisionCollection ###
-x3dom.registerNodeType(
-    "CollisionCollection",
-    "RigidBodyPhysics",
-    defineClass(x3dom.nodeTypes.X3DChildNode,
-
-        /**
-         * Constructor for CollisionCollection
-         * @constructs x3dom.nodeTypes.CollisionCollection
-         * @x3d 3.3
-         * @component RigidBodyPhysics
-         * @status experimental
-         * @extends x3dom.nodeTypes.X3DChildNode
-         * @param {Object} [ctx=null] - context object, containing initial settings like namespace
-         * @classdesc The CollisionCollection node holds a collection of objects in the collidables field that can be
-         *  managed as a single entity for resolution of inter-object collisions with other groups of collidable
-         *  objects. A group consists of both collidable objects as well as spaces that may be collided against each
-         *  other. A set of parameters are provided that specify default values that will be assigned to all Contact
-         *  nodes generated from the CollisionSensor node. A user may then override the individual Contact node by
-         *  inserting a script between the output of the sensor and the input to the RigidBodyCollection node if it is
-         *  desired to process the contact stream.
-         */
-        function(ctx){
-            x3dom.nodeTypes.CollisionCollection.superClass.call(this, ctx);
-
-            /**
-             * The bounce field indicates how bouncy the surface contact is. A value of 0 indicates no bounce at all
-             *  while a value of 1 indicates maximum bounce.
-             * @var {x3dom.fields.SFFloat} bounce
-             * @memberof x3dom.nodeTypes.CollisionCollection
-             * @initvalue 0
-             * @range [0,1]
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'bounce', 0);
-
-            /**
-             * The enabled field is used to control whether the collision detection system for this collection should be
-             *  run at the end of this frame. A value of TRUE enables it while a value of FALSE disables it. A
-             *  CollisionSensor node watching this collection does not report any outputs for this collection for this
-             *  frame if it is not enabled.
-             * @var {x3dom.fields.SFBool} enabled
-             * @memberof x3dom.nodeTypes.CollisionCollection
-             * @initvalue true
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFBool(ctx, 'enabled', true);
-
-            /**
-             * Friction Coefficients
-             * @var {x3dom.fields.SFVec2f} frictionCoefficients
-             * @memberof x3dom.nodeTypes.CollisionCollection
-             * @initvalue 0,0
-             * @range [0, inf)
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFVec2f(ctx, 'frictionCoefficients', 0,0);
-
-            /**
-             * The minBounceSpeed field indicates the minimum speed, in speed base units, that an object shall have
-             *  before an object will bounce. If the object is below this speed, it will not bounce, effectively having
-             *  an equivalent value for the bounce field of zero.
-             * @var {x3dom.fields.SFFloat} minBounceSpeed
-             * @memberof x3dom.nodeTypes.CollisionCollection
-             * @initvalue 0.1
-             * @range [0, inf)
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'minBounceSpeed', 0.1);
-
-            /**
-             * Slip factors
-             * @var {x3dom.fields.SFVec2f} slipFactors
-             * @memberof x3dom.nodeTypes.CollisionCollection
-             * @initvalue 0,0
-             * @range (-inf, inf)
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFVec2f(ctx, 'slipFactors', 0,0);
-
-            /**
-             * The softnessConstantForceMix value applies a constant force value to make the colliding surfaces appear
-             *  to be somewhat soft.
-             * @var {x3dom.fields.SFFloat} softnessConstantForceMix
-             * @memberof x3dom.nodeTypes.CollisionCollection
-             * @initvalue 0.0001
-             * @range [0,1]
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'softnessConstantForceMix', 0.0001);
-
-            /**
-             * The softnessErrorCorrection determines how much of the collision error should be fixed in a set of
-             *  evaluations. The value is limited to the range of [0,1]. A value of 0 specifies no error correction
-             *  while a value of 1 specifies that all errors should be corrected in a single step.
-             * @var {x3dom.fields.SFFloat} softnessErrorCorrection
-             * @memberof x3dom.nodeTypes.CollisionCollection
-             * @initvalue 0.8
-             * @range [0,1]
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'softnessErrorCorrection', 0.8);
-
-            /**
-             * The surfaceSpeed field defines the speed in the two friction directions in speed base units. This is used
-             *  to indicate if the contact surface is moving independently of the motion of the bodies.
-             * @var {x3dom.fields.SFVec2f} surfaceSpeed
-             * @memberof x3dom.nodeTypes.CollisionCollection
-             * @initvalue 0,0
-             * @range (-inf, inf)
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFVec2f(ctx, 'surfaceSpeed', 0,0);
-
-            /**
-             * The collidables field can be managed as a single entity for resolution of inter-object collisions with
-             *  other groups of collidable objects.
-             * @var {x3dom.fields.MFNode} collidables
-             * @memberof x3dom.nodeTypes.CollisionCollection
-             * @initvalue x3dom.nodeTypes.X3DNBodyCollidableNode
-             * @field x3d
-             * @instance
-             */
-            this.addField_MFNode('collidables', x3dom.nodeTypes.X3DNBodyCollidableNode);
-
-        },
-        {
-            nodeChanged: function(){
-                if(!this._cf.collidables.nodes){
-                    for(var x in this._xmlNode.children){
-                        if(x3dom.isa(this._xmlNode.children[x]._x3domNode, x3dom.nodeTypes.X3DNBodyCollidableNode)){
-                            this._cf.collidables = this._xmlNode.children[x];
-                        }
-                    }
-                }
-                //x3dom.debug.logInfo('CollisionCollection: ');
-            }
-        }
-    )
-);
-/** @namespace x3dom.nodeTypes */
-/*
- * X3DOM JavaScript Library
- * http://www.x3dom.org
- *
- * (C)2009 Fraunhofer IGD, Darmstadt, Germany
- * Dual licensed under the MIT and GPL
- */
-
-//	### CollisionSensor ###
-x3dom.registerNodeType(
-    "CollisionSensor",
-    "RigidBodyPhysics",
-    defineClass(x3dom.nodeTypes.X3DSensorNode,
-
-        /**
-         * Constructor for CollisionSensor
-         * @constructs x3dom.nodeTypes.CollisionSensor
-         * @x3d 3.3
-         * @component RigidBodyPhysics
-         * @status experimental
-         * @extends x3dom.nodeTypes.X3DSensorNode
-         * @param {Object} [ctx=null] - context object, containing initial settings like namespace
-         * @classdesc The CollisionSensor node is used to send collision detection information into the scene graph for
-         *  user processing. The collision detection system does not require an instance of this class to be in the
-         *  scene in order for it to run or affect the physics model. This class is used to report to the user contact
-         *  information should the user require this information for other purposes.
-         */
-        function(ctx){
-            x3dom.nodeTypes.CollisionSensor.superClass.call(this, ctx);
-
-            /**
-             * The collider field specifies the nodes and spaces that are to be included in collision detection
-             *  computations.
-             * @var {x3dom.fields.SFNode} collider
-             * @memberof x3dom.nodeTypes.CollisionSensor
-             * @initvalue x3dom.nodeTypes.CollisionCollection
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFNode('collider', x3dom.nodeTypes.CollisionCollection);
-
-        },
-        {
-            nodeChanged: function(){
-                if(!this._cf.collider.node){
-                    for(var x in this._xmlNode.children){
-                        if(x3dom.isa(this._xmlNode.children[x]._x3domNode, x3dom.nodeTypes.CollisionCollection)){
-                            this._cf.collider = this._xmlNode.children[x];
-                        }
-                    }
-                }
-                //x3dom.debug.logInfo('CollisionSensor: ');
-            }
-        }
-    )
-);
-/** @namespace x3dom.nodeTypes */
-/*
- * X3DOM JavaScript Library
- * http://www.x3dom.org
- *
- * (C)2009 Fraunhofer IGD, Darmstadt, Germany
- * Dual licensed under the MIT and GPL
- */
-
-//	### X3DRigidJointNode ###
-x3dom.registerNodeType(
-    "X3DRigidJointNode",
-    "RigidBodyPhysics",
-    defineClass(x3dom.nodeTypes.X3DNode,
-
-        /**
-         * Constructor for X3DRigidJointNode
-         * @constructs x3dom.nodeTypes.X3DRigidJointNode
-         * @x3d 3.3
-         * @component RigidBodyPhysics
-         * @status full
-         * @extends x3dom.nodeTypes.X3DNode
-         * @param {Object} [ctx=null] - context object, containing initial settings like namespace
-         * @classdesc The X3DRigidJointNode abstract node type is the base type for all joint types.
-         */
-        function(ctx){
-            x3dom.nodeTypes.X3DRigidJointNode.superClass.call(this, ctx);
-
-            /**
-             * The forceOutput field is used to control which output fields are to be generated for the next frame. In
-             *  physics models, the amount of data that can be generated per frame can be quite extensive, particularly
-             *  in complex models with a large number of joints. A typical application will need only a few of them, if
-             *  any at all. This field is used to control which of those outputs the author requires to be generated.
-             *  The values of the array are to describe the names, exactly, of the output field(s) that are to be
-             *  updated at the start of the next frame. Two special values are defined: "ALL" and "NONE".
-             * @var {x3dom.fields.SFString} forceOutput
-             * @memberof x3dom.nodeTypes.X3DRigidJointNode
-             * @initvalue "NONE"
-             * @range ["ALL", "NONE",...]
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFString(ctx, 'forceOutput', "");
-
-            /**
-             * The first body to be joint by the node
-             * @var {x3dom.fields.SFNode} body1
-             * @memberof x3dom.nodeTypes.X3DRigidJointNode
-             * @initvalue x3dom.nodeTypes.RigidBody
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFNode('body1', x3dom.nodeTypes.RigidBody);
-
-            /**
-             * The second rigid body to be joint by the node
-             * @var {x3dom.fields.SFNode} body2
-             * @memberof x3dom.nodeTypes.X3DRigidJointNode
-             * @initvalue x3dom.nodeTypes.RigidBody
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFNode('body2', x3dom.nodeTypes.RigidBody);
-
-        },
-        {
-            nodeChanged: function(){
-                if(!this._cf.body1.node){
-                    for(var x in this._xmlNode.children){
-                        if(x3dom.isa(this._xmlNode.children[x]._x3domNode, x3dom.nodeTypes.RigidBody)){
-                            this._cf.body1 = this._xmlNode.children[x];
-                        }
-                    }
-                }
-                if(!this._cf.body2.node){
-                    for(var x in this._xmlNode.children){
-                        if(x3dom.isa(this._xmlNode.children[x]._x3domNode, x3dom.nodeTypes.RigidBody)){
-                            this._cf.body2 = this._xmlNode.children[x];
-                        }
-                    }
-                }
-                //x3dom.debug.logInfo('X3DRigidJointNode: ');
-            }
-        }
-    )
-);
-/** @namespace x3dom.nodeTypes */
-/*
- * X3DOM JavaScript Library
- * http://www.x3dom.org
- *
- * (C)2009 Fraunhofer IGD, Darmstadt, Germany
- * Dual licensed under the MIT and GPL
- */
-
-//	### BallJoint ###
-x3dom.registerNodeType(
-    "BallJoint",
-    "RigidBodyPhysics",
-    defineClass(x3dom.nodeTypes.X3DRigidJointNode,
-
-        /**
-         * Constructor for BallJoint
-         * @constructs x3dom.nodeTypes.BallJoint
-         * @x3d 3.3
-         * @component RigidBodyPhysics
-         * @status full
-         * @extends x3dom.nodeTypes.X3DRigidJointNode
-         * @param {Object} [ctx=null] - context object, containing initial settings like namespace
-         * @classdesc The BallJoint node represents an unconstrained joint between two bodies that pivot about a common
-         *  anchor point.
-         */
-        function(ctx){
-            x3dom.nodeTypes.BallJoint.superClass.call(this, ctx);
-
-            /**
-             * The common anchor point.
-             * @var {x3dom.fields.SFVec3f} anchorPoint
-             * @memberof x3dom.nodeTypes.BallJoint
-             * @initvalue 0,0,0
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFVec3f(ctx, 'anchorPoint', 0,0,0);
-
-
-        },
-        {
-            nodeChanged: function(){
-                //x3dom.debug.logInfo('BallJoint: ');
-            }
-        }
-    )
-);
-/** @namespace x3dom.nodeTypes */
-/*
- * X3DOM JavaScript Library
- * http://www.x3dom.org
- *
- * (C)2009 Fraunhofer IGD, Darmstadt, Germany
- * Dual licensed under the MIT and GPL
- */
-
-//	### MotorJoint ###
-x3dom.registerNodeType(
-    "MotorJoint",
-    "RigidBodyPhysics",
-    defineClass(x3dom.nodeTypes.X3DRigidJointNode,
-
-        /**
-         * Constructor for MotorJoint
-         * @constructs x3dom.nodeTypes.MotorJoint
-         * @x3d 3.3
-         * @component RigidBodyPhysics
-         * @status experimental
-         * @extends x3dom.nodeTypes.X3DRigidJointNode
-         * @param {Object} [ctx=null] - context object, containing initial settings like namespace
-         * @classdesc The MotorJoint node allows control of the relative angular velocities between the two bodies
-         *  (specified by the body1 and body2 fields) associated with a joint. This can be especially useful with a
-         *  BallJoint where there is no restriction on the angular degrees of freedom.
-         */
-        function(ctx){
-            x3dom.nodeTypes.MotorJoint.superClass.call(this, ctx);
-
-            /**
-             * The three axis angle fields provide angles (in angle base units) for this frame for the corresponding
-             *  motor axis when in user-calculated mode.
-             * @var {x3dom.fields.SFFloat} axis1Angle
-             * @memberof x3dom.nodeTypes.MotorJoint
-             * @initvalue 0
-             * @range [-pi, pi]
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'axis1Angle', 0);
-
-            /**
-             * Torque on axis 1.
-             * @var {x3dom.fields.SFFloat} axis1Torque
-             * @memberof x3dom.nodeTypes.MotorJoint
-             * @initvalue 0
-             * @range (-inf, inf)
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'axis1Torque', 0);
-
-            /**
-             * The three axis angle fields provide angles (in angle base units) for this frame for the corresponding
-             *  motor axis when in user-calculated mode.
-             * @var {x3dom.fields.SFFloat} axis2Angle
-             * @memberof x3dom.nodeTypes.MotorJoint
-             * @initvalue 0
-             * @range [-pi, pi]
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'axis2Angle', 0);
-
-            /**
-             * Torque on axis 2.
-             * @var {x3dom.fields.SFFloat} axis2Torque
-             * @memberof x3dom.nodeTypes.MotorJoint
-             * @initvalue 0
-             * @range (-inf, inf)
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'axis2Torque', 0);
-
-            /**
-             * The three axis angle fields provide angles (in angle base units) for this frame for the corresponding
-             *  motor axis when in user-calculated mode.
-             * @var {x3dom.fields.SFFloat} axis3Angle
-             * @memberof x3dom.nodeTypes.MotorJoint
-             * @initvalue 0
-             * @range [-pi, pi]
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'axis3Angle', 0);
-
-            /**
-             * Torque on axis 3.
-             * @var {x3dom.fields.SFFloat} axis3Torque
-             * @memberof x3dom.nodeTypes.MotorJoint
-             * @initvalue 0
-             * @range (-inf, inf)
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'axis3Torque', 0);
-
-            /**
-             * The currently enabled axis.
-             * @var {x3dom.fields.SFInt32} enabledAxes
-             * @memberof x3dom.nodeTypes.MotorJoint
-             * @initvalue 1
-             * @range [0,3]
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFInt32(ctx, 'enabledAxes', 1);
-
-            /**
-             * The motorAxis fields define the axis vector of the corresponding axis.
-             * @var {x3dom.fields.SFVec3f} motor1Axis
-             * @memberof x3dom.nodeTypes.MotorJoint
-             * @initvalue 0,0,0
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFVec3f(ctx, 'motor1Axis', 0,0,0);
-
-            /**
-             * The motorAxis fields define the axis vector of the corresponding axis.
-             * @var {x3dom.fields.SFVec3f} motor2Axis
-             * @memberof x3dom.nodeTypes.MotorJoint
-             * @initvalue 0,0,0
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFVec3f(ctx, 'motor2Axis', 0,0,0);
-
-            /**
-             * The motorAxis fields define the axis vector of the corresponding axis.
-             * @var {x3dom.fields.SFVec3f} motor3Axis
-             * @memberof x3dom.nodeTypes.MotorJoint
-             * @initvalue 0,0,0
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFVec3f(ctx, 'motor3Axis', 0,0,0);
-
-            /**
-             * The stop bounce fields describe how much the joint should bounce the body back on the corresponding axis
-             *  if the joint limit has been reached or exceeded. A value of zero indicates no bounce at all, and a value
-             *  of one says that it should bounce with velocity equal and opposite to the collision velocity of the
-             *  contact.
-             * @var {x3dom.fields.SFFloat} stop1Bounce
-             * @memberof x3dom.nodeTypes.MotorJoint
-             * @initvalue 0
-             * @range [0,1]
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'stop1Bounce', 0);
-
-            /**
-             * The stop error correction fields describe the amount of error correction to be performed in a time step
-             *  when the joint reaches the limit on the corresponding axis. A value of zero means no error correction is
-             *  to be performed and a value of one means all error should be corrected in a single step.
-             * @var {x3dom.fields.SFFloat} stop1ErrorCorrection
-             * @memberof x3dom.nodeTypes.MotorJoint
-             * @initvalue 0.8
-             * @range [0,1]
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'stop1ErrorCorrection', 0.8);
-
-            /**
-             * The stop bounce fields describe how much the joint should bounce the body back on the corresponding axis
-             *  if the joint limit has been reached or exceeded. A value of zero indicates no bounce at all, and a value
-             *  of one says that it should bounce with velocity equal and opposite to the collision velocity of the
-             *  contact.
-             * @var {x3dom.fields.SFFloat} stop2Bounce
-             * @memberof x3dom.nodeTypes.MotorJoint
-             * @initvalue 0
-             * @range [0,1]
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'stop2Bounce', 0);
-
-            /**
-             * The stop error correction fields describe the amount of error correction to be performed in a time step
-             *  when the joint reaches the limit on the corresponding axis. A value of zero means no error correction is
-             *  to be performed and a value of one means all error should be corrected in a single step.
-             * @var {x3dom.fields.SFFloat} stop2ErrorCorrection
-             * @memberof x3dom.nodeTypes.MotorJoint
-             * @initvalue 0.8
-             * @range [0,1]
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'stop2ErrorCorrection', 0.8);
-
-            /**
-             * The stop bounce fields describe how much the joint should bounce the body back on the corresponding axis
-             *  if the joint limit has been reached or exceeded. A value of zero indicates no bounce at all, and a value
-             *  of one says that it should bounce with velocity equal and opposite to the collision velocity of the
-             *  contact.
-             * @var {x3dom.fields.SFFloat} stop3Bounce
-             * @memberof x3dom.nodeTypes.MotorJoint
-             * @initvalue 0
-             * @range [0,1]
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'stop3Bounce', 0);
-
-            /**
-             * The stop error correction fields describe the amount of error correction to be performed in a time step
-             *  when the joint reaches the limit on the corresponding axis. A value of zero means no error correction is
-             *  to be performed and a value of one means all error should be corrected in a single step.
-             * @var {x3dom.fields.SFFloat} stop3ErrorCorrection
-             * @memberof x3dom.nodeTypes.MotorJoint
-             * @initvalue 0.8
-             * @range [0,1]
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'stop3ErrorCorrection', 0.8);
-
-        },
-        {
-            nodeChanged: function(){
-                //x3dom.debug.logInfo('MotorJoint: ');
-            }
-        }
-    )
-);
-/** @namespace x3dom.nodeTypes */
-/*
- * X3DOM JavaScript Library
- * http://www.x3dom.org
- *
- * (C)2009 Fraunhofer IGD, Darmstadt, Germany
- * Dual licensed under the MIT and GPL
- */
-
-//	### SliderJoint ###
-x3dom.registerNodeType(
-    "SliderJoint",
-    "RigidBodyPhysics",
-    defineClass(x3dom.nodeTypes.X3DRigidJointNode,
-
-        /**
-         * Constructor for SliderJoint
-         * @constructs x3dom.nodeTypes.SliderJoint
-         * @x3d 3.3
-         * @component RigidBodyPhysics
-         * @status experimental
-         * @extends x3dom.nodeTypes.X3DRigidJointNode
-         * @param {Object} [ctx=null] - context object, containing initial settings like namespace
-         * @classdesc The SliderJoint node represents a joint where all movement between the bodies specified by the
-         *  body1 and body2 fields is constrained to a single dimension along a user-defined axis.
-         */
-        function(ctx){
-            x3dom.nodeTypes.SliderJoint.superClass.call(this, ctx);
-
-            /**
-             * The axis field indicates which axis along which the two bodies will act. The value should represent a
-             *  normalized vector.
-             * @var {x3dom.fields.SFVec3f} axis
-             * @memberof x3dom.nodeTypes.SliderJoint
-             * @initvalue 0,1,0
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFVec3f(ctx, 'axis', 0,1,0);
-
-            /**
-             * If minSeparation is greater than maxSeparation, the stops become ineffective as if the object has no
-             *  stops at all.
-             * @var {x3dom.fields.SFFloat} maxSeparation
-             * @memberof x3dom.nodeTypes.SliderJoint
-             * @initvalue 1
-             * @range [0,inf)
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'maxSeparation', 1);
-
-            /**
-             * If minSeparation is greater than maxSeparation, the stops become ineffective as if the object has no
-             *  stops at all.
-             * @var {x3dom.fields.SFFloat} minSeparation
-             * @memberof x3dom.nodeTypes.SliderJoint
-             * @initvalue 0
-             * @range [0,inf)
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'minSeparation', 0);
-
-            /**
-             * The stopBounce field describes how much the joint should bounce the body back if the joint limit has been
-             *  reached or exceeded. A value of zero indicates no bounce at all, and a value of one indicates that it
-             *  should bounce with velocity equal and opposite to the collision velocity of the contact.
-             * @var {x3dom.fields.SFFloat} stopBounce
-             * @memberof x3dom.nodeTypes.SliderJoint
-             * @initvalue 0
-             * @range [0,1]
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'stopBounce', 0);
-
-            /**
-             * The stopErrorCorrection field describes the amount of error correction to be performed in a time step
-             *  when the joint reaches the limit. A value of zero means no error correction is to be performed and a
-             *   value of one means all error should be corrected in a single step.
-             * @var {x3dom.fields.SFFloat} stopErrorCorrection
-             * @memberof x3dom.nodeTypes.SliderJoint
-             * @initvalue 1
-             * @range [0,1]
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'stopErrorCorrection', 1);
-
-
-        },
-        {
-            nodeChanged: function(){
-                //x3dom.debug.logInfo('SliderJoint: ');
-            }
-        }
-    )
-);
-/** @namespace x3dom.nodeTypes */
-/*
- * X3DOM JavaScript Library
- * http://www.x3dom.org
- *
- * (C)2009 Fraunhofer IGD, Darmstadt, Germany
- * Dual licensed under the MIT and GPL
- */
-
-//	### UniversalJoint ###
-x3dom.registerNodeType(
-    "UniversalJoint",
-    "RigidBodyPhysics",
-    defineClass(x3dom.nodeTypes.X3DRigidJointNode,
-
-        /**
-         * Constructor for UniversalJoint
-         * @constructs x3dom.nodeTypes.UniversalJoint
-         * @x3d 3.3
-         * @component RigidBodyPhysics
-         * @status experimental
-         * @extends x3dom.nodeTypes.X3DRigidJointNode
-         * @param {Object} [ctx=null] - context object, containing initial settings like namespace
-         * @classdesc A universal joint is like a BallJoint that constrains an extra degree of rotational freedom.
-         *  Given the axis specified by the axis1 field on the body specified by the body1 field, and the axis specified
-         *  by the axis2 field on body2 that is perpendicular to axis1, the UniversalJoint node keeps the axes
-         *  perpendicular to each other. Thus, rotation of the two bodies about the direction perpendicular to the two
-         *  axes will be equal.
-         */
-        function(ctx){
-            x3dom.nodeTypes.UniversalJoint.superClass.call(this, ctx);
-
-            /**
-             * Anchor of the joint.
-             * @var {x3dom.fields.SFVec3f} anchorPoint
-             * @memberof x3dom.nodeTypes.UniversalJoint
-             * @initvalue 0,0,0
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFVec3f(ctx, 'anchorPoint', 0,0,0);
-
-            /**
-             * The vectors specified by the axis1 and axis2 fields shall be perpendicular. If not, the interactions are
-             *  undefined.
-             * @var {x3dom.fields.SFVec3f} axis1
-             * @memberof x3dom.nodeTypes.UniversalJoint
-             * @initvalue 0,0,0
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFVec3f(ctx, 'axis1', 0,0,0);
-
-            /**
-             * The vectors specified by the axis1 and axis2 fields shall be perpendicular. If not, the interactions are
-             *  undefined.
-             * @var {x3dom.fields.SFVec3f} axis2
-             * @memberof x3dom.nodeTypes.UniversalJoint
-             * @initvalue 0,0,0
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFVec3f(ctx, 'axis2', 0,0,0);
-
-            /**
-             * The stop bounce fields describe how much the joint should bounce the body back on the corresponding axis
-             *  if the joint limit has been reached or exceeded. A value of zero indicates no bounce at all, and a value
-             *  of one indicates that it should bounce with velocity equal and opposite to the collision velocity of the
-             *  contact.
-             * @var {x3dom.fields.SFFloat} stop1Bounce
-             * @memberof x3dom.nodeTypes.UniversalJoint
-             * @initvalue 0
-             * @range [0,1]
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'stop1Bounce', 0);
-
-            /**
-             * The stop error correction fields describe the amount of error correction to be performed in a time step
-             *  when the joint reaches the limit on the corresponding axis. A value of zero means no error correction is
-             *  to be performed and a value of one means all error should be corrected in a single step.
-             * @var {x3dom.fields.SFFloat} stop1ErrorCorrection
-             * @memberof x3dom.nodeTypes.UniversalJoint
-             * @initvalue 0.8
-             * @range [0,1]
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'stop1ErrorCorrection', 0.8);
-
-            /**
-             * The stop bounce fields describe how much the joint should bounce the body back on the corresponding axis
-             *  if the joint limit has been reached or exceeded. A value of zero indicates no bounce at all, and a value
-             *  of one indicates that it should bounce with velocity equal and opposite to the collision velocity of the
-             *  contact.
-             * @var {x3dom.fields.SFFloat} stop2Bounce
-             * @memberof x3dom.nodeTypes.UniversalJoint
-             * @initvalue 0
-             * @range [0,1]
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'stop2Bounce', 0);
-
-            /**
-             * The stop error correction fields describe the amount of error correction to be performed in a time step
-             *  when the joint reaches the limit on the corresponding axis. A value of zero means no error correction is
-             *  to be performed and a value of one means all error should be corrected in a single step.
-             * @var {x3dom.fields.SFFloat} stop2ErrorCorrection
-             * @memberof x3dom.nodeTypes.UniversalJoint
-             * @initvalue 0.8
-             * @range [0,1]
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'stop2ErrorCorrection', 0.8);
-
-        },
-        {
-            nodeChanged: function(){
-                //x3dom.debug.logInfo('UniversalJoint: ');
-            }
-        }
-    )
-);
-/** @namespace x3dom.nodeTypes */
-/*
- * X3DOM JavaScript Library
- * http://www.x3dom.org
- *
- * (C)2009 Fraunhofer IGD, Darmstadt, Germany
- * Dual licensed under the MIT and GPL
- */
-
-//	### SingleAxisHingeJoint ###
-x3dom.registerNodeType(
-    "SingleAxisHingeJoint",
-    "RigidBodyPhysics",
-    defineClass(x3dom.nodeTypes.X3DRigidJointNode,
-
-        /**
-         * Constructor for SingleAxisHingeJoint
-         * @constructs x3dom.nodeTypes.SingleAxisHingeJoint
-         * @x3d 3.3
-         * @component RigidBodyPhysics
-         * @status experimental
-         * @extends x3dom.nodeTypes.X3DRigidJointNode
-         * @param {Object} [ctx=null] - context object, containing initial settings like namespace
-         * @classdesc This node represents a joint with a single axis about which to rotate. As the name suggests, this
-         *  is a joint that works like a traditional door hinge. The axis of the hinge is defined to be along the unit
-         *  vector described in the axis field and centered on the anchorPoint described in world coordinates. The
-         *  objects on each side of the hinge are specified by the body1 and body2 fields.
-         */
-        function(ctx){
-            x3dom.nodeTypes.SingleAxisHingeJoint.superClass.call(this, ctx);
-
-            /**
-             * The axis of the hinge is defined to be along the unit vector described in the axis field and centered on
-             * the anchorPoint described in world coordinates.
-             * @var {x3dom.fields.SFVec3f} anchorPoint
-             * @memberof x3dom.nodeTypes.SingleAxisHingeJoint
-             * @initvalue 0,0,0
-             * @field x3dom
-             * @instance
-             */
-            this.addField_SFVec3f(ctx, 'anchorPoint', 0,0,0);
-
-            /**
-             * The axis of the hinge is defined to be along the unit vector described in the axis field and centered on
-             *  the anchorPoint described in world coordinates.
-             * @var {x3dom.fields.SFVec3f} axis
-             * @memberof x3dom.nodeTypes.SingleAxisHingeJoint
-             * @initvalue 0,0,0
-             * @field x3dom
-             * @instance
-             */
-            this.addField_SFVec3f(ctx, 'axis', 0,0,0);
-
-            /**
-             * The minAngle and maxAngle fields are used to control the maximum angles through which the hinge is
-             *  allowed to travel. A hinge may not travel more than π radians (or the equivalent angle base units) in
-             *  either direction from its initial position.
-             * @var {x3dom.fields.SFFloat} maxAngle
-             * @memberof x3dom.nodeTypes.SingleAxisHingeJoint
-             * @initvalue 90
-             * @range [-PI*degToRad, PI*degToRad]
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'maxAngle', 90);
-
-            /**
-             * The minAngle and maxAngle fields are used to control the maximum angles through which the hinge is
-             *  allowed to travel. A hinge may not travel more than π radians (or the equivalent angle base units) in
-             *  either direction from its initial position.
-             * @var {x3dom.fields.SFFloat} minAngle
-             * @memberof x3dom.nodeTypes.SingleAxisHingeJoint
-             * @initvalue -90
-             * @range [-PI*degToRad, PI*degToRad]
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'minAngle', -90);
-
-            /**
-             * The stopBounce field describes how much the joint should bounce the body back if the joint limit has been
-             *  reached or exceeded. A value of zero indicates no bounce at all, and a value of one says that it should
-             *  bounce with velocity equal and opposite to the collision velocity of the contact.
-             * @var {x3dom.fields.SFFloat} stopBounce
-             * @memberof x3dom.nodeTypes.SingleAxisHingeJoint
-             * @initvalue 0
-             * @range [0,1]
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'stopBounce', 0);
-
-            /**
-             * The stopErrorCorrection field describes the amount of error correction to be performed in a time step
-             *  when the joint reaches the limit. A value of zero means no error correction is to be performed and a
-             *  value of one means all error should be corrected in a single step.
-             * @var {x3dom.fields.SFFloat} stopErrorCorrection
-             * @memberof x3dom.nodeTypes.SingleAxisHingeJoint
-             * @initvalue 0.8
-             * @range [0,1]
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'stopErrorCorrection', 0.8);
-
-        },
-        {
-            nodeChanged: function(){
-                //x3dom.debug.logInfo('SingleAxisHingeJoint: ');
-            }
-        }
-    )
-);
-/** @namespace x3dom.nodeTypes */
-/*
- * X3DOM JavaScript Library
- * http://www.x3dom.org
- *
- * (C)2009 Fraunhofer IGD, Darmstadt, Germany
- * Dual licensed under the MIT and GPL
- */
-
-//	### DoubleAxisHingeJoint ###
-x3dom.registerNodeType(
-    "DoubleAxisHingeJoint",
-    "RigidBodyPhysics",
-    defineClass(x3dom.nodeTypes.X3DRigidJointNode,
-
-        /**
-         * Constructor for DoubleAxisHingeJoint
-         * @constructs x3dom.nodeTypes.DoubleAxisHingeJoint
-         * @x3d 3.3
-         * @component RigidBodyPhysics
-         * @status experimental
-         * @extends x3dom.nodeTypes.X3DRigidJointNode
-         * @param {Object} [ctx=null] - context object, containing initial settings like namespace
-         * @classdesc The DoubleAxisHingeJoint node represents a joint that has two independent axes that are located
-         *  around a common anchor point. Axis 1 is specified relative to the first body (specified by the body1 field)
-         *  and axis 2 is specified relative to the second body (specified by the body2 field). Axis 1 can have limits
-         *  and a motor, axis 2 can only have a motor.
-         */
-        function(ctx){
-            x3dom.nodeTypes.DoubleAxisHingeJoint.superClass.call(this, ctx);
-
-            /**
-             * Anchor point of the joint
-             * @var {x3dom.fields.SFVec3f} anchorPoint
-             * @memberof x3dom.nodeTypes.DoubleAxisHingeJoint
-             * @initvalue 0,0,0
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFVec3f(ctx, 'anchorPoint', 0,0,0);
-
-            /**
-             * Axis 1 is specified relative to the first body (specified by the body1 field).
-             * @var {x3dom.fields.SFVec3f} axis1
-             * @memberof x3dom.nodeTypes.DoubleAxisHingeJoint
-             * @initvalue 0,0,0
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFVec3f(ctx, 'axis1', 0,0,0);
-
-            /**
-             * Axis 2 is specified relative to the second body (specified by the body2 field).
-             * @var {x3dom.fields.SFVec3f} axis2
-             * @memberof x3dom.nodeTypes.DoubleAxisHingeJoint
-             * @initvalue 0,0,0
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFVec3f(ctx, 'axis2', 0,0,0);
-
-            /**
-             * Desired angular velocity for the first axis.
-             * @var {x3dom.fields.SFFloat} desiredAngularVelocity1
-             * @memberof x3dom.nodeTypes.DoubleAxisHingeJoint
-             * @initvalue 0
-             * @range (-inf,inf)
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'desiredAngularVelocity1', 0);
-
-            /**
-             * Desired angular velocity for the second axis.
-             * @var {x3dom.fields.SFFloat} desiredAngularVelocity2
-             * @memberof x3dom.nodeTypes.DoubleAxisHingeJoint
-             * @initvalue 0
-             * @range (-inf,inf)
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'desiredAngularVelocity2', 0);
-
-            /**
-             * The minAngle1 and maxAngle1 fields are used to control the maximum angles through which the hinge is
-             *  allowed to travel. A hinge may not travel more than π radians (or the equivalent angle base units) in
-             *  either direction from its initial position.
-             * @var {x3dom.fields.SFFloat} maxAngle1
-             * @memberof x3dom.nodeTypes.DoubleAxisHingeJoint
-             * @initvalue 90
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'maxAngle1', 90);
-
-            /**
-             * The minAngle1 and maxAngle1 fields are used to control the maximum angles through which the hinge is
-             *  allowed to travel. A hinge may not travel more than π radians (or the equivalent angle base units) in
-             *  either direction from its initial position.
-             * @var {x3dom.fields.SFFloat} minAngle1
-             * @memberof x3dom.nodeTypes.DoubleAxisHingeJoint
-             * @initvalue -90
-             * @range [-pi * radToDeg, pi * radToDeg]
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'minAngle1', -90);
-
-            /**
-             * The maxTorque1 field defines the maximum amount of torque that the motor can apply on axis 1 in order to
-             *  achieve the desired desiredAngularVelocity1 value.
-             * @var {x3dom.fields.SFFloat} maxTorque1
-             * @memberof x3dom.nodeTypes.DoubleAxisHingeJoint
-             * @initvalue 0
-             * @range (-inf, inf)
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'maxTorque1', 0);
-
-            /**
-             * The maxTorque2 field defines the maximum amount of torque that the motor can apply on axis 1 in order to
-             *  achieve the desired desiredAngularVelocity2 value.
-             * @var {x3dom.fields.SFFloat} maxTorque2
-             * @memberof x3dom.nodeTypes.DoubleAxisHingeJoint
-             * @initvalue 0
-             * @range (-inf, inf)
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'maxTorque2', 0);
-
-            /**
-             * The stopBounce1 field is used to set how bouncy the minimum and maximum angle stops are for axis 1. A
-             *  value of zero means they are not bouncy while a value of 1 means maximum bounciness (full reflection of
-             *  force arriving at the stop).
-             * @var {x3dom.fields.SFFloat} stopBounce1
-             * @memberof x3dom.nodeTypes.DoubleAxisHingeJoint
-             * @initvalue 0
-             * @range [0,1]
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'stopBounce1', 0);
-
-            /**
-             * The stopConstantForceMix1 and suspensionForce fields can be used to apply damping to the calculations by
-             *  violating the normal constraints by applying a small, constant force to those calculations.
-             * @var {x3dom.fields.SFFloat} stopConstantForceMix1
-             * @memberof x3dom.nodeTypes.DoubleAxisHingeJoint
-             * @initvalue 0.001
-             * @range [0,inf]
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'stopConstantForceMix1', 0.001);
-
-            /**
-             * The stopErrorCorrection1 and suspensionErrorCorrection fields describe how quickly the system should
-             *  resolve intersection errors due to floating point inaccuracies.
-             * @var {x3dom.fields.SFFloat} stopErrorCorrection1
-             * @memberof x3dom.nodeTypes.DoubleAxisHingeJoint
-             * @initvalue 0.8
-             * @range [0,1]
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'stopErrorCorrection1', 0.8);
-
-            /**
-             * The stopErrorCorrection1 and suspensionErrorCorrection fields describe how quickly the system should
-             *  resolve intersection errors due to floating point inaccuracies.
-             * @var {x3dom.fields.SFFloat} suspensionErrorCorrection
-             * @memberof x3dom.nodeTypes.DoubleAxisHingeJoint
-             * @initvalue 0.8
-             * @range [0,1]
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'suspensionErrorCorrection', 0.8);
-
-            /**
-             * The stopConstantForceMix1 and suspensionForce fields can be used to apply damping to the calculations by
-             *  violating the normal constraints by applying a small, constant force to those calculations.
-             * @var {x3dom.fields.SFFloat} suspensionForce
-             * @memberof x3dom.nodeTypes.DoubleAxisHingeJoint
-             * @initvalue 0
-             * @range [0,inf)
-             * @field x3d
-             * @instance
-             */
-            this.addField_SFFloat(ctx, 'suspensionForce', 0);
-        },
-        {
-            nodeChanged: function(){
-                //x3dom.debug.logInfo('DoubleAxisHingeJoint: ');
-            }
-        }
-    )
-);
 
 x3dom.versionInfo = {
-    version:  '1.7.0',
-    revision: 'f33e92d248a2f25d52fa63ede8ffee570c8a6304',
-    date:     'Wed Jun 17 09:49:25 2015 +0200'
+    version:  '1.7.1',
+    revision: '27d2b19b572f365b32d12cd9883e4bf894e60cef',
+    date:     'Tue Jan 5 13:25:24 2016 +0100'
 };
 
 
 x3dom.versionInfo = {
-    version:  '1.7.0',
-    revision: 'f33e92d248a2f25d52fa63ede8ffee570c8a6304',
-    date:     'Wed Jun 17 09:49:25 2015 +0200'
+    version:  '1.7.1',
+    revision: '27d2b19b572f365b32d12cd9883e4bf894e60cef',
+    date:     'Tue Jan 5 13:25:24 2016 +0100'
 };
 
