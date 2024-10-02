@@ -1,4 +1,4 @@
-/** X3DOM Runtime, http://www.x3dom.org/ 1.8.0 - 4c48cbddc8c7e1cbaa5d09fdd152934ec60fc7b8 - Wed Jul 24 14:56:37 2019 +0200 *//*
+/** X3DOM Runtime, http://www.x3dom.org/ 1.8.1 - 0c742a1a981f8c0a9cbb7059f36c3a6c4cb9fec6 - Fri Sep 27 18:22:15 2019 +0200 *//*
  * X3DOM JavaScript Library
  * http://www.x3dom.org
  *
@@ -1174,7 +1174,7 @@ x3dom.RequestManager.requests = [];
  *
  * @type {number}
  */
-x3dom.RequestManager.maxParallelRequests = 40;
+x3dom.RequestManager.maxParallelRequests = 50;
 
 /**
  *
@@ -15743,23 +15743,26 @@ x3dom.Texture.prototype.updateText = function() {
 
         var leftToRight = fontStyleNode._vf.leftToRight ? 'ltr' : 'rtl';
         var topToBottom = fontStyleNode._vf.topToBottom;
+    
+        var beginAlign = leftToRight == 'ltr' ? 'left' : 'right';
+        var endAlign = leftToRight == 'ltr' ? 'right' : 'left';
 
         font_justify = fontStyleNode._vf.justify[0].toString().replace(/\'/g, '');
         switch (font_justify.toUpperCase()) {
             case 'BEGIN':
-                font_justify = 'left';
+                font_justify = beginAlign;
                 break;
             case 'END':
-                font_justify = 'right';
+                font_justify = endAlign;
                 break;
             case 'FIRST':
-                font_justify = 'left';
+                font_justify = beginAlign;
                 break; // relevant only in justify[1], eg. minor alignment
             case 'MIDDLE':
                 font_justify = 'center';
                 break;
             default:
-                font_justify = 'left';
+                font_justify = beginAlign;
                 break;
         }
 
@@ -15834,7 +15837,7 @@ x3dom.Texture.prototype.updateText = function() {
         lengths[i] = pLength <= 0 ? pWidth : pLength * x3dToPx;
     }
 
-    var canvas_extra = 0.1 * textHeight; // single line, some fonts are higher than textHeight
+    var canvas_extra = 0.25 * textHeight; // single line, some fonts are higher than textHeight
     var txtW = maxWidth;
     var txtH = textHeight * font_spacing * paragraph.length + canvas_extra;
 
@@ -15850,11 +15853,11 @@ x3dom.Texture.prototype.updateText = function() {
             textX = txtW / 2;
             break;
         case "left":
-            x_offset = leftToRight == 'ltr' ? 0 : -txtW;
+            x_offset = 0;
             textX = 0;
             break;
         case "right":
-            x_offset = leftToRight == 'ltr' ? -txtW : 0;
+            x_offset = -txtW;
             textX = txtW;
             break;
     }
@@ -15862,7 +15865,7 @@ x3dom.Texture.prototype.updateText = function() {
     // y_offset, baseline and first Y
     switch (minor_alignment) {
         case "MIDDLE":
-            y_offset = txtH / 2;
+            y_offset = txtH / 2 - canvas_extra / 2;
             break;
         case "BEGIN":
             y_offset = topToBottom ? 0 : txtH - canvas_extra;
@@ -15909,6 +15912,7 @@ x3dom.Texture.prototype.updateText = function() {
     // create the multiline text always top down
     for (i = 0; i < paragraph.length; i++) {
         j = topToBottom ? i : paragraph.length - 1 - i;
+        if (leftToRight == 'rtl') paragraph[j] = '\u202e' + paragraph[j]; //force rtl unicode mark
         text_ctx.fillText(paragraph[j], textX, textY, lengths[j]);
         textY += textHeight * font_spacing;
     }
@@ -15935,8 +15939,6 @@ x3dom.Texture.prototype.updateText = function() {
         node.setAllDirty();
     });
 };
-
-
 
 /*
  * X3DOM JavaScript Library
@@ -16642,14 +16644,17 @@ x3dom.X3DDocument.prototype.onKeyPress = function(charCode)
     			var rotation = new x3dom.fields.Quaternion(0, 0, 1, 0);
     			rotation.setValue(mat_view);
     			var rot = rotation.toAxisAngle();
-    			var translation = mat_view.e3();
+                var translation = mat_view.e3();
+                var center = viewpoint.getCenterOfRotation();
 
     			x3dom.debug.logInfo('\n&lt;Viewpoint position="' + translation.x.toFixed(5) + ' '
     			                    + translation.y.toFixed(5) + ' ' + translation.z.toFixed(5) + '" ' +
     								'orientation="' + rot[0].x.toFixed(5) + ' ' + rot[0].y.toFixed(5) + ' '
     								+ rot[0].z.toFixed(5) + ' ' + rot[1].toFixed(5) + '" \n\t' +
                                     'zNear="' + viewpoint.getNear().toFixed(5) + '" ' +
-    								'zFar="' + viewpoint.getFar().toFixed(5) + '" ' +
+                                    'zFar="' + viewpoint.getFar().toFixed(5) + '" ' +
+                                    'centerOfRotation="' + center.x.toFixed(5) + ' ' + center.y.toFixed(5) +  ' ' + center.z.toFixed(5) + '" ' +
+                                    'fieldOfView="' + viewpoint.getFieldOfView().toFixed(5) + '" ' +
     								'description="' + viewpoint._vf.description + '"&gt;' +
                                     '&lt;/Viewpoint&gt;');
             })();
@@ -19102,6 +19107,12 @@ x3dom.Mesh.prototype.calcTexCoords = function(mode) {
             this._texCoords[0][j++] = 0.5 + this._normals[0][i] / 2.0;
             this._texCoords[0][j++] = 0.5 + this._normals[0][i + 1] / 2.0;
         }
+    } 
+    if (mode.toLowerCase() === "coord") {
+        for (var k = 0, l = 0, m = this._positions[0].length; k < m; k += 3) {
+            this._texCoords[0][l++] = this._positions[0][k];
+            this._texCoords[0][l++] = this._positions[0][k + 1];
+        }
     } else {
         // "plane" is x3d default mapping
         var min = new x3dom.fields.SFVec3f(0, 0, 0),
@@ -21466,6 +21477,113 @@ x3dom.fields.Quaternion.prototype.setValueByStr = function(str) {
     return this;
 };
 
+function _colorParse(str) {
+    var red = 0.0, green = 0.0, blue = 0.0;
+    var alpha = 1.0;
+
+    // Definition of CSS color names
+    var colorNames = {
+      aliceblue: '#f0f8ff',          antiquewhite: '#faebd7',         aqua: '#00ffff',
+      aquamarine: '#7fffd4',         azure: '#f0ffff',                beige: '#f5f5dc',
+      bisque: '#ffe4c4',             black: '#000000',                blanchedalmond: '#ffebcd',
+      blue: '#0000ff',               blueviolet: '#8a2be2',           brown: '#a52a2a',
+      burlywood: '#deb887',          cadetblue: '#5f9ea0',            chartreuse: '#7fff00',
+      chocolate: '#d2691e',          coral: '#ff7f50',                cornflowerblue: '#6495ed',
+      cornsilk: '#fff8dc',           crimson: '#dc143c',              cyan: '#00ffff',
+      darkblue: '#00008b',           darkcyan: '#008b8b',             darkgoldenrod: '#b8860b',
+      darkgray: '#a9a9a9',           darkgreen: '#006400',            darkkhaki: '#bdb76b',
+      darkmagenta: '#8b008b',        darkolivegreen: '#556b2f',       darkorange: '#ff8c00',
+      darkorchid: '#9932cc',         darkred: '#8b0000',              darksalmon: '#e9967a',
+      darkseagreen: '#8fbc8f',       darkslateblue: '#483d8b',        darkslategray: '#2f4f4f',
+      darkturquoise: '#00ced1',      darkviolet: '#9400d3',           deeppink: '#ff1493',
+      deepskyblue: '#00bfff',        dimgray: '#696969',              dodgerblue: '#1e90ff',
+      feldspar: '#d19275',           firebrick: '#b22222',            floralwhite: '#fffaf0',
+      forestgreen: '#228b22',        fuchsia: '#ff00ff',              gainsboro: '#dcdcdc',
+      ghostwhite: '#f8f8ff',         gold: '#ffd700',                 goldenrod: '#daa520',
+      gray: '#808080',               green: '#008000',                greenyellow: '#adff2f',
+      honeydew: '#f0fff0',           hotpink: '#ff69b4',              indianred : '#cd5c5c',
+      indigo : '#4b0082',            ivory: '#fffff0',                khaki: '#f0e68c',
+      lavender: '#e6e6fa',           lavenderblush: '#fff0f5',        lawngreen: '#7cfc00',
+      lemonchiffon: '#fffacd',       lightblue: '#add8e6',            lightcoral: '#f08080',
+      lightcyan: '#e0ffff',          lightgoldenrodyellow: '#fafad2', lightgrey: '#d3d3d3',
+      lightgreen: '#90ee90',         lightpink: '#ffb6c1',            lightsalmon: '#ffa07a',
+      lightseagreen: '#20b2aa',      lightskyblue: '#87cefa',         lightslateblue: '#8470ff',
+      lightslategray: '#778899',     lightsteelblue: '#b0c4de',       lightyellow: '#ffffe0',
+      lime: '#00ff00',               limegreen: '#32cd32',            linen: '#faf0e6',
+      magenta: '#ff00ff',            maroon: '#800000',               mediumaquamarine: '#66cdaa',
+      mediumblue: '#0000cd',         mediumorchid: '#ba55d3',         mediumpurple: '#9370d8',
+      mediumseagreen: '#3cb371',     mediumslateblue: '#7b68ee',      mediumspringgreen: '#00fa9a',
+      mediumturquoise: '#48d1cc',    mediumvioletred: '#c71585',      midnightblue: '#191970',
+      mintcream: '#f5fffa',          mistyrose: '#ffe4e1',            moccasin: '#ffe4b5',
+      navajowhite: '#ffdead',        navy: '#000080',                 oldlace: '#fdf5e6',
+      olive: '#808000',              olivedrab: '#6b8e23',            orange: '#ffa500',
+      orangered: '#ff4500',          orchid: '#da70d6',               palegoldenrod: '#eee8aa',
+      palegreen: '#98fb98',          paleturquoise: '#afeeee',        palevioletred: '#d87093',
+      papayawhip: '#ffefd5',         peachpuff: '#ffdab9',            peru: '#cd853f',
+      pink: '#ffc0cb',               plum: '#dda0dd',                 powderblue: '#b0e0e6',
+      purple: '#800080',             red: '#ff0000',                  rosybrown: '#bc8f8f',
+      royalblue: '#4169e1',          saddlebrown: '#8b4513',          salmon: '#fa8072',
+      sandybrown: '#f4a460',         seagreen: '#2e8b57',             seashell: '#fff5ee',
+      sienna: '#a0522d',             silver: '#c0c0c0',               skyblue: '#87ceeb',
+      slateblue: '#6a5acd',          slategray: '#708090',            snow: '#fffafa',
+      springgreen: '#00ff7f',        steelblue: '#4682b4',            tan: '#d2b48c',
+      teal: '#008080',               thistle: '#d8bfd8',              tomato: '#ff6347',
+      turquoise: '#40e0d0',          violet: '#ee82ee',               violetred: '#d02090',
+      wheat: '#f5deb3',              white: '#ffffff',                whitesmoke: '#f5f5f5',
+      yellow: '#ffff00',             yellowgreen: '#9acd32'
+    };
+
+    // Matches CSS rgb() function
+    var rgbMatch = /^rgb\((\d{1,3}),\s{0,1}(\d{1,3}),\s{0,1}(\d{1,3})\)$/.exec(str);
+    if (rgbMatch !== null) {
+        red   = rgbMatch[1] / 255.0;
+        green = rgbMatch[2] / 255.0;
+        blue  = rgbMatch[3] / 255.0;
+    }
+
+    // Matches CSS rgba() function
+    var rgbaMatch = /^rgba\((\d{1,3}),\s{0,1}(\d{1,3}),\s{0,1}(\d{1,3}),(0+\.?\d*|1\.?0*)\)$/.exec(str);
+    if (rgbaMatch !== null) {
+        red   = rgbaMatch[1] / 255.0;
+        green = rgbaMatch[2] / 255.0;
+        blue  = rgbaMatch[3] / 255.0;
+        alpha = +rgbaMatch[4];
+    }
+
+    // Matches CSS color name
+    if (colorNames[str]) {
+        str = colorNames[str];
+    }
+
+    // Hexadecimal color codes
+    if (str.substr && str.substr(0, 1) === "#") {
+        var hex = str.substr(1);
+        var len = hex.length;
+
+        if (len === 8) {
+            red   = parseInt("0x" + hex.substr(0, 2), 16) / 255.0;
+            green = parseInt("0x" + hex.substr(2, 2), 16) / 255.0;
+            blue  = parseInt("0x" + hex.substr(4, 2), 16) / 255.0;
+            alpha = parseInt("0x" + hex.substr(6, 2), 16) / 255.0;
+        } else if (len === 6) {
+            red   = parseInt("0x" + hex.substr(0, 2), 16) / 255.0;
+            green = parseInt("0x" + hex.substr(2, 2), 16) / 255.0;
+            blue  = parseInt("0x" + hex.substr(4, 2), 16) / 255.0;
+        } else if (len === 4) {
+            red   = parseInt("0x" + hex.substr(0, 1), 16) / 15.0;
+            green = parseInt("0x" + hex.substr(1, 1), 16) / 15.0;
+            blue  = parseInt("0x" + hex.substr(2, 1), 16) / 15.0;
+            alpha = parseInt("0x" + hex.substr(3, 1), 16) / 15.0;
+        } else if (len === 3) {
+            red   = parseInt("0x" + hex.substr(0, 1), 16) / 15.0;
+            green = parseInt("0x" + hex.substr(1, 1), 16) / 15.0;
+            blue  = parseInt("0x" + hex.substr(2, 1), 16) / 15.0;
+        }
+    }
+
+    return { r: red, g: green, b: blue, a: alpha };
+}
+
 /**
  * SFColor constructor.
  *
@@ -21559,81 +21677,8 @@ x3dom.fields.SFColor.prototype.setValueByStr = function(str) {
 };
 
 x3dom.fields.SFColor.colorParse = function(color) {
-    var red = 0, green = 0, blue = 0;
-
-    // definition of css color names
-    var color_names = {
-        aliceblue: 'f0f8ff',    antiquewhite: 'faebd7', aqua: '00ffff',
-        aquamarine: '7fffd4',   azure: 'f0ffff',        beige: 'f5f5dc',
-        bisque: 'ffe4c4',       black: '000000',        blanchedalmond: 'ffebcd',
-        blue: '0000ff',         blueviolet: '8a2be2',   brown: 'a52a2a',
-        burlywood: 'deb887',    cadetblue: '5f9ea0',    chartreuse: '7fff00',
-        chocolate: 'd2691e',    coral: 'ff7f50',        cornflowerblue: '6495ed',
-        cornsilk: 'fff8dc',     crimson: 'dc143c',      cyan: '00ffff',
-        darkblue: '00008b',     darkcyan: '008b8b',     darkgoldenrod: 'b8860b',
-        darkgray: 'a9a9a9',     darkgreen: '006400',    darkkhaki: 'bdb76b',
-        darkmagenta: '8b008b',  darkolivegreen: '556b2f',darkorange: 'ff8c00',
-        darkorchid: '9932cc',   darkred: '8b0000',      darksalmon: 'e9967a',
-        darkseagreen: '8fbc8f', darkslateblue: '483d8b',darkslategray: '2f4f4f',
-        darkturquoise: '00ced1',darkviolet: '9400d3',   deeppink: 'ff1493',
-        deepskyblue: '00bfff',  dimgray: '696969',      dodgerblue: '1e90ff',
-        feldspar: 'd19275',     firebrick: 'b22222',    floralwhite: 'fffaf0',
-        forestgreen: '228b22',  fuchsia: 'ff00ff',      gainsboro: 'dcdcdc',
-        ghostwhite: 'f8f8ff',   gold: 'ffd700',         goldenrod: 'daa520',
-        gray: '808080',         green: '008000',        greenyellow: 'adff2f',
-        honeydew: 'f0fff0',     hotpink: 'ff69b4',      indianred : 'cd5c5c',
-        indigo : '4b0082',      ivory: 'fffff0',        khaki: 'f0e68c',
-        lavender: 'e6e6fa',     lavenderblush: 'fff0f5',lawngreen: '7cfc00',
-        lemonchiffon: 'fffacd', lightblue: 'add8e6',    lightcoral: 'f08080',
-        lightcyan: 'e0ffff',    lightgoldenrodyellow: 'fafad2', lightgrey: 'd3d3d3',
-        lightgreen: '90ee90',   lightpink: 'ffb6c1',    lightsalmon: 'ffa07a',
-        lightseagreen: '20b2aa',lightskyblue: '87cefa', lightslateblue: '8470ff',
-        lightslategray: '778899',lightsteelblue: 'b0c4de',lightyellow: 'ffffe0',
-        lime: '00ff00',         limegreen: '32cd32',    linen: 'faf0e6',
-        magenta: 'ff00ff',      maroon: '800000',       mediumaquamarine: '66cdaa',
-        mediumblue: '0000cd',   mediumorchid: 'ba55d3', mediumpurple: '9370d8',
-        mediumseagreen: '3cb371',mediumslateblue: '7b68ee', mediumspringgreen: '00fa9a',
-        mediumturquoise: '48d1cc',mediumvioletred: 'c71585',midnightblue: '191970',
-        mintcream: 'f5fffa',    mistyrose: 'ffe4e1',    moccasin: 'ffe4b5',
-        navajowhite: 'ffdead',  navy: '000080',         oldlace: 'fdf5e6',
-        olive: '808000',        olivedrab: '6b8e23',    orange: 'ffa500',
-        orangered: 'ff4500',    orchid: 'da70d6',       palegoldenrod: 'eee8aa',
-        palegreen: '98fb98',    paleturquoise: 'afeeee',palevioletred: 'd87093',
-        papayawhip: 'ffefd5',   peachpuff: 'ffdab9',    peru: 'cd853f',
-        pink: 'ffc0cb',         plum: 'dda0dd',         powderblue: 'b0e0e6',
-        purple: '800080',       red: 'ff0000',          rosybrown: 'bc8f8f',
-        royalblue: '4169e1',    saddlebrown: '8b4513',  salmon: 'fa8072',
-        sandybrown: 'f4a460',   seagreen: '2e8b57',     seashell: 'fff5ee',
-        sienna: 'a0522d',       silver: 'c0c0c0',       skyblue: '87ceeb',
-        slateblue: '6a5acd',    slategray: '708090',    snow: 'fffafa',
-        springgreen: '00ff7f',  steelblue: '4682b4',    tan: 'd2b48c',
-        teal: '008080',         thistle: 'd8bfd8',      tomato: 'ff6347',
-        turquoise: '40e0d0',    violet: 'ee82ee',       violetred: 'd02090',
-        wheat: 'f5deb3',        white: 'ffffff',        whitesmoke: 'f5f5f5',
-        yellow: 'ffff00',       yellowgreen: '9acd32'
-    };
-
-    if (color_names[color]) {
-        // first check if color is given as colorname
-        color = "#" + color_names[color];
-    }
-
-    if (color.substr && color.substr(0, 1) === "#") {
-        color = color.substr(1);
-        var len = color.length;
-
-        if (len === 6) {
-            red   = parseInt("0x" + color.substr(0, 2), 16) / 255.0;
-            green = parseInt("0x" + color.substr(2, 2), 16) / 255.0;
-            blue  = parseInt("0x" + color.substr(4, 2), 16) / 255.0;
-        } else if (len === 3) {
-            red   = parseInt("0x" + color.substr(0, 1), 16) / 15.0;
-            green = parseInt("0x" + color.substr(1, 1), 16) / 15.0;
-            blue  = parseInt("0x" + color.substr(2, 1), 16) / 15.0;
-        }
-    }
-
-    return new x3dom.fields.SFColor(red, green, blue);
+    var rgb = _colorParse(color);
+    return new x3dom.fields.SFColor(rgb.r, rgb.g, rgb.b);
 };
 
 /**
@@ -21721,93 +21766,8 @@ x3dom.fields.SFColorRGBA.prototype.toUint = function() {
 };
 
 x3dom.fields.SFColorRGBA.colorParse = function(color) {
-    var red = 0, green = 0, blue = 0, alpha = 0;
-
-    // definition of css color names
-    var color_names = {
-        aliceblue: 'f0f8ff',    antiquewhite: 'faebd7', aqua: '00ffff',
-        aquamarine: '7fffd4',   azure: 'f0ffff',        beige: 'f5f5dc',
-        bisque: 'ffe4c4',       black: '000000',        blanchedalmond: 'ffebcd',
-        blue: '0000ff',         blueviolet: '8a2be2',   brown: 'a52a2a',
-        burlywood: 'deb887',    cadetblue: '5f9ea0',    chartreuse: '7fff00',
-        chocolate: 'd2691e',    coral: 'ff7f50',        cornflowerblue: '6495ed',
-        cornsilk: 'fff8dc',     crimson: 'dc143c',      cyan: '00ffff',
-        darkblue: '00008b',     darkcyan: '008b8b',     darkgoldenrod: 'b8860b',
-        darkgray: 'a9a9a9',     darkgreen: '006400',    darkkhaki: 'bdb76b',
-        darkmagenta: '8b008b',  darkolivegreen: '556b2f',darkorange: 'ff8c00',
-        darkorchid: '9932cc',   darkred: '8b0000',      darksalmon: 'e9967a',
-        darkseagreen: '8fbc8f', darkslateblue: '483d8b',darkslategray: '2f4f4f',
-        darkturquoise: '00ced1',darkviolet: '9400d3',   deeppink: 'ff1493',
-        deepskyblue: '00bfff',  dimgray: '696969',      dodgerblue: '1e90ff',
-        feldspar: 'd19275',     firebrick: 'b22222',    floralwhite: 'fffaf0',
-        forestgreen: '228b22',  fuchsia: 'ff00ff',      gainsboro: 'dcdcdc',
-        ghostwhite: 'f8f8ff',   gold: 'ffd700',         goldenrod: 'daa520',
-        gray: '808080',         green: '008000',        greenyellow: 'adff2f',
-        honeydew: 'f0fff0',     hotpink: 'ff69b4',      indianred : 'cd5c5c',
-        indigo : '4b0082',      ivory: 'fffff0',        khaki: 'f0e68c',
-        lavender: 'e6e6fa',     lavenderblush: 'fff0f5',lawngreen: '7cfc00',
-        lemonchiffon: 'fffacd', lightblue: 'add8e6',    lightcoral: 'f08080',
-        lightcyan: 'e0ffff',    lightgoldenrodyellow: 'fafad2', lightgrey: 'd3d3d3',
-        lightgreen: '90ee90',   lightpink: 'ffb6c1',    lightsalmon: 'ffa07a',
-        lightseagreen: '20b2aa',lightskyblue: '87cefa', lightslateblue: '8470ff',
-        lightslategray: '778899',lightsteelblue: 'b0c4de',lightyellow: 'ffffe0',
-        lime: '00ff00',         limegreen: '32cd32',    linen: 'faf0e6',
-        magenta: 'ff00ff',      maroon: '800000',       mediumaquamarine: '66cdaa',
-        mediumblue: '0000cd',   mediumorchid: 'ba55d3', mediumpurple: '9370d8',
-        mediumseagreen: '3cb371',mediumslateblue: '7b68ee', mediumspringgreen: '00fa9a',
-        mediumturquoise: '48d1cc',mediumvioletred: 'c71585',midnightblue: '191970',
-        mintcream: 'f5fffa',    mistyrose: 'ffe4e1',    moccasin: 'ffe4b5',
-        navajowhite: 'ffdead',  navy: '000080',         oldlace: 'fdf5e6',
-        olive: '808000',        olivedrab: '6b8e23',    orange: 'ffa500',
-        orangered: 'ff4500',    orchid: 'da70d6',       palegoldenrod: 'eee8aa',
-        palegreen: '98fb98',    paleturquoise: 'afeeee',palevioletred: 'd87093',
-        papayawhip: 'ffefd5',   peachpuff: 'ffdab9',    peru: 'cd853f',
-        pink: 'ffc0cb',         plum: 'dda0dd',         powderblue: 'b0e0e6',
-        purple: '800080',       red: 'ff0000',          rosybrown: 'bc8f8f',
-        royalblue: '4169e1',    saddlebrown: '8b4513',  salmon: 'fa8072',
-        sandybrown: 'f4a460',   seagreen: '2e8b57',     seashell: 'fff5ee',
-        sienna: 'a0522d',       silver: 'c0c0c0',       skyblue: '87ceeb',
-        slateblue: '6a5acd',    slategray: '708090',    snow: 'fffafa',
-        springgreen: '00ff7f',  steelblue: '4682b4',    tan: 'd2b48c',
-        teal: '008080',         thistle: 'd8bfd8',      tomato: 'ff6347',
-        turquoise: '40e0d0',    violet: 'ee82ee',       violetred: 'd02090',
-        wheat: 'f5deb3',        white: 'ffffff',        whitesmoke: 'f5f5f5',
-        yellow: 'ffff00',       yellowgreen: '9acd32'
-    };
-
-    if (color_names[color]) {
-        // first check if color is given as colorname
-        color = "#" + color_names[color] + "ff";
-    }
-
-    if (color.substr && color.substr(0, 1) === "#") {
-        color = color.substr(1);
-        var len = color.length;
-
-        if (len === 8) {
-            red   = parseInt("0x" + color.substr(0, 2), 16) / 255.0;
-            green = parseInt("0x" + color.substr(2, 2), 16) / 255.0;
-            blue  = parseInt("0x" + color.substr(4, 2), 16) / 255.0;
-            alpha = parseInt("0x" + color.substr(6, 2), 16) / 255.0;
-        } else if (len === 6) {
-            red   = parseInt("0x" + color.substr(0, 2), 16) / 255.0;
-            green = parseInt("0x" + color.substr(2, 2), 16) / 255.0;
-            blue  = parseInt("0x" + color.substr(4, 2), 16) / 255.0;
-            alpha = 1.0;
-        } else if (len === 4) {
-            red   = parseInt("0x" + color.substr(0, 1), 16) / 15.0;
-            green = parseInt("0x" + color.substr(1, 1), 16) / 15.0;
-            blue  = parseInt("0x" + color.substr(2, 1), 16) / 15.0;
-            alpha = parseInt("0x" + color.substr(3, 1), 16) / 15.0;
-        } else if (len === 3) {
-            red   = parseInt("0x" + color.substr(0, 1), 16) / 15.0;
-            green = parseInt("0x" + color.substr(1, 1), 16) / 15.0;
-            blue  = parseInt("0x" + color.substr(2, 1), 16) / 15.0;
-            alpha = 1.0;
-        }
-    }
-
-    return new x3dom.fields.SFColorRGBA(red, green, blue, alpha);
+    var rgba = _colorParse(color);
+    return new x3dom.fields.SFColorRGBA(rgba.r, rgba.g, rgba.b, rgba.a);
 };
 
 /**
@@ -21854,16 +21814,13 @@ x3dom.fields.SFImage.prototype.copy = function() {
 x3dom.fields.SFImage.prototype.setValueByStr = function(str) {
     var mc = str.match(/(\w+)/g);
     var n = mc.length;
-    var c2 = 0;
-    var hex = "0123456789ABCDEF";
-
+    
     this.array = [];
 
     if (n > 2) {
         this.width = +mc[0];
         this.height = +mc[1];
         this.comp = +mc[2];
-        c2 = 2 * this.comp;
     } else {
         this.width = 0;
         this.height = 0;
@@ -21872,61 +21829,36 @@ x3dom.fields.SFImage.prototype.setValueByStr = function(str) {
     }
 
     var len, i;
+    var r, g, b, a;
+    var radix = 10;
+    
     for (i = 3; i < n; i++) {
-        var r, g, b, a;
+        if (!mc[i].substr) continue;
 
-        if (!mc[i].substr) {
-            continue;
-        }
-
-        if (mc[i].substr(1, 1).toLowerCase() !== "x") {
-            // Maybe optimize by directly parsing value!
-            var inp = parseInt(mc[i], 10);
-
-            if (this.comp === 1) {
-                r = inp;
-                this.array.push(r);
-            } else if (this.comp === 2) {
-                r = inp >> 8 & 255;
-                g = inp & 255;
-                this.array.push(r, g);
-            } else if (this.comp === 3) {
-                r = inp >> 16 & 255;
-                g = inp >> 8 & 255;
-                b = inp & 255;
-                this.array.push(r, g, b);
-            } else if (this.comp === 4) {
-                r = inp >> 24 & 255;
-                g = inp >> 16 & 255;
-                b = inp >> 8 & 255;
-                a = inp & 255;
-                this.array.push(r, g, b, a);
-            }
-        } else if (mc[i].substr(1, 1).toLowerCase() === "x") {
-            mc[i] = mc[i].substr(2);
-            len = mc[i].length;
-
-            if (len === c2) {
-                if (this.comp === 1) {
-                    r = parseInt("0x" + mc[i].substr(0, 2), 16);
-                    this.array.push(r);
-                } else if (this.comp === 2) {
-                    r = parseInt("0x" + mc[i].substr(0, 2), 16);
-                    g = parseInt("0x" + mc[i].substr(2, 2), 16);
-                    this.array.push(r, g);
-                } else if (this.comp === 3) {
-                    r = parseInt("0x" + mc[i].substr(0, 2), 16);
-                    g = parseInt("0x" + mc[i].substr(2, 2), 16);
-                    b = parseInt("0x" + mc[i].substr(4, 2), 16);
-                    this.array.push(r, g, b);
-                } else if (this.comp === 4) {
-                    r = parseInt("0x" + mc[i].substr(0, 2), 16);
-                    g = parseInt("0x" + mc[i].substr(2, 2), 16);
-                    b = parseInt("0x" + mc[i].substr(4, 2), 16);
-                    a = parseInt("0x" + mc[i].substr(6, 2), 16);
-                    this.array.push(r, g, b, a);
-                }
-            }
+        if (mc[i].substr(1, 1).toLowerCase() === "x") radix = 16;
+        // Maybe optimize by directly parsing value!
+        var inp = parseInt(mc[i], radix);
+	// just coercing should also work:
+	// var inp = mc[i];
+        // check for NaN ?
+        if (this.comp === 1) {
+            r = inp & 255;
+            this.array.push(r);
+        } else if (this.comp === 2) {
+            r = inp >> 8 & 255;
+            g = inp & 255;
+            this.array.push(r, g);
+        } else if (this.comp === 3) {
+            r = inp >> 16 & 255;
+            g = inp >> 8 & 255;
+            b = inp & 255;
+            this.array.push(r, g, b);
+        } else if (this.comp === 4) {
+            r = inp >> 24 & 255;
+            g = inp >> 16 & 255;
+            b = inp >> 8 & 255;
+            a = inp & 255;
+            this.array.push(r, g, b, a);
         }
     }
 };
@@ -26298,6 +26230,9 @@ x3dom.shader.DynamicShader.prototype.generateVertexShader = function(gl, propert
 		
 		if (properties.SPHEREMAPPING) {
 			shader += " fragTexcoord = 0.5 + fragNormal.xy / 2.0;\n";
+			if(properties.TEXTRAFO) {
+				shader += " fragTexcoord = (texTrafoMatrix * vec4(fragTexcoord, 1.0, 1.0)).xy;\n";
+			}
 		} else if(properties.TEXTRAFO) {
 			shader += " fragTexcoord = (texTrafoMatrix * vec4(vertTexCoord, 1.0, 1.0)).xy;\n";
 		} else {
@@ -28398,10 +28333,10 @@ x3dom.shader.ComposedShader.prototype.injectVRPartsVS = function(shader)
 				   "{\n" +
 				   "    vec4 webVRPos = modelViewProjectionInverseMatrix * gl_Position;\n" +
 				   "    webVRPos.xyz = webVRPos.xyz / webVRPos.w;\n" +
-				   "    if(fragEyeIdx == -1.0) {\n" +
-				   "        gl_Position = modelViewProjectionMatrix * webVRPos;\n" +
-				   "    } else if(fragEyeIdx == -1.0) {\n" +
+				   "    if(fragEyeIdx == 1.0) {\n" +
 				   "        gl_Position = modelViewProjectionMatrix2 * webVRPos;\n" +
+				   "    } else {\n" +
+				   "        gl_Position = modelViewProjectionMatrix  * webVRPos;\n" +
                    "    }\n" +
 				   "    vrOffset = fragEyeIdx * 0.5;\n" +
 				   "    gl_Position.x *= 0.5;\n" +
@@ -28441,7 +28376,7 @@ x3dom.shader.ComposedShader.prototype.injectVRPartsFS = function(shader)
 
 x3dom.shader.ComposedShader.prototype.extractShaderSections = function(shader)
 {
-	var regex = /void\s*main\s*\(\)\s*{[\s\S]*}/;
+	var regex = /void\s*main\s*\(\s*(?:void)?\s*\)\s*{[\s\S]*}/;
 
 	var match = regex.exec( shader );
 
@@ -28451,7 +28386,7 @@ x3dom.shader.ComposedShader.prototype.extractShaderSections = function(shader)
 	var before    = shader.substring(0, match.index);
 	var mainStart = shader.substring(match.index, start);
 	var main      = shader.substring(start, end);
-	var mainEnd   = shader.substring(end, shader.lebgth);
+	var mainEnd   = shader.substring(end, shader.length);
 
 	return {
 		before:	   before,	
@@ -28683,11 +28618,21 @@ x3dom.shader.BackgroundTextureShader.prototype.generateVertexShader = function(g
 					"varying vec2 fragTexCoord;\n" +
 					"uniform vec2 scale;\n" +
 					"uniform vec2 translation;\n" +
+					"uniform float isVR;\n" +
+					"attribute float eyeIdx;\n" +
+					"varying float vrOffset;\n" +
+					"varying float fragEyeIdx;\n" +
 					"\n" +
 					"void main(void) {\n" +
-					"    vec2 texCoord = (position.xy + 1.0) * 0.5;\n" +
-					"    fragTexCoord = texCoord * scale + translation;\n" +
-					"    gl_Position = vec4(position.xy, 0.0, 1.0);\n" +
+					"   vec2 texCoord = (position.xy + 1.0) * 0.5;\n" +
+					"   fragTexCoord = texCoord * scale + translation;\n" +
+					"	fragEyeIdx = eyeIdx;\n" +
+					"   gl_Position = vec4(position.xy, 0.0, 1.0);\n" +
+					"	if(isVR == 1.0){\n" +
+					"    	vrOffset = eyeIdx * 0.5;\n" +
+					"    	gl_Position.x *= 0.5;\n" +
+					"    	gl_Position.x += vrOffset * gl_Position.w;\n" +
+					"	}\n" +
 					"}\n";
 
 	var vertexShader = gl.createShader(gl.VERTEX_SHADER);
@@ -28712,12 +28657,19 @@ x3dom.shader.BackgroundTextureShader.prototype.generateFragmentShader = function
   shader += " precision mediump float;\n";
   shader += "#endif\n\n";
 
-	shader += "uniform sampler2D tex;\n" +
-				"varying vec2 fragTexCoord;\n" +
-				"\n" +
-				"void main(void) {\n" +
-				"    gl_FragColor = texture2D(tex, fragTexCoord);\n" +
-				"}";
+	shader += "uniform float isVR;\n" +
+	          "varying float vrOffset;\n" +
+	          "varying float fragEyeIdx;\n" +
+	          "uniform float screenWidth;\n" +
+	          "uniform sampler2D tex;\n" +
+			  "varying vec2 fragTexCoord;\n" +
+			  "\n" +
+			  "void main(void) {\n" +
+			  "	   if ( isVR == 1.0 ) {\n" +
+			  "        if ( ( step( 0.5, gl_FragCoord.x / screenWidth ) - 0.5 ) * vrOffset < 0.0 ) discard;\n" +
+			  "	   }\n"+
+			  "    gl_FragColor = texture2D(tex, fragTexCoord);\n" +
+			  "}";
 
     var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
 	gl.shaderSource(fragmentShader, shader);
@@ -28771,11 +28723,26 @@ x3dom.shader.BackgroundSkyTextureShader.prototype.generateVertexShader = functio
 	var shader = 	"attribute vec3 position;\n" +
 					"attribute vec2 texcoord;\n" +
 					"uniform mat4 modelViewProjectionMatrix;\n" +
+					"uniform mat4 modelViewProjectionMatrix2;\n" +
 					"varying vec2 fragTexCoord;\n" +
+					"uniform float isVR;\n" +
+					"attribute float eyeIdx;\n" +
+					"varying float vrOffset;\n" +
+					"varying float fragEyeIdx;\n" +
 					"\n" +
 					"void main(void) {\n" +
 					"    fragTexCoord = texcoord;\n" +
-					"    gl_Position = modelViewProjectionMatrix * vec4(position, 1.0);\n" +
+					"	 fragEyeIdx = eyeIdx;\n" +
+					"	 if(eyeIdx == 1.0){\n" +
+					"   	gl_Position = modelViewProjectionMatrix2 * vec4(position, 1.0);\n" +
+					"	 } else {\n" +
+					"   	gl_Position = modelViewProjectionMatrix * vec4(position, 1.0);\n" +
+					"	 }\n" +
+					"	 if(isVR == 1.0){\n" +
+					"    	vrOffset = eyeIdx * 0.5;\n" +
+					"    	gl_Position.x *= 0.5;\n" +
+					"    	gl_Position.x += vrOffset * gl_Position.w;\n" +
+					"	 }\n" +
 					"}\n";
 
 	var vertexShader = gl.createShader(gl.VERTEX_SHADER);
@@ -28800,12 +28767,18 @@ x3dom.shader.BackgroundSkyTextureShader.prototype.generateFragmentShader = funct
   shader += " precision mediump float;\n";
   shader += "#endif\n\n";
 
-	shader += "uniform sampler2D tex;\n" +
-				"varying vec2 fragTexCoord;\n" +
-				"\n" +
-				"void main(void) {\n" +
-				"    gl_FragColor = texture2D(tex, fragTexCoord);\n" +
-				"}\n";
+	shader += "uniform float isVR;\n" +
+	          "varying float vrOffset;\n" +
+	          "varying float fragEyeIdx;\n" +
+	          "uniform float screenWidth;\n" +"uniform sampler2D tex;\n" +
+			  "varying vec2 fragTexCoord;\n" +
+			  "\n" +
+			  "void main(void) {\n" +
+			  "    if ( isVR == 1.0 ) {\n" +
+			  "        if ( ( step( 0.5, gl_FragCoord.x / screenWidth ) - 0.5 ) * vrOffset < 0.0 ) discard;\n" +
+			  "    }\n"+
+			  "    gl_FragColor = texture2D(tex, fragTexCoord);\n" +
+			  "}\n";
 
     var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
 	gl.shaderSource(fragmentShader, shader);
@@ -30350,7 +30323,7 @@ x3dom.gfx_webgl = (function() {
         for (var i = 0; i < validContextNames.length; i++) {
             try {
 
-                x3dom.caps.RENDERMODE = "HARDWARE";
+                x3dom.caps.RENDERMODE = "HARDWARE (" + validContextNames[i] + ")";
 
                 ctx = canvas.getContext(validContextNames[i], ctxAttribs);
 
@@ -31143,7 +31116,7 @@ x3dom.gfx_webgl = (function() {
                 } else {
                     bgnd._webgl.shader = this.cache.getShader(gl, x3dom.shader.BACKGROUND_CUBETEXTURE_DDS);
                     bgnd._webgl.texture = x3dom.Utils.createTextureCube(gl, bgnd._nameSpace.doc, url,
-                        true, bgnd._vf.crossOrigin, true, false);
+                        false, bgnd._vf.crossOrigin, true, false);
                 }
 
 
@@ -31398,6 +31371,7 @@ x3dom.gfx_webgl = (function() {
                 gl.bindBuffer(gl.ARRAY_BUFFER, bgnd._webgl.buffers[x3dom.BUFFER_IDX.TEXCOORD]);
                 gl.vertexAttribPointer(sp.texcoord, 2, gl.FLOAT, false, 0, 0);
                 gl.enableVertexAttribArray(sp.texcoord);
+                that.setVertexAttribEyeIdx(gl, sp);
 
                 that.drawElements(gl, bgnd._webgl.primType, bgnd._webgl.indexes.length, gl.UNSIGNED_SHORT, 0);
 
@@ -31406,6 +31380,7 @@ x3dom.gfx_webgl = (function() {
 
                 gl.disableVertexAttribArray(sp.position);
                 gl.disableVertexAttribArray(sp.texcoord);
+                that.disableVertexAttribEyeIdx(gl, sp);
 
                 gl.clear(gl.DEPTH_BUFFER_BIT);
             } else if (!sp || !bgnd._webgl.texture ||
@@ -35207,7 +35182,7 @@ x3dom.gfx_webgl = (function() {
 
     Context.prototype.setVertexAttribEyeIdx = function(gl, sp)
     {
-        if(x3dom.caps.WEBGL_VERSION == 2)
+        if(x3dom.caps.WEBGL_VERSION == 2 && sp.eyeIdx != undefined)
         {
             if(!this.eyeIdxBuffer)
             {
@@ -35227,7 +35202,7 @@ x3dom.gfx_webgl = (function() {
                 gl.vertexAttribDivisor(sp.eyeIdx, 1);
             }
         }
-        else if(x3dom.caps.INSTANCED_ARRAYS)
+        else if(x3dom.caps.INSTANCED_ARRAYS && sp.eyeIdx != undefined)
         {
             var instancedArrays = this.ctx3d.getExtension("ANGLE_instanced_arrays");
 
@@ -58837,11 +58812,27 @@ x3dom.registerNodeType(
                     }
                 }
 
-                if (field === 'url')
+                if (fieldName === 'url')
                 {
+                    for (i=0; i<n; i++)
+                    {
+                        if (this._cf.parts.nodes[i]._vf.type.toLowerCase() == 'vertex') {
+                            this._vertex = this._cf.parts.nodes[i];
+                            this._id = this._cf.parts.nodes[i]._id;
+                        }
+                        else if (this._cf.parts.nodes[i]._vf.type.toLowerCase() == 'fragment') {
+                            this._fragment = this._cf.parts.nodes[i];
+                            this._id += " - " + this._cf.parts.nodes[i]._id;
+                        }
+                    }
+
                     Array.forEach(this._parentNodes, function (app) {
                         Array.forEach(app._parentNodes, function (shape) {
-                            shape._dirty.shader = true;
+                            if (shape._cleanupGLObjects)
+                            {
+                                shape._cleanupGLObjects();
+                            }
+                            shape.setAllDirty();
                         });
                     });
                 }
@@ -58930,11 +58921,20 @@ x3dom.registerNodeType(
 
                     if (that._vf.url.length && that._vf.url[0].indexOf('\n') == -1)
                     {
-                        var xhr = new XMLHttpRequest();
-                        xhr.open("GET", that._nameSpace.getURL(that._vf.url[0]), false);
+                        var xhr        = new XMLHttpRequest(),
+                            url        = that._nameSpace.getURL(that._vf.url[0]);
+                            originalID = that._id;
+
+
+                        that._id = "default";
+                        that._vf.url = new x3dom.fields.MFString( [ this._getDefaultShader() ] );                      
+
+                        xhr.open("GET", url, false);
                         xhr.onload = function() {
                             that._vf.url = new x3dom.fields.MFString( [] );
                             that._vf.url.push(xhr.response);
+                            that._id = originalID;
+                            that.fieldChanged("url");
                         };
                         xhr.onerror = function() {
                             x3dom.debug.logError("Could not load file '" + that._vf.url[0] + "'.");
@@ -58986,6 +58986,28 @@ x3dom.registerNodeType(
                 //	shader.nodeChanged();
                 //});
                 parent.nodeChanged();
+            },
+
+            _getDefaultShader : function()
+            {
+                if( this._vf.type.toLowerCase() == 'vertex' )
+                {
+                    return  "attribute vec3 position;\n" +
+                            "uniform mat4 modelViewProjectionMatrix;\n" +
+                            "void main(void) {\n" +
+                            "    gl_Position = modelViewProjectionMatrix * vec4(position, 1.0);\n" +
+                            "}\n";
+                }
+
+                if( this._vf.type.toLowerCase() == 'fragment' )
+                {
+                    return  "precision highp float;\n" +
+                            "void main(void) {\n" +
+                            "    gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);\n" +
+                            "}\n";
+                }
+
+                
             }
         }
     )
@@ -83812,6 +83834,7 @@ x3dom.registerNodeType(
             its._nameSpace = node._nameSpace;
             its._vf.solid = false;
             its._vf.ccw = false;
+            its._cf.texCoord = node._cf.texCoord;
             var ind = [],
             i1 = 0,
             i2 = w;
@@ -83832,13 +83855,7 @@ x3dom.registerNodeType(
             its._vf.index = ind;
 
             its.addChild(coordNode);
-            if (0) {
-                var tc = new x3dom.nodeTypes.TextureCoordinate();
-                tc._nameSpace = node._nameSpace;
-                tc._vf.point = new x3dom.fields.MFVec2f(data[2]/*tess.texcoords*/);
-                its.addChild(tc);
-            }
-
+            
             its.nodeChanged();
             its._xmlNode = node._xmlNode;
             return its;
@@ -83858,13 +83875,16 @@ x3dom.registerNodeType(
                 co._vf.point.push(
                     new x3dom.fields.SFVec3f(data[1][i][0], data[1][i][1], data[1][i][2]));
             its.addChild(co);
-            var tc = new x3dom.nodeTypes.TextureCoordinate();
-            tc._nameSpace = node._nameSpace;
-            tc._vf.point = new x3dom.fields.MFVec2f();
-            for (var i = 0; i < data[2].length; i++)
-                tc._vf.point.push(
-                    new x3dom.fields.SFVec2f(data[2][i][0], data[2][i][1]));
-            its.addChild(tc);
+            if (node._cf.texCoord.node !== null) its._cf.texCoord = node._cf.texCoord; 
+            else {
+                var tc = new x3dom.nodeTypes.TextureCoordinate();
+                tc._nameSpace = node._nameSpace;
+                tc._vf.point = new x3dom.fields.MFVec2f();
+                for (var i = 0; i < data[2].length; i++)
+                    tc._vf.point.push(
+                        new x3dom.fields.SFVec2f(data[2][i][0], data[2][i][1]));
+                its.addChild(tc);
+            }
             its.nodeChanged();
             its._xmlNode = node._xmlNode;
             return its;
@@ -86256,15 +86276,15 @@ x3dom.WorkerTask = function (script, caller, callback, msg) {
 
 
 x3dom.versionInfo = {
-    version:  '1.8.0',
-    revision: '4c48cbddc8c7e1cbaa5d09fdd152934ec60fc7b8',
-    date:     'Wed Jul 24 14:56:37 2019 +0200'
+    version:  '1.8.1',
+    revision: '0c742a1a981f8c0a9cbb7059f36c3a6c4cb9fec6',
+    date:     'Fri Sep 27 18:22:15 2019 +0200'
 };
 
 
 x3dom.versionInfo = {
-    version:  '1.8.0',
-    revision: '4c48cbddc8c7e1cbaa5d09fdd152934ec60fc7b8',
-    date:     'Wed Jul 24 14:56:37 2019 +0200'
+    version:  '1.8.1',
+    revision: '0c742a1a981f8c0a9cbb7059f36c3a6c4cb9fec6',
+    date:     'Fri Sep 27 18:22:15 2019 +0200'
 };
 
