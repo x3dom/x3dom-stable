@@ -1,4 +1,4 @@
-/** X3DOM Runtime, http://www.x3dom.org/ 1.5.0 - bd0c4fe7954094877b20444b729f04aaf3a466a5 - Thu Sep 12 15:22:34 2013 +0200 *//*
+/** X3DOM Runtime, http://www.x3dom.org/ 1.5.1 - c0f47cbb994175bc43240b8de110f51628c95b6a - Wed Oct 23 16:23:43 2013 +0200 *//*
  * X3DOM JavaScript Library
  * http://www.x3dom.org
  *
@@ -2054,46 +2054,50 @@ x3dom.EarClipping = {
  */
 
 /*****************************************************************************
-* 
+* Utils class holds utility functions for renderer
 *****************************************************************************/
 x3dom.Utils = {};
+
+x3dom.Utils.maxIndexableCoords = 65535;
 x3dom.Utils.measurements = [];
 
 
 // http://gent.ilcore.com/2012/06/better-timer-for-javascript.html
 window.performance = window.performance || {};
-performance.now = (function() {
-  return performance.now       ||
-         performance.mozNow    ||
-         performance.msNow     ||
-         performance.oNow      ||
-         performance.webkitNow ||
-         function() { return new Date().getTime(); };
+performance.now = (function () {
+    return performance.now ||
+           performance.mozNow ||
+           performance.msNow ||
+           performance.oNow ||
+           performance.webkitNow ||
+           function () {
+               return new Date().getTime();
+           };
 })();
 
-x3dom.Utils.startMeasure = function(name) {
-  var uname = name.toUpperCase();
-  if ( !x3dom.Utils.measurements[uname] ) {
-    if ( performance && performance.now ) {
-      x3dom.Utils.measurements[uname] = performance.now();
-    } else {
-      x3dom.Utils.measurements[uname] = new Date().getTime();
+x3dom.Utils.startMeasure = function (name) {
+    var uname = name.toUpperCase();
+    if (!x3dom.Utils.measurements[uname]) {
+        if (performance && performance.now) {
+            x3dom.Utils.measurements[uname] = performance.now();
+        } else {
+            x3dom.Utils.measurements[uname] = new Date().getTime();
+        }
     }
-  }
 };
 
-x3dom.Utils.stopMeasure = function(name) { 
-  var uname = name.toUpperCase();
-  if ( x3dom.Utils.measurements[uname] ) {
-    var startTime = x3dom.Utils.measurements[uname];
-    delete x3dom.Utils.measurements[uname];
-    if ( performance && performance.now ) {
-      return performance.now() - startTime;
-    } else {
-      return new Date().getTime() - startTime;
+x3dom.Utils.stopMeasure = function (name) {
+    var uname = name.toUpperCase();
+    if (x3dom.Utils.measurements[uname]) {
+        var startTime = x3dom.Utils.measurements[uname];
+        delete x3dom.Utils.measurements[uname];
+        if (performance && performance.now) {
+            return performance.now() - startTime;
+        } else {
+            return new Date().getTime() - startTime;
+        }
     }
-  }
-  return 0;
+    return 0;
 };
 
 /*****************************************************************************
@@ -2108,16 +2112,26 @@ x3dom.Utils.isNumber = function(n) {
 *****************************************************************************/
 x3dom.Utils.createTexture2D = function(gl, doc, src, bgnd, withCredentials, scale)
 {
-	doc.downloadCount++;
-
 	var texture = gl.createTexture();
+
+    //Create a black 4 pixel texture to prevent 'texture not complete' warning
+    var data = new Uint8Array([0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255]);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 2, 2, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+
+    texture.ready = false;
+	
+	if (src == null || src == '')
+	    return texture;
 	
 	var image = new Image();
 	image.crossOrigin = withCredentials ? 'use-credentials' : '';
 	image.src = src;
 	
+	doc.downloadCount++;	
+	
 	image.onload = function() {
-
         if (scale)
 		    image = x3dom.Utils.scaleImage( image );
 		
@@ -2125,6 +2139,7 @@ x3dom.Utils.createTexture2D = function(gl, doc, src, bgnd, withCredentials, scal
 			gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 		}
 		gl.bindTexture(gl.TEXTURE_2D, texture);
+		//gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
 		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
 		gl.bindTexture(gl.TEXTURE_2D, null);
 		if(bgnd == true) {
@@ -2149,78 +2164,6 @@ x3dom.Utils.createTexture2D = function(gl, doc, src, bgnd, withCredentials, scal
 };
 
 /*****************************************************************************
- *
- *****************************************************************************/
-x3dom.Utils.generateNonIndexedTriangleData = function(indices, positions, normals, texCoords, colors,
-                                                      newPositions, newNormals, newTexCoords, newColors)
-{
-    //@todo: add support for RGBA colors and 3D texture coordinates
-    //@todo: if there is any need for that, add multi-index support
-
-    for (i = 0; i < indices.length; i+=3) {
-        var i0 = indices[i  ],
-            i1 = indices[i+1],
-            i2 = indices[i+2];
-
-        if (positions) {
-            var p0 = new x3dom.fields.SFVec3f(),
-                p1 = new x3dom.fields.SFVec3f(),
-                p2 = new x3dom.fields.SFVec3f();
-
-            p0.setValues(positions[i0]);
-            p1.setValues(positions[i1]);
-            p2.setValues(positions[i2]);
-
-            newPositions.push(p0);
-            newPositions.push(p1);
-            newPositions.push(p2);
-        }
-
-        if (normals) {
-            var n0 = new x3dom.fields.SFVec3f(),
-                n1 = new x3dom.fields.SFVec3f(),
-                n2 = new x3dom.fields.SFVec3f();
-
-            n0.setValues(normals[i0]);
-            n1.setValues(normals[i1]);
-            n2.setValues(normals[i2]);
-
-            newNormals.push(n0);
-            newNormals.push(n1);
-            newNormals.push(n2);
-        }
-
-        if (texCoords) {
-            var t0 = new x3dom.fields.SFVec2f(),
-                t1 = new x3dom.fields.SFVec2f(),
-                t2 = new x3dom.fields.SFVec2f();
-
-            t0.setValues(texCoords[i0]);
-            t1.setValues(texCoords[i1]);
-            t1.setValues(texCoords[i2]);
-
-            newTexCoords.push(t0);
-            newTexCoords.push(t1);
-            newTexCoords.push(t2);
-        }
-
-        if (colors) {
-            var c0 = new x3dom.fields.SFVec3f(),
-                c1 = new x3dom.fields.SFVec3f(),
-                c2 = new x3dom.fields.SFVec3f();
-
-            c0.setValues(texCoords[i0]);
-            c1.setValues(texCoords[i1]);
-            c1.setValues(texCoords[i2]);
-
-            newColors.push(c0);
-            newColors.push(c1);
-            newColors.push(c2);
-        }
-    }
-};
-
-/*****************************************************************************
 * 
 *****************************************************************************/
 x3dom.Utils.createTextureCube = function(gl, doc, url, bgnd, withCredentials, scale)
@@ -2240,20 +2183,22 @@ x3dom.Utils.createTextureCube = function(gl, doc, url, bgnd, withCredentials, sc
 				 gl.TEXTURE_CUBE_MAP_NEGATIVE_Y, gl.TEXTURE_CUBE_MAP_POSITIVE_Y,
 				 gl.TEXTURE_CUBE_MAP_NEGATIVE_X, gl.TEXTURE_CUBE_MAP_POSITIVE_X];
 	}
-	
+
+    texture.ready = false;
     texture.pendingTextureLoads = -1;
     texture.textureCubeReady = false;
-        
+
     var width = 0, height = 0;
-        
+
 	for (var i=0; i<faces.length; i++) {
 		var face = faces[i];
+
 		var image = new Image();
 		image.crossOrigin = withCredentials ? 'use-credentials' : '';
 		texture.pendingTextureLoads++;
 		doc.downloadCount++;
 		
-		image.onload = function(texture, face, image, swap) {
+		image.onload = (function(texture, face, image, swap) {
 			return function() {
 				if (width == 0 && height == 0) {
 					width = image.width;
@@ -2278,7 +2223,7 @@ x3dom.Utils.createTextureCube = function(gl, doc, url, bgnd, withCredentials, sc
 					doc.needRender = true;
 				}
 			};
-		}( texture, face, image, bgnd );
+		})( texture, face, image, bgnd );
 
 		image.onerror = function()
 		{
@@ -2386,7 +2331,8 @@ x3dom.Utils.nextHighestPowerOfTwo = function(x)
 *****************************************************************************/
 x3dom.Utils.nextBestPowerOfTwo = function(x)
 {
-	var log2x = Math.log(x) / Math.log(2);
+    // use precomputed log(2.0) = 0.693147180559945
+	var log2x = Math.log(x) / 0.693147180559945;
 	return Math.pow(2, Math.round(log2x));
 };
 
@@ -2411,6 +2357,42 @@ x3dom.Utils.getDataTypeSize = function(type)
 		default:
 			return 8;
 	}
+};
+
+/*****************************************************************************
+ * Return offset multiplier (Uint32 is twice as big as Uint16)
+ *****************************************************************************/
+x3dom.Utils.getOffsetMultiplier = function(indexType, gl)
+{
+    switch(indexType)
+    {
+        case gl.UNSIGNED_SHORT:
+            return 1;
+        case gl.UNSIGNED_INT:
+            return 2;
+        case gl.UNSIGNED_BYTE:
+            return 0.5;
+        default:
+            return 1;
+    }
+};
+
+/*****************************************************************************
+ * Return byte aware offset
+ *****************************************************************************/
+x3dom.Utils.getByteAwareOffset = function(offset, indexType, gl)
+{
+    switch(indexType)
+    {
+        case gl.UNSIGNED_SHORT:
+            return 2 * offset;
+        case gl.UNSIGNED_INT:
+            return 4 * offset;
+        case gl.UNSIGNED_BYTE:
+            return offset;
+        default:
+            return 2 * offset;
+    }
 };
 
 /*****************************************************************************
@@ -2517,8 +2499,8 @@ x3dom.Utils.checkDirtyLighting = function (viewarea)
 *****************************************************************************/
 x3dom.Utils.minFilterDic = function(gl, minFilter)
 {
-	switch(minFilter)
-	{ 
+	switch(minFilter.toUpperCase())
+	{
 		case "NEAREST":                      return gl.NEAREST;
 		case "LINEAR":                       return gl.LINEAR;
 		case "NEAREST_MIPMAP_NEAREST":       return gl.NEAREST_MIPMAP_NEAREST;
@@ -2543,8 +2525,8 @@ x3dom.Utils.minFilterDic = function(gl, minFilter)
 *****************************************************************************/
 x3dom.Utils.magFilterDic = function(gl, magFilter)
 {
-	switch(magFilter)
-	{	
+	switch(magFilter.toUpperCase())
+	{
 		case "NEAREST": 		return gl.NEAREST;
 		case "LINEAR":			return gl.LINEAR;
 		case "AVG_PIXEL":		return gl.LINEAR;
@@ -2561,8 +2543,8 @@ x3dom.Utils.magFilterDic = function(gl, magFilter)
 *****************************************************************************/
 x3dom.Utils.boundaryModesDic = function(gl, mode) 
 {
-	switch(mode)
-	{ 
+	switch(mode.toUpperCase())
+	{
 		case "CLAMP":             return gl.CLAMP_TO_EDGE;
 		case "CLAMP_TO_EDGE":     return gl.CLAMP_TO_EDGE;
 		case "CLAMP_TO_BOUNDARY": return gl.CLAMP_TO_EDGE;       
@@ -2570,6 +2552,86 @@ x3dom.Utils.boundaryModesDic = function(gl, mode)
 		case "REPEAT":            return gl.REPEAT;
 		default:				  return gl.REPEAT;
 	}
+};
+
+/*****************************************************************************
+ * Get GL primitive type
+ *****************************************************************************/
+x3dom.Utils.primTypeDic = function(gl, type)
+{
+    switch(type.toUpperCase())
+    {
+        case "POINTS":        return gl.POINTS;
+        case "LINES":         return gl.LINES;
+        case "LINELOOP":      return gl.LINE_LOOP;
+        case "LINESTRIP":     return gl.LINE_STRIP;
+        case "TRIANGLES":     return gl.TRIANGLES;
+        case "TRIANGLESTRIP": return gl.TRIANGLE_STRIP;
+        case "TRIANGLEFAN":   return gl.TRIANGLE_FAN;
+        default:              return gl.TRIANGLES;
+    }
+};
+
+/*****************************************************************************
+* Get GL depth function
+*****************************************************************************/
+x3dom.Utils.depthFunc = function(gl, func) 
+{
+	switch(func.toUpperCase())
+	{ 
+		case "NEVER":             return gl.NEVER;
+		case "ALWAYS":            return gl.ALWAYS;
+		case "LESS":              return gl.LESS;       
+		case "EQUAL":             return gl.EQUAL;
+		case "LEQUAL":            return gl.LEQUAL;
+        case "GREATER":           return gl.GREATER;
+        case "GEQUAL":            return gl.GEQUAL;
+        case "NOTEQUAL":          return gl.NOTEQUAL;
+		default:				  return gl.LEQUAL;
+	}
+};
+
+/*****************************************************************************
+ * Get GL blend function
+ *****************************************************************************/
+x3dom.Utils.blendFunc = function(gl, func)
+{
+    switch(func.toLowerCase())
+    {
+        case "zero":                        return gl.ZERO;
+        case "one":                         return gl.ONE;
+        case "dst_color":                   return gl.DST_COLOR;
+        case "dst_alpha":                   return gl.DST_ALPHA;
+        case "src_color":                   return gl.SRC_COLOR;
+        case "src_alpha":                   return gl.SRC_ALPHA;
+        case "one_minus_dst_color":         return gl.ONE_MINUS_DST_COLOR;
+        case "one_minus_dst_alpha":         return gl.ONE_MINUS_DST_ALPHA;
+        case "one_minus_src_color":         return gl.ONE_MINUS_SRC_COLOR;
+        case "one_minus_src_alpha":         return gl.ONE_MINUS_SRC_ALPHA;
+        case "src_alpha_saturate":          return gl.SRC_ALPHA_SATURATE;
+        case "constant_color":              return gl.CONSTANT_COLOR;
+        case "constant_alpha":              return gl.CONSTANT_ALPHA;
+        case "one_minus_constant_color":    return gl.ONE_MINUS_CONSTANT_COLOR;
+        case "one_minus_constant_alpha":    return gl.ONE_MINUS_CONSTANT_ALPHA;
+        default:				            return 0;
+    }
+};
+
+/*****************************************************************************
+ * Get GL blend equations
+ *****************************************************************************/
+x3dom.Utils.blendEquation = function(gl, func)
+{
+    switch(func.toLowerCase())
+    {
+        case "func_add":                return gl.FUNC_ADD;
+        case "func_subtract":           return gl.FUNC_SUBTRACT;
+        case "func_reverse_subtract":   return gl.FUNC_REVERSE_SUBTRACT;
+        case "min":                     return 0;  //Not supported yet
+        case "max":                     return 0;  //Not supported yet
+        case "logic_op":                return 0;  //Not supported yet
+        default:				        return 0;
+    }
 };
 
 /*****************************************************************************
@@ -2587,57 +2649,57 @@ x3dom.Utils.generateProperties = function (viewarea, shape)
 	//Check if it's a composed shader
 	if (appearance && appearance._shader &&
         x3dom.isa(appearance._shader, x3dom.nodeTypes.ComposedShader)) {
-		property.CSHADER   = shape._objectID;
-        //property.CSHADER_V = appearance._shader._vertex._vf.url[0];
-        //property.CSHADER_F = appearance._shader._fragment._vf.url[0];
+
+		property.CSHADER          = shape._objectID;
 	}
     else if (geometry) {
 
-		property.CSHADER			    = -1;
-		property.SOLID				    = (shape.isSolid()) ? 1 : 0;
-		property.TEXT				    = (x3dom.isa(geometry, x3dom.nodeTypes.Text)) ? 1 : 0;
-		property.POPGEOMETRY  	  = (x3dom.isa(geometry, x3dom.nodeTypes.PopGeometry)) ? 1 : 0;
-		property.BITLODGEOMETRY	  = (x3dom.isa(geometry, x3dom.nodeTypes.BitLODGeometry)) ? 1 : 0;
-		property.IMAGEGEOMETRY	  = (x3dom.isa(geometry, x3dom.nodeTypes.ImageGeometry))  ? 1 : 0;
-		property.IG_PRECISION		  = (property.IMAGEGEOMETRY) ? geometry.numCoordinateTextures() : 0;
-		property.IG_INDEXED			  = (property.IMAGEGEOMETRY && geometry.getIndexTexture() != null) ? 1 : 0;
-		property.POINTLINE2D		  = x3dom.isa(geometry, x3dom.nodeTypes.PointSet) ||
-                                        x3dom.isa(geometry, x3dom.nodeTypes.IndexedLineSet) ||
-                                        x3dom.isa(geometry, x3dom.nodeTypes.Polypoint2D) ||
-                                        x3dom.isa(geometry, x3dom.nodeTypes.Polyline2D) ||
-                                        x3dom.isa(geometry, x3dom.nodeTypes.Arc2D) ||
-                                        x3dom.isa(geometry, x3dom.nodeTypes.Circle2D) ? 1 : 0;
-		
-		property.APPMAT					= (appearance && (material || property.CSSHADER) ) ? 1 : 0;
-		property.SHADOW				    = (viewarea.getLightsShadow()) ? 1 : 0;
-		property.FOG				    = (viewarea._scene.getFog()._vf.visibilityRange > 0) ? 1 : 0;
-		property.CSSHADER			    = (appearance && appearance._shader && x3dom.isa(appearance._shader, x3dom.nodeTypes.CommonSurfaceShader)) ? 1 : 0;
-		property.LIGHTS				    = (!property.POINTLINE2D && appearance && (material || property.CSSHADER)) ? (viewarea.getLights().length) + (viewarea._scene.getNavigationInfo()._vf.headlight) : 0;
-		property.TEXTURED			    = (texture || property.TEXT) ? 1 : 0;
-		property.TEXTRAFO			    = (appearance && appearance._cf.textureTransform.node) ? 1 : 0;
-		property.DIFFUSEMAP			  = (property.CSSHADER && appearance._shader.getDiffuseMap()) ? 1 : 0; 
-		property.NORMALMAP			  = (property.CSSHADER && appearance._shader.getNormalMap()) ? 1 : 0; 
-		property.SPECMAP			    = (property.CSSHADER && appearance._shader.getSpecularMap()) ? 1 : 0;
-        property.DISPLACEMENTMAP	= (property.CSSHADER && appearance._shader.getDisplacementMap()) ? 1 : 0;
-        property.DIFFPLACEMENTMAP	= (property.CSSHADER && appearance._shader.getDiffuseDisplacementMap()) ? 1 : 0;
-		property.CUBEMAP			    = (texture && x3dom.isa(texture, x3dom.nodeTypes.X3DEnvironmentTextureNode)) ? 1 : 0;
-		property.BLENDING			    = (property.TEXT || property.CUBEMAP || (texture && texture._blending)) ? 1 : 0;
-		property.REQUIREBBOX		  = (geometry._vf.coordType !== undefined && geometry._vf.coordType != "Float32") ? 1 : 0;
-		property.REQUIREBBOXNOR   = (geometry._vf.normalType !== undefined && geometry._vf.normalType != "Float32") ? 1 : 0;
-		property.REQUIREBBOXCOL   = (geometry._vf.colorType !== undefined && geometry._vf.colorType != "Float32") ? 1 : 0;
-		property.REQUIREBBOXTEX   = (geometry._vf.texCoordType !== undefined && geometry._vf.texCoordType != "Float32") ? 1 : 0;    
-		property.COLCOMPONENTS		= geometry._mesh._numColComponents;
-		property.NORCOMPONENTS		= geometry._mesh._numNormComponents;
-		property.POSCOMPONENTS		= geometry._mesh._numPosComponents;
-		property.SPHEREMAPPING		= (geometry._cf.texCoord !== undefined && 
-                                 geometry._cf.texCoord.node !== null && 
-                                 geometry._cf.texCoord.node._vf.mode &&
-                                 geometry._cf.texCoord.node._vf.mode.toLowerCase() == "sphere") ? 1 : 0;
-		property.VERTEXCOLOR		  = (geometry._mesh._colors[0].length > 0 || 
-                                (property.IMAGEGEOMETRY && geometry.getColorTexture()) || 
-                                (property.BITLODGEOMETRY && geometry.hasColor()) || 
-                                (property.POPGEOMETRY    && geometry.hasColor()) ||
-                                (geometry._vf.color !== undefined && geometry._vf.color.length > 0)) ? 1 : 0;
+        property.CSHADER          = -1;
+        property.SOLID            = (shape.isSolid()) ? 1 : 0;
+        property.TEXT             = (x3dom.isa(geometry, x3dom.nodeTypes.Text)) ? 1 : 0;
+        property.POPGEOMETRY      = (x3dom.isa(geometry, x3dom.nodeTypes.PopGeometry)) ? 1 : 0;
+        property.BITLODGEOMETRY   = (x3dom.isa(geometry, x3dom.nodeTypes.BitLODGeometry)) ? 1 : 0;
+        property.IMAGEGEOMETRY    = (x3dom.isa(geometry, x3dom.nodeTypes.ImageGeometry))  ? 1 : 0;
+        property.IG_PRECISION     = (property.IMAGEGEOMETRY) ? geometry.numCoordinateTextures() : 0;
+        property.IG_INDEXED       = (property.IMAGEGEOMETRY && geometry.getIndexTexture() != null) ? 1 : 0;
+        property.POINTLINE2D      = x3dom.isa(geometry, x3dom.nodeTypes.PointSet) ||
+                                    x3dom.isa(geometry, x3dom.nodeTypes.IndexedLineSet) ||
+                                    x3dom.isa(geometry, x3dom.nodeTypes.Polypoint2D) ||
+                                    x3dom.isa(geometry, x3dom.nodeTypes.Polyline2D) ||
+                                    x3dom.isa(geometry, x3dom.nodeTypes.Arc2D) ||
+                                    x3dom.isa(geometry, x3dom.nodeTypes.Circle2D) ? 1 : 0;
+        
+        property.APPMAT           = (appearance && (material || property.CSSHADER) ) ? 1 : 0;
+        property.SHADOW           = (viewarea.getLightsShadow()) ? 1 : 0;
+        property.FOG              = (viewarea._scene.getFog()._vf.visibilityRange > 0) ? 1 : 0;
+        property.CSSHADER         = (appearance && appearance._shader &&
+                                     x3dom.isa(appearance._shader, x3dom.nodeTypes.CommonSurfaceShader)) ? 1 : 0;
+        property.LIGHTS           = (!property.POINTLINE2D && appearance && (material || property.CSSHADER)) ?
+                                     viewarea.getLights().length + (viewarea._scene.getNavigationInfo()._vf.headlight) : 0;
+        property.TEXTURED         = (texture || property.TEXT) ? 1 : 0;
+        property.TEXTRAFO         = (appearance && appearance._cf.textureTransform.node) ? 1 : 0;
+        property.DIFFUSEMAP       = (property.CSSHADER && appearance._shader.getDiffuseMap()) ? 1 : 0;
+        property.NORMALMAP        = (property.CSSHADER && appearance._shader.getNormalMap()) ? 1 : 0;
+        property.SPECMAP          = (property.CSSHADER && appearance._shader.getSpecularMap()) ? 1 : 0;
+        property.DISPLACEMENTMAP  = (property.CSSHADER && appearance._shader.getDisplacementMap()) ? 1 : 0;
+        property.DIFFPLACEMENTMAP = (property.CSSHADER && appearance._shader.getDiffuseDisplacementMap()) ? 1 : 0;
+        property.CUBEMAP          = (texture && x3dom.isa(texture, x3dom.nodeTypes.X3DEnvironmentTextureNode)) ? 1 : 0;
+        property.BLENDING         = (property.TEXT || property.CUBEMAP || (texture && texture._blending)) ? 1 : 0;
+        property.REQUIREBBOX      = (geometry._vf.coordType !== undefined && geometry._vf.coordType != "Float32") ? 1 : 0;
+        property.REQUIREBBOXNOR   = (geometry._vf.normalType !== undefined && geometry._vf.normalType != "Float32") ? 1 : 0;
+        property.REQUIREBBOXCOL   = (geometry._vf.colorType !== undefined && geometry._vf.colorType != "Float32") ? 1 : 0;
+        property.REQUIREBBOXTEX   = (geometry._vf.texCoordType !== undefined && geometry._vf.texCoordType != "Float32") ? 1 : 0;    
+        property.COLCOMPONENTS    = geometry._mesh._numColComponents;
+        property.NORCOMPONENTS    = geometry._mesh._numNormComponents;
+        property.POSCOMPONENTS    = geometry._mesh._numPosComponents;
+        property.SPHEREMAPPING    = (geometry._cf.texCoord !== undefined && geometry._cf.texCoord.node !== null &&
+                                     geometry._cf.texCoord.node._vf.mode &&
+                                     geometry._cf.texCoord.node._vf.mode.toLowerCase() == "sphere") ? 1 : 0;
+        property.VERTEXCOLOR      = (geometry._mesh._colors[0].length > 0 ||
+                                     (property.IMAGEGEOMETRY && geometry.getColorTexture()) ||
+                                     (property.BITLODGEOMETRY && geometry.hasColor()) ||
+                                     (property.POPGEOMETRY    && geometry.hasColor()) ||
+                                     (geometry._vf.color !== undefined && geometry._vf.color.length > 0)) ? 1 : 0;
 	}
 	
 	property.toIdentifier = function() { 
@@ -2672,32 +2734,34 @@ x3dom.Utils.generateProperties = function (viewarea, shape)
 *****************************************************************************/
 x3dom.Utils.wrapProgram = function (gl, program, shaderID)
 {
-	var shader = {};
-
-    shader.shaderID = shaderID;
+	var shader = {
+        shaderID: shaderID,
+        program: program
+    };
         
 	shader.bind = function () { 
 		gl.useProgram(program); 
 	};
-	
-	var i 	= 0;
+
 	var loc = null;
 	var obj = null;
-	var glErr;
-	
+	var i, glErr;
+
+    // get uniforms
 	var numUniforms = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS);
 	
 	for (i=0; i < numUniforms; ++i) {
 		try {
 			obj = gl.getActiveUniform(program, i);
 		}
-		catch (eu) {}
+		catch (eu) {
+            if (!obj) continue;
+        }
 
-		glErr = gl.getError();
-		
-		if (glErr !== 0) {
-			x3dom.debug.logError("GL-Error (on searching uniforms): " + glErr);
-		}
+        glErr = gl.getError();
+        if (glErr) {
+            x3dom.debug.logError("GL-Error (on searching uniforms): " + glErr);
+        }
 
 		loc = gl.getUniformLocation(program, obj.name);	
 		
@@ -2715,8 +2779,6 @@ x3dom.Utils.wrapProgram = function (gl, program, shaderID)
 					(function (loc) { return function (val) { gl.uniform1i(loc, val); }; })(loc));
 				break;
 			case gl.FLOAT:
-				//shader.__defineSetter__(obj.name, 
-				//	(function (loc) { return function (val) { gl.uniform1f(loc, val); }; })(loc));
                 /*
                  * Passing a MFFloat type into uniform.
                  * by Sofiane Benchaa, 2012.
@@ -2769,25 +2831,27 @@ x3dom.Utils.wrapProgram = function (gl, program, shaderID)
 				x3dom.debug.logWarning('GLSL program variable '+obj.name+' has unknown type '+obj.type);
 		}
 	}
-	
+
+    // get attributes
 	var numAttribs = gl.getProgramParameter(program, gl.ACTIVE_ATTRIBUTES);
 	
 	for (i=0; i < numAttribs; ++i) {
 		try {
 			obj = gl.getActiveAttrib(program, i);
 		}
-		catch (ea) {}
-		
-		glErr = gl.getError();
-		
-		if (glErr !== 0) {
-			x3dom.debug.logError("GL-Error (on searching attributes): " + glErr);   
-		}
+		catch (ea) {
+            if (!obj) continue;
+        }
+
+        glErr = gl.getError();
+        if (glErr) {
+            x3dom.debug.logError("GL-Error (on searching attributes): " + glErr);
+        }
 
 		loc = gl.getAttribLocation(program, obj.name);
 		shader[obj.name] = loc;
 	}
-	shader["program"]=program;
+
 	return shader;
 };
 
@@ -2965,6 +3029,7 @@ x3dom.StateManager.prototype.initStates = function ()
     //Initialize Rasterization states
     this.states['cullFace'] = null;
     this.states['frontFace'] = null;
+    this.states['lineWidth'] = null;
 
     //Initialize Per-Fragment-Operation states
     this.states['blendColor'] = {red: null, green: null, blue: null, alpha: null};
@@ -2976,6 +3041,7 @@ x3dom.StateManager.prototype.initStates = function ()
 
     //Initialize View and Clip states
     this.states['viewport'] = {x: null, y: null, width: null, height: null};
+    this.states['depthRange'] = {zNear: null, zFar: null};
 
     //TODO more states (e.g. stencil, texture, ...)
 };
@@ -3024,7 +3090,7 @@ x3dom.StateManager.prototype.colorMask = function (red, green, blue, alpha)
     if (this.states['colorMask'].red != red ||
         this.states['colorMask'].green != green ||
         this.states['colorMask'].blue != blue ||
-        this.states['colorMask'].alpha != alphal)
+        this.states['colorMask'].alpha != alpha)
     {
         this.gl.colorMask(red, green, blue, alpha);
         this.states['colorMask'].red = red;
@@ -3083,6 +3149,20 @@ x3dom.StateManager.prototype.frontFace = function (mode)
 };
 
 /*
+ * Specify the width of rasterized lines
+ */
+x3dom.StateManager.prototype.lineWidth = function (width)
+{
+    width = (width <= 1) ? 1 : width;
+
+    if (this.states['lineWidth'] != width)
+    {
+        this.gl.lineWidth(width);
+        this.states['lineWidth'] = width;
+    }
+};
+
+/*
  * Set the blend color
  */
 x3dom.StateManager.prototype.blendColor = function (red, green, blue, alpha)
@@ -3105,7 +3185,7 @@ x3dom.StateManager.prototype.blendColor = function (red, green, blue, alpha)
  */
 x3dom.StateManager.prototype.blendEquation = function (mode)
 {
-    if (this.states['blendEquation'] != mode)
+    if (mode && this.states['blendEquation'] != mode)
     {
         this.gl.blendEquation(mode);
         this.states['blendEquation'] = mode;
@@ -3171,6 +3251,27 @@ x3dom.StateManager.prototype.depthFunc = function (func)
 };
 
 /*
+ * Specify the value used for depth buffer comparisons
+ */
+x3dom.StateManager.prototype.depthRange = function (zNear, zFar)
+{
+    if (zNear < 0 || zFar < 0 || zNear > zFar)
+    {
+        return;   // do noting and leave default values
+    }
+
+    zNear = (zNear > 1) ? 1 : zNear;
+    zFar  = (zFar  > 1) ? 1 : zFar;
+
+    if (this.states['depthRange'].zNear != zNear || this.states['depthRange'].zFar != zFar)
+    {
+        this.gl.depthRange(zNear, zFar);
+        this.states['depthRange'].zNear = zNear;
+        this.states['depthRange'].zFar = zFar;
+    }
+};
+
+/*
  * Set the viewport
  */
 x3dom.StateManager.prototype.viewport = function (x, y, width, height)
@@ -3210,13 +3311,34 @@ x3dom.StateManager.prototype.bindFramebuffer = function (target, framebuffer)
 
 
 /** used from within gfx_webgl.js */
-x3dom.BinaryContainerLoader = {};
+x3dom.BinaryContainerLoader = {
+    outOfMemory: false,     // try to prevent browser crashes
+
+    checkError: function(gl) {
+        var glErr = gl.getError();
+        if (glErr) {
+            if (glErr == gl.OUT_OF_MEMORY) {
+                this.outOfMemory = true;
+                x3dom.debug.logError("GL-Error " + glErr + " on loading binary geometry (out of memory).");
+                console.error("WebGL: OUT_OF_MEMORY");
+            }
+            else {
+                x3dom.debug.logError("GL-Error " + glErr + " on loading binary geometry.");
+            }
+        }
+    }
+};
 
 
 /** setup/download binary geometry */
 x3dom.BinaryContainerLoader.setupBinGeo = function(shape, sp, gl, viewarea, currContext)
 {
+    if (this.outOfMemory) {
+        return;
+    }
+
     var t00 = new Date().getTime();
+    var that = this;
 
     var binGeo = shape._cf.geometry.node;
 
@@ -3231,8 +3353,8 @@ x3dom.BinaryContainerLoader.setupBinGeo = function(shape, sp, gl, viewarea, curr
         ((!binGeo._hasStrideOffset && binGeo._vf.color.length > 0) ? 1 : 0);
 
     var createTriangleSoup = (binGeo._vf.normalPerVertex == false) ||
-                              ((binGeo._vf.indexType == "Uint32") &&
-                               (binGeo._vf.index.length > 0));
+                              ((binGeo._vf.index.length > 0) && (binGeo._vf.indexType == "Int32" ||
+                                (binGeo._vf.indexType == "Uint32" && !x3dom.caps.INDEX_UINT)));
 
     shape._webgl.makeSeparateTris = {
         index: null,
@@ -3264,7 +3386,7 @@ x3dom.BinaryContainerLoader.setupBinGeo = function(shape, sp, gl, viewarea, curr
 
             for (var k=0; k<shape._webgl.primType.length; k++) {
                 if (shape._webgl.primType[k] == gl.TRIANGLE_STRIP) {
-                    x3dom.debug.logError("Triangle strips not yet supported for per-face normals.");
+                    x3dom.debug.logError("makeSeparateTris: triangle strips not yet supported for per-face normals.");
                     return;
                 }
             }
@@ -3297,7 +3419,7 @@ x3dom.BinaryContainerLoader.setupBinGeo = function(shape, sp, gl, viewarea, curr
             var dataLen = shape._coordStrideOffset[0] / x3dom.Utils.getDataTypeSize(geoNode._vf.coordType);
             dataLen = (dataLen == 0) ? 3 : dataLen;
 
-            x3dom.debug.logInfo("makeSeparateTris.createMesh called with coord length " + dataLen);
+            x3dom.debug.logWarning("makeSeparateTris.createMesh called with coord length " + dataLen);
 
             if (this.color && dataLen != shape._colorStrideOffset[0] / x3dom.Utils.getDataTypeSize(geoNode._vf.colorType))
             {
@@ -3507,6 +3629,8 @@ x3dom.BinaryContainerLoader.setupBinGeo = function(shape, sp, gl, viewarea, curr
             this.texCoord = null;
             this.color = null;
 
+            that.checkError(gl);
+
             // recreate shader
             delete shape._webgl.shader;
             shape._webgl.shader = currContext.cache.getDynamicShader(gl, viewarea, shape);
@@ -3544,6 +3668,15 @@ x3dom.BinaryContainerLoader.setupBinGeo = function(shape, sp, gl, viewarea, curr
             var indicesBuffer = gl.createBuffer();
             shape._webgl.buffers[0] = indicesBuffer;
 
+            if (x3dom.caps.INDEX_UINT && attribTypeStr == "Uint32") {
+                //indexArray is Uint32Array
+                shape._webgl.indexType = gl.UNSIGNED_INT;
+            }
+            else {
+                //indexArray is Uint16Array
+                shape._webgl.indexType = gl.UNSIGNED_SHORT;
+            }
+
             gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indicesBuffer);
             gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indexArray, gl.STATIC_DRAW);
 
@@ -3570,6 +3703,8 @@ x3dom.BinaryContainerLoader.setupBinGeo = function(shape, sp, gl, viewarea, curr
             shape._webgl.internalDownloadCount -= 1;
             if (shape._webgl.internalDownloadCount == 0)
                 shape._nameSpace.doc.needRender = true;
+
+            that.checkError(gl);
 
             var t11 = new Date().getTime() - t00;
             x3dom.debug.logInfo("XHR0/ index load time: " + t11 + " ms");
@@ -3677,6 +3812,8 @@ x3dom.BinaryContainerLoader.setupBinGeo = function(shape, sp, gl, viewarea, curr
             if (shape._webgl.internalDownloadCount == 0)
                 shape._nameSpace.doc.needRender = true;
 
+            that.checkError(gl);
+
             var t11 = new Date().getTime() - t00;
             x3dom.debug.logInfo("XHR/ interleaved array load time: " + t11 + " ms");
         };
@@ -3712,6 +3849,8 @@ x3dom.BinaryContainerLoader.setupBinGeo = function(shape, sp, gl, viewarea, curr
                 shape._webgl.makeSeparateTris.pushBuffer("coord", vertices);
                 return;
             }
+
+            gl.bindAttribLocation(sp.program, 0, "position");
 
             var positionBuffer = gl.createBuffer();
             shape._webgl.buffers[1] = positionBuffer;
@@ -3769,6 +3908,8 @@ x3dom.BinaryContainerLoader.setupBinGeo = function(shape, sp, gl, viewarea, curr
             if (shape._webgl.internalDownloadCount == 0)
                 shape._nameSpace.doc.needRender = true;
 
+            that.checkError(gl);
+
             var t11 = new Date().getTime() - t00;
             x3dom.debug.logInfo("XHR1/ coord load time: " + t11 + " ms");
         };
@@ -3823,6 +3964,8 @@ x3dom.BinaryContainerLoader.setupBinGeo = function(shape, sp, gl, viewarea, curr
             shape._webgl.internalDownloadCount -= 1;
             if (shape._webgl.internalDownloadCount == 0)
                 shape._nameSpace.doc.needRender = true;
+
+            that.checkError(gl);
 
             var t11 = new Date().getTime() - t00;
             x3dom.debug.logInfo("XHR2/ normal load time: " + t11 + " ms");
@@ -3879,6 +4022,8 @@ x3dom.BinaryContainerLoader.setupBinGeo = function(shape, sp, gl, viewarea, curr
             if (shape._webgl.internalDownloadCount == 0)
                 shape._nameSpace.doc.needRender = true;
 
+            that.checkError(gl);
+
             var t11 = new Date().getTime() - t00;
             x3dom.debug.logInfo("XHR3/ texCoord load time: " + t11 + " ms");
         };
@@ -3934,6 +4079,8 @@ x3dom.BinaryContainerLoader.setupBinGeo = function(shape, sp, gl, viewarea, curr
             if (shape._webgl.internalDownloadCount == 0)
                 shape._nameSpace.doc.needRender = true;
 
+            that.checkError(gl);
+
             var t11 = new Date().getTime() - t00;
             x3dom.debug.logInfo("XHR4/ color load time: " + t11 + " ms");
         };
@@ -3945,6 +4092,10 @@ x3dom.BinaryContainerLoader.setupBinGeo = function(shape, sp, gl, viewarea, curr
 /** setup/download pop geometry */
 x3dom.BinaryContainerLoader.setupPopGeo = function(shape, sp, gl, viewarea, currContext)
 {
+    if (this.outOfMemory) {
+        return;
+    }
+
     var popGeo = shape._cf.geometry.node;
 
     //reserve space for vertex buffer (and index buffer if any) on the gpu
@@ -4031,6 +4182,8 @@ x3dom.BinaryContainerLoader.setupPopGeo = function(shape, sp, gl, viewarea, curr
     shape._webgl.currentNumVertices = 0;
     shape._webgl.numVerticesAtLevel = [];
     shape._webgl.levelsAvailable    = 0;
+
+    this.checkError(gl);
 
     shape._webgl.levelLoaded = [];
     (function() {
@@ -4162,9 +4315,27 @@ x3dom.BinaryContainerLoader.setupPopGeo = function(shape, sp, gl, viewarea, curr
 /** setup/download bit-lod geometry */
 x3dom.BinaryContainerLoader.setupBitLODGeo = function(shape, sp, gl, viewarea, currContext)
 {
+    if (this.outOfMemory) {
+        return;
+    }
+
     shape._webgl.bitLODGeometry = -1;
 
     var bitLODGeometry = shape._cf.geometry.node;
+
+    if (!bitLODGeometry._vf.normalPerVertex)
+    {
+        shape._webgl.bitLODtotalVertexCount = 0;    // otherwise undefined
+
+        for (i = 0; i < bitLODGeometry._vf.vertexCount.length; i++) {
+            if (shape._webgl.primType[i] == gl.TRIANGLES) {
+                shape._webgl.bitLODtotalVertexCount += bitLODGeometry._vf.vertexCount[i];
+            }
+            else if (shape._webgl.primType[i] == gl.TRIANGLE_STRIP) {
+                shape._webgl.bitLODtotalVertexCount += (bitLODGeometry._vf.vertexCount[i] - 2) * 3;
+            }
+        }
+    }
 
     //Get number of components
     var numComponents = bitLODGeometry.getNumComponents();
@@ -4713,6 +4884,10 @@ x3dom.BinaryContainerLoader.setupBitLODGeo = function(shape, sp, gl, viewarea, c
 /** setup/download image geometry */
 x3dom.BinaryContainerLoader.setupImgGeo = function(shape, sp, gl, viewarea, currContext)
 {
+    if (this.outOfMemory) {
+        return;
+    }
+
     var imageGeometry = shape._cf.geometry.node;
 
     if ( imageGeometry.getIndexTexture() ) {
@@ -4741,6 +4916,8 @@ x3dom.BinaryContainerLoader.setupImgGeo = function(shape, sp, gl, viewarea, curr
     gl.enableVertexAttribArray(sp.position);
 
     vertices = null;
+
+    this.checkError(gl);
 };
 
 /*
@@ -5988,9 +6165,9 @@ x3dom.X3DCanvas = function(x3dElem, canvasIdx) {
 		div.appendChild(link);
 
         // check if "altImg" is specified on x3d element and if so use it as background
-        altImg = x3dElem.getAttribute("altImg") || null;
+        var altImg = x3dElem.getAttribute("altImg") || null;
         if (altImg) {
-            altImgObj = new Image();
+            var altImgObj = new Image();
             altImgObj.src = altImg;
             div.style.backgroundImage = "url("+altImg+")";
             div.style.backgroundRepeat = "no-repeat";
@@ -6151,7 +6328,12 @@ x3dom.X3DCanvas = function(x3dElem, canvasIdx) {
             // mozilla touch
             "onMozTouchDown",
             "onMozTouchMove",
-            "onMozTouchUp"
+            "onMozTouchUp",
+
+            // drag and drop, requires 'draggable' source property set true (usually of an img)
+            "ondragstart",
+            "ondrop",
+            "ondragover"
         ];
 
         // TODO; handle attribute event handlers dynamically during runtime
@@ -6163,6 +6345,12 @@ x3dom.X3DCanvas = function(x3dElem, canvasIdx) {
                 x3dom.debug.logInfo(evtName +", "+ userEvt);
                 canvas.setAttribute(evtName, userEvt);
             }
+        }
+
+        var userProp = x3dElem.getAttribute("draggable");
+        if (userProp) {
+            x3dom.debug.logInfo("draggable=" + userProp);
+            canvas.setAttribute("draggable", userProp);
         }
 
         // workaround since one cannot find out which handlers are registered
@@ -6222,12 +6410,12 @@ x3dom.X3DCanvas = function(x3dElem, canvasIdx) {
         }
 
         // Apply the width and height of the X3D element to the canvas
-        var w = 2, h = 2;
+        var w, h;
 
         if ((w = x3dElem.getAttribute("width")) !== null) {
             //Attention: pbuffer dim is _not_ derived from style attribs!
             if (w.indexOf("%") >= 0) {
-				x3dom.debug.logWarning("The width attribute is to be specified in pixels.");
+				x3dom.debug.logWarning("The width attribute is to be specified in pixels not in percent.");
 			}
             canvas.style.width = w;
             canvas.setAttribute("width", w);
@@ -6236,7 +6424,7 @@ x3dom.X3DCanvas = function(x3dElem, canvasIdx) {
         if ((h = x3dElem.getAttribute("height")) !== null) {
             //Attention: pbuffer dim is _not_ derived from style attribs!
             if (h.indexOf("%") >= 0) {
-				x3dom.debug.logWarning("The height attribute is to be specified in pixels.");
+				x3dom.debug.logWarning("The height attribute is to be specified in pixels not in percent.");
 			}
             canvas.style.height = h;
             canvas.setAttribute("height", h);
@@ -6296,7 +6484,7 @@ x3dom.X3DCanvas = function(x3dElem, canvasIdx) {
 	
 	this.backend = this.x3dElem.getAttribute('backend');
 	if (this.backend)
-	    this.backend = this.backend.toLowerCase()
+	    this.backend = this.backend.toLowerCase();
 	else
 	    this.backend = 'none';
 
@@ -6336,10 +6524,11 @@ x3dom.X3DCanvas = function(x3dElem, canvasIdx) {
 	x3dom.caps.BACKEND = this.backend;
 
     // for FPS measurements
+    this.fps_t0 = new Date().getTime();
+
     this.lastTimeFPSWasTaken = 0;
     this.framesSinceLastTime = 0;
 
-	this.fps_t0 = new Date().getTime();
     this.doc = null;
 
     // allow listening for (size) changes
@@ -6427,7 +6616,7 @@ x3dom.X3DCanvas = function(x3dElem, canvasIdx) {
         
         // TODO: handle context lost events properly
         this.canvas.addEventListener("webglcontextlost", function(event) {
-            x3dom.debug.logWarning("WebGL context lost");
+            x3dom.debug.logError("WebGL context lost");
             event.preventDefault();
         }, false);
         
@@ -6549,23 +6738,31 @@ x3dom.X3DCanvas = function(x3dElem, canvasIdx) {
 
         this.canvas.addEventListener('DOMMouseScroll', function (evt) {
 			if(!this.isMulti) {
+                this.focus();
+
 				this.mouse_drag_y += 2 * evt.detail;
 
 				this.parent.doc.onDrag(that.gl, this.mouse_drag_x, this.mouse_drag_y, 2);
 				this.parent.doc.needRender = true;
-				
-				evt.returnValue = true;
+
+                evt.preventDefault();
+                evt.stopPropagation();
+                evt.returnValue = false;
 			}
         }, false);
 
         this.canvas.addEventListener('mousewheel', function (evt) {
 			if(!this.isMulti) {
+                this.focus();
+
 				this.mouse_drag_y -= 0.1 * evt.wheelDeltaY;
 
 				this.parent.doc.onDrag(that.gl, this.mouse_drag_x, this.mouse_drag_y, 2);
 				this.parent.doc.needRender = true;
-				
-				evt.returnValue = true;
+
+                evt.preventDefault();
+                evt.stopPropagation();
+                evt.returnValue = false;
 			}
         }, false);
 
@@ -6615,6 +6812,8 @@ x3dom.X3DCanvas = function(x3dElem, canvasIdx) {
           lastSquareDistance : 0,
           lastAngle : 0,
 		  lastLayer : [],
+
+          examineNavType: true,
           
           calcAngle : function(vector)
           {
@@ -6632,7 +6831,7 @@ x3dom.X3DCanvas = function(x3dElem, canvasIdx) {
           visMarker: this.showTouchpoints,
           visMarkerBag: [],
           
-          visualizeTouches: function(evt, cleanup)
+          visualizeTouches: function(evt)
           {
               if (!this.visMarker)
                   return;
@@ -6694,10 +6893,15 @@ x3dom.X3DCanvas = function(x3dElem, canvasIdx) {
             this.isMulti = true;
 			evt.preventDefault();
 			touches.visualizeTouches(evt);
+
+            this.focus();
 			
 			if (doc == null)
 				doc = this.parent.doc;
-			
+
+            var navi = doc._scene.getNavigationInfo();
+            touches.examineNavType = (navi.getType() == "examine");
+
 			touches.lastLayer = [];
 
             var i, pos;
@@ -6730,16 +6934,21 @@ x3dom.X3DCanvas = function(x3dElem, canvasIdx) {
 			
 			// update scene bbox
 			doc._scene.updateVolume();
-			
-			doc._viewarea._hasTouches = true;
-			
-			for(i = 0; i < evt.touches.length; i++) {
-				pos = this.parent.mousePosition(evt.touches[i]);
-				doc.onPick(that.gl, pos.x, pos.y);
-				doc._viewarea.prepareEvents(pos.x, pos.y, 1, "onmousedown");
-				doc._viewarea._pickingInfo.lastClickObj = doc._viewarea._pickingInfo.pickObj;
-				doc.needRender = true;
-			}            
+
+            if (touches.examineNavType) {
+                for(i = 0; i < evt.touches.length; i++) {
+                    pos = this.parent.mousePosition(evt.touches[i]);
+                    doc.onPick(that.gl, pos.x, pos.y);
+                    doc._viewarea.prepareEvents(pos.x, pos.y, 1, "onmousedown");
+                    doc._viewarea._pickingInfo.lastClickObj = doc._viewarea._pickingInfo.pickObj;
+                }
+            }
+            else if (evt.touches.length) {
+                pos = this.parent.mousePosition(evt.touches[0]);
+                doc.onMousePress(that.gl, pos.x, pos.y, 1);     // 1 means left mouse button
+            }
+
+            doc.needRender = true;
         };
         
         var touchStartHandlerMoz = function(evt)
@@ -6769,51 +6978,70 @@ x3dom.X3DCanvas = function(x3dElem, canvasIdx) {
 			if (doc == null)
 				doc = this.parent.doc;
 
-            var rotMatrix;
-			// one finger: x/y rotation
-			if(evt.touches.length == 1) {
-				var currentDrag = new x3dom.fields.SFVec2f(evt.touches[0].screenX, evt.touches[0].screenY);
-								
-				var deltaDrag = currentDrag.subtract(touches.lastDrag);
-				touches.lastDrag = currentDrag;
-				
-				var mx = x3dom.fields.SFMatrix4f.rotationY(deltaDrag.x / 100);
-				var my = x3dom.fields.SFMatrix4f.rotationX(deltaDrag.y / 100);
-				rotMatrix = mx.mult(my);
-				
-				doc.onMoveView(that.gl, null, rotMatrix);
-				doc.needRender = true;
-			}
-			// two fingers: scale, translation, rotation around view (z) axis
-			else if(evt.touches.length >= 2) {
-				var touch0 = new x3dom.fields.SFVec2f(evt.touches[0].screenX, evt.touches[0].screenY);
-				var touch1 = new x3dom.fields.SFVec2f(evt.touches[1].screenX, evt.touches[1].screenY);
-            
-				var distance = touch1.subtract(touch0);
-				var middle = distance.multiply(0.5).add(touch0);
-				var squareDistance = distance.dot(distance);
-            
-				var deltaMiddle = middle.subtract(touches.lastMiddle);
-				var deltaZoom = squareDistance - touches.lastSquareDistance;
-            
-				var deltaMove = new x3dom.fields.SFVec3f(
-            		 deltaMiddle.x / screen.width,
-            		-deltaMiddle.y / screen.height,
-              		 deltaZoom / (screen.width * screen.height * 0.2));
-			
-				var rotation = touches.calcAngle(distance);
-				var angleDelta = touches.lastAngle - rotation;
-				touches.lastAngle = rotation;
+            var pos = null;
+            var rotMatrix = null;
 
-				rotMatrix = x3dom.fields.SFMatrix4f.rotationZ(angleDelta);
+            if (touches.examineNavType) {
+                /*
+                if (doc._scene._vf.doPickPass && doc._scene._vf.pickMode.toLowerCase() !== "box") {
+                    for(var i = 0; i < evt.touches.length; i++) {
+                        pos = this.parent.mousePosition(evt.touches[i]);
+                        doc.onPick(that.gl, pos.x, pos.y);
 
-				touches.lastMiddle = middle;
-				touches.lastDistance = distance;
-				touches.lastSquareDistance = squareDistance;
+                        doc._viewarea.handleMoveEvt(pos.x, pos.y, 1);
+                    }
+                }
+                */
 
-				doc.onMoveView(that.gl, deltaMove, rotMatrix);
-				doc.needRender = true;
-			}
+                // one finger: x/y rotation
+                if(evt.touches.length == 1) {
+                    var currentDrag = new x3dom.fields.SFVec2f(evt.touches[0].screenX, evt.touches[0].screenY);
+
+                    var deltaDrag = currentDrag.subtract(touches.lastDrag);
+                    touches.lastDrag = currentDrag;
+
+                    var mx = x3dom.fields.SFMatrix4f.rotationY(deltaDrag.x / 100);
+                    var my = x3dom.fields.SFMatrix4f.rotationX(deltaDrag.y / 100);
+                    rotMatrix = mx.mult(my);
+
+                    doc.onMoveView(that.gl, null, rotMatrix);
+                }
+                // two fingers: scale, translation, rotation around view (z) axis
+                else if(evt.touches.length >= 2) {
+                    var touch0 = new x3dom.fields.SFVec2f(evt.touches[0].screenX, evt.touches[0].screenY);
+                    var touch1 = new x3dom.fields.SFVec2f(evt.touches[1].screenX, evt.touches[1].screenY);
+
+                    var distance = touch1.subtract(touch0);
+                    var middle = distance.multiply(0.5).add(touch0);
+                    var squareDistance = distance.dot(distance);
+
+                    var deltaMiddle = middle.subtract(touches.lastMiddle);
+                    var deltaZoom = squareDistance - touches.lastSquareDistance;
+
+                    var deltaMove = new x3dom.fields.SFVec3f(
+                                                 deltaMiddle.x / screen.width,
+                                                -deltaMiddle.y / screen.height,
+                                                 deltaZoom / (screen.width * screen.height * 0.2));
+
+                    var rotation = touches.calcAngle(distance);
+                    var angleDelta = touches.lastAngle - rotation;
+                    touches.lastAngle = rotation;
+
+                    rotMatrix = x3dom.fields.SFMatrix4f.rotationZ(angleDelta);
+
+                    touches.lastMiddle = middle;
+                    touches.lastDistance = distance;
+                    touches.lastSquareDistance = squareDistance;
+
+                    doc.onMoveView(that.gl, deltaMove, rotMatrix);
+                }
+            }
+            else if (evt.touches.length) {
+                pos = this.parent.mousePosition(evt.touches[0]);
+                doc.onDrag(that.gl, pos.x, pos.y, 1);
+            }
+
+            doc.needRender = true;
         };
         
         var touchMoveHandlerMoz = function(evt)
@@ -6836,7 +7064,9 @@ x3dom.X3DCanvas = function(x3dElem, canvasIdx) {
 			
 			if (doc == null)
 				doc = this.parent.doc;
-          
+
+			doc._viewarea._isMoving = false;
+
 			// reinit first finger for rotation
 			if (touches.numTouches == 2 && evt.touches.length == 1)
 				touches.lastDrag = new x3dom.fields.SFVec2f(evt.touches[0].screenX, evt.touches[0].screenY);
@@ -6848,50 +7078,54 @@ x3dom.X3DCanvas = function(x3dElem, canvasIdx) {
 			        dblClick = true;
 			    touches.numTouches = evt.touches.length;
 			}
-			
-			doc._viewarea._hasTouches = false;
-			
-			for(var i = 0; i < touches.lastLayer.length; i++) {
-				var pos = touches.lastLayer[i][1];
-				
-				doc.onPick(that.gl, pos.x, pos.y);
-				
-				if (doc._scene._vf.pickMode.toLowerCase() !== "box") {
-                    doc._viewarea.prepareEvents(pos.x, pos.y, 1, "onmouseup");
-                    doc._viewarea._pickingInfo.lastClickObj = doc._viewarea._pickingInfo.pickObj;
 
-                    // click means that mousedown _and_ mouseup were detected on same element
-                    if (doc._viewarea._pickingInfo.pickObj &&
-                    	doc._viewarea._pickingInfo.pickObj ===
-                    	doc._viewarea._pickingInfo.lastClickObj) {
-    
-                    	doc._viewarea.prepareEvents(pos.x, pos.y, 1, "onclick");
+            if (touches.examineNavType) {
+                for(var i = 0; i < touches.lastLayer.length; i++) {
+                    var pos = touches.lastLayer[i][1];
+
+                    doc.onPick(that.gl, pos.x, pos.y);
+
+                    if (doc._scene._vf.pickMode.toLowerCase() !== "box") {
+                        doc._viewarea.prepareEvents(pos.x, pos.y, 1, "onmouseup");
+                        doc._viewarea._pickingInfo.lastClickObj = doc._viewarea._pickingInfo.pickObj;
+
+                        // click means that mousedown _and_ mouseup were detected on same element
+                        if (doc._viewarea._pickingInfo.pickObj &&
+                            doc._viewarea._pickingInfo.pickObj ===
+                            doc._viewarea._pickingInfo.lastClickObj) {
+
+                            doc._viewarea.prepareEvents(pos.x, pos.y, 1, "onclick");
+                        }
                     }
-			    }
-			    else {
-                    var line = doc._viewarea.calcViewRay(pos.x, pos.y);
-                    var isect = doc._scene.doIntersect(line);
-                    var obj = line.hitObject;
-                    
-                    if (isect && obj) {
-                        doc._viewarea._pick.setValues(line.hitPoint);
-                        doc._viewarea.checkEvents(obj, pos.x, pos.y, 1, "onclick");
-                        
-                        x3dom.debug.logInfo("Hit '" + obj._xmlNode.localName + "/ " +
-                                            obj._DEF + "' at pos " + doc._viewarea._pick);
+                    else {
+                        var line = doc._viewarea.calcViewRay(pos.x, pos.y);
+                        var isect = doc._scene.doIntersect(line);
+                        var obj = line.hitObject;
+
+                        if (isect && obj) {
+                            doc._viewarea._pick.setValues(line.hitPoint);
+                            doc._viewarea.checkEvents(obj, pos.x, pos.y, 1, "onclick");
+
+                            x3dom.debug.logInfo("Hit '" + obj._xmlNode.localName + "/ " +
+                                                obj._DEF + "' at pos " + doc._viewarea._pick);
+                        }
                     }
-			    }
-			}
-			
-            if (dblClick) {
-                var now = new Date().getTime();
-                var dist = touches.firstTouchPoint.subtract(touches.lastDrag).length();
+                }
 
-                if (dist < 18 && now - touches.firstTouchTime < 180)
-                    doc.onDoubleClick(that.gl, 0, 0);
+                if (dblClick) {
+                    var now = new Date().getTime();
+                    var dist = touches.firstTouchPoint.subtract(touches.lastDrag).length();
 
-                touches.firstTouchTime = now;
-                touches.firstTouchPoint = touches.lastDrag;
+                    if (dist < 18 && now - touches.firstTouchTime < 180)
+                        doc.onDoubleClick(that.gl, 0, 0);
+
+                    touches.firstTouchTime = now;
+                    touches.firstTouchPoint = touches.lastDrag;
+                }
+            }
+            else if (touches.lastLayer.length) {
+                pos = touches.lastLayer[0][1];
+                doc.onMouseRelease(that.gl, pos.x, pos.y, 0, 1);
             }
 			
 			doc.needRender = true;
@@ -6970,61 +7204,64 @@ x3dom.X3DCanvas = function(x3dElem, canvasIdx) {
 
 x3dom.X3DCanvas.prototype.tick = function()
 {
-    var d = new Date().getTime();
-    var diff = d - this.lastTimeFPSWasTaken;
-    
-    if (diff >= 1000 && this.doc.needRender)
-    {
-        this.x3dElem.runtime.fps = this.framesSinceLastTime / (diff / 1000.0);
-        this.x3dElem.runtime.addMeasurement('FPS', this.x3dElem.runtime.fps);
-
-        this.framesSinceLastTime = 0;
-        this.lastTimeFPSWasTaken = d;
-    }
-    this.framesSinceLastTime++;
-
-    var fps = 1000.0 / (d - this.fps_t0);
-    this.fps_t0 = d;
-
     try {
+        var runtime = this.x3dElem.runtime;
+
+        var d = new Date().getTime();
+        var diff = d - this.lastTimeFPSWasTaken;
+
+        var fps = 1000.0 / (d - this.fps_t0);
+        this.fps_t0 = d;
+
+        // update routes and stuff
         this.doc.advanceTime(d / 1000.0);
         var animD = new Date().getTime() - d;
 
         if (this.doc.needRender) {
+            // calc average frames per second
+            if (diff >= 1000) {
+                runtime.fps = this.framesSinceLastTime / (diff / 1000.0);
+                runtime.addMeasurement('FPS', runtime.fps);
 
-            if (this.x3dElem.runtime.isReady == false) {
-                this.x3dElem.runtime.ready();
-                this.x3dElem.runtime.isReady = true;
+                this.framesSinceLastTime = 0;
+                this.lastTimeFPSWasTaken = d;
+            }
+            this.framesSinceLastTime++;
+
+            runtime.addMeasurement('ANIM', animD);
+
+            if (runtime.isReady == false) {
+                runtime.ready();
+                runtime.isReady = true;
             }
 
-            this.x3dElem.runtime.enterFrame();
-			
-            this.x3dElem.runtime.addMeasurement('ANIM', animD);
+            runtime.enterFrame();
 
             if (this.backend == 'flash') {
-              if (this.isFlashReady) {
-                this.canvas.setFPS({fps: fps});
+                if (this.isFlashReady) {
+                    this.canvas.setFPS({fps: fps});
+
+                    this.doc.needRender = false;
+                    this.doc.render(this.gl);
+                }
+            }
+            else {
+                // picking might require another pass
                 this.doc.needRender = false;
                 this.doc.render(this.gl);
-              }
-			}
-			else {
-			    // picking might require another pass
-				this.doc.needRender = false;
-				this.doc.render(this.gl);
 
                 if (!this.doc._scene._vf.doPickPass)
-                    this.x3dElem.runtime.removeMeasurement('PICKING');
-			}
+                    runtime.removeMeasurement('PICKING');
+            }
 
-            this.x3dElem.runtime.exitFrame();
-		}
-		
+            runtime.exitFrame();
+        }
+
         if (this.progressDiv) {
             if (this.doc.downloadCount > 0) {
-                this.x3dElem.runtime.addInfo("#LOADS:", this.doc.downloadCount);
+                runtime.addInfo("#LOADS:", this.doc.downloadCount);
             } else {
-                this.x3dElem.runtime.removeInfo("#LOADS:");
+                runtime.removeInfo("#LOADS:");
             }
 
             if (this.doc.properties.getProperty("showProgress") !== 'false') {
@@ -7038,10 +7275,9 @@ x3dom.X3DCanvas.prototype.tick = function()
 
                     /*
                     var myThat = this;
-
-                    window.setTimeout( function() { 
-                           myThat.doc.downloadCount = 0;
-                           myThat.progressDiv.style.display = 'none';
+                    window.setTimeout( function() {
+                        myThat.doc.downloadCount = 0;
+                        myThat.progressDiv.style.display = 'none';
                     }, 10000 );
                     */
                 }
@@ -7049,7 +7285,6 @@ x3dom.X3DCanvas.prototype.tick = function()
                 this.progressDiv.style.display = 'none';
             }
         }
-
     } catch (e) {
         x3dom.debug.logException(e);
         throw e;
@@ -7142,23 +7377,25 @@ x3dom.Runtime = function(doc, canvas) {
     this.states = { measurements: [], infos: [] };
 };
 
-x3dom.Runtime.prototype.addMeasurement = function(title, value) {
-  this.states.measurements[title] = value;
+
+x3dom.Runtime.prototype.addMeasurement = function (title, value) {
+    this.states.measurements[title] = value;
 };
 
-x3dom.Runtime.prototype.removeMeasurement = function(title) {
-  if ( this.states.measurements[title] ) {
-    delete this.states.measurements[title];
-  }
+x3dom.Runtime.prototype.removeMeasurement = function (title) {
+    if (this.states.measurements[title]) {
+        delete this.states.measurements[title];
+    }
 };
 
-x3dom.Runtime.prototype.addInfo = function(title, value) {
-  this.states.infos[title] = value;
+x3dom.Runtime.prototype.addInfo = function (title, value) {
+    this.states.infos[title] = value;
 };
 
-x3dom.Runtime.prototype.removeInfo = function(title) {
-  delete this.states.infos[title];
+x3dom.Runtime.prototype.removeInfo = function (title) {
+    delete this.states.infos[title];
 };
+
 
 x3dom.Runtime.prototype.initialize = function(doc, canvas) {
     this.doc = doc;
@@ -7258,6 +7495,16 @@ x3dom.Runtime.prototype.enterFrame = function() {
 x3dom.Runtime.prototype.exitFrame = function() {
     //x3dom.debug.logInfo('Render frame finished');
     // to be overwritten by user
+};
+
+/**
+ * APIFunction: triggerRedraw
+ *
+ * triggers a redraw of the scene
+ *
+ */
+x3dom.Runtime.prototype.triggerRedraw = function() {
+    this.canvas.doc.needRender = true;
 };
 
 /**
@@ -7833,12 +8080,30 @@ x3dom.Runtime.prototype.examine = function() {
 };
 
 /**
+ * APIFunction: turnTable
+ *
+ * Switches to turnTable mode
+ */
+x3dom.Runtime.prototype.turnTable = function() {
+    this.canvas.doc._scene.getNavigationInfo().setType("turntable");
+};
+
+/**
  * APIFunction: fly
  *
  * Switches to fly mode
  */
 x3dom.Runtime.prototype.fly = function() {
     this.canvas.doc._scene.getNavigationInfo().setType("fly");
+};
+
+/**
+ * APIFunction: freeFly
+ *
+ * Switches to freeFly mode
+ */
+x3dom.Runtime.prototype.freeFly = function() {
+    this.canvas.doc._scene.getNavigationInfo().setType("freefly");
 };
 
 /**
@@ -7892,10 +8157,10 @@ x3dom.Runtime.prototype.helicopter = function() {
  */
  x3dom.Runtime.prototype.resetExamin = function() {
     var viewarea = this.canvas.doc._viewarea;
-    viewarea._relMat = x3dom.fields.SFMatrix4f.identity();
     viewarea._rotMat = x3dom.fields.SFMatrix4f.identity();
     viewarea._transMat = x3dom.fields.SFMatrix4f.identity();
     viewarea._movement = new x3dom.fields.SFVec3f(0, 0, 0);
+    viewarea._needNavigationMatrixUpdate = true;
     this.canvas.doc.needRender = true;
  };
 
@@ -8240,10 +8505,17 @@ x3dom.userAgentFeature = {
             'components', 
             'loadpath', 
             'disableDoubleClick',
+            'backend',
+            'altImg',
+            'flashrenderer',
+            'swfpath',
+            'runtimeEnabled',
+            'keysEnabled',
+            'showTouchpoints',
+            'disableTouch',
             'maxActiveDownloads'
         ]);
         var components, prefix;
-		
 		var showLoggingConsole = false;
 
         // for each X3D element
@@ -8275,7 +8547,7 @@ x3dom.userAgentFeature = {
                 // load components from params or default to x3d attribute
                 components = settings.getProperty('components', x3ds[i].getAttribute("components"));
                 if (components) {
-                    prefix = settings.getProperty('loadpath', x3ds[i].getAttribute("loadpath"))
+                    prefix = settings.getProperty('loadpath', x3ds[i].getAttribute("loadpath"));
                     components = components.trim().split(',');
                     for (j=0; j < components.length; j++) {
                         x3dom.loadJS(components[j] + ".js", prefix);
@@ -8302,22 +8574,15 @@ x3dom.userAgentFeature = {
 			x3dom.debug.activate(false);
 		}
 
-/*
-        // active hacky DOMAttrModified workaround to webkit
-        if (window.navigator.userAgent.match(/webkit/i)) {
-            x3dom.debug.logInfo ("Activate DOMAttrModifiedEvent workaround for WebKit.");
-            x3dom.userAgentFeature.supportsDOMAttrModified = false;
-        }
-*/
-
         // Convert the collection into a simple array (is this necessary?)
         x3ds = Array.map(x3ds, function (n) {
-            //n.runtime = x3dom.runtime;
-            n.runtime = new x3dom.Runtime();
             n.hasRuntime = true;
             return n;
         });
-        w3sg = Array.map(w3sg, function (n) { n.hasRuntime = false; return n; });
+        w3sg = Array.map(w3sg, function (n) {
+            n.hasRuntime = false;
+            return n;
+        });
         
         for (i=0; i<w3sg.length; i++) {
             x3ds.push(w3sg[i]);
@@ -8337,8 +8602,8 @@ x3dom.userAgentFeature = {
         // an X3D canvas and load the content
         var x3d_element;
         var x3dcanvas;
-        var altDiv, altP, aLnk, altImg, altImgObj;
-        var t0,t1;
+        var altDiv, altP, aLnk, altImg;
+        var t0, t1;
 
         for (i=0; i < x3ds.length; i++)
         {
@@ -8357,6 +8622,7 @@ x3dom.userAgentFeature = {
                 altDiv = document.createElement("div");
                 altDiv.setAttribute("class", "x3dom-nox3d");
                 altDiv.setAttribute("id", "x3dom-nox3d");
+
                 altP = document.createElement("p");
                 altP.appendChild(document.createTextNode("WebGL is not yet supported in your browser. "));
                 aLnk = document.createElement("a");
@@ -8378,11 +8644,9 @@ x3dom.userAgentFeature = {
             
             t0 = new Date().getTime();
 
-//            if (!x3ds[i].runtime) {
-                 x3ds[i].runtime = new x3dom.Runtime(x3ds[i], x3dcanvas);
-//            }
-
+            x3ds[i].runtime = new x3dom.Runtime(x3ds[i], x3dcanvas);
             x3ds[i].runtime.initialize(x3ds[i], x3dcanvas);
+
             if (x3dom.runtime.ready) {
                 x3ds[i].runtime.ready = x3dom.runtime.ready;
             }
@@ -8410,27 +8674,10 @@ x3dom.userAgentFeature = {
                 x3ds[i].runtime.processIndicator(false);
             }
 
-//            var showProgress = x3ds[i].getAttribute("showProgress");
-//            if (showProgress == 'true' || showProgress === true || showProgress == 'bar') {
-//                var spinner = document.createElement("div");
-//                spinner.innerHTML = "Loaded " + " elements"
-//                spinner.id = 'x3dom-progress-1';
-//                spinner.className = 'x3dom-progress';
-//                if (showProgress == 'bar') {
-//                    spinner.className = 'x3dom-progress x3dom-progress-bar';
-//                }
-//                 x3ds[i].appendChild(spinner);
-//            }
-
             x3dom.canvases.push(x3dcanvas);
+
 			t1 = new Date().getTime() - t0;
             x3dom.debug.logInfo("Time for setup and init of GL element no. " + i + ": " + t1 + " ms.");
-			
-            //Start image queue
-
-		    // gets the value of param name="maxActiveDownloads"
-		    // settings.getProperty('maxActiveDownloads', 10);
-            //x3dom.ImageLoadManager.load();
         }
         
         var ready = (function(eventType) {
@@ -8473,9 +8720,9 @@ x3dom.userAgentFeature = {
 		document.__getElementsByTagName = document.getElementsByTagName;
 		
 		document.getElementsByTagName = function(tag) {
-			var obj = new Array();   
-				
+			var obj = [];
 			var elems = this.__getElementsByTagName("*");
+
 			if(tag =="*"){
 				obj = elems;
 			} else {
@@ -8532,11 +8779,12 @@ x3dom.userAgentFeature = {
         window.attachEvent('onunload', onunload);
         window.attachEvent('onreload', onunload);
     }
-   // Initialize if we were loaded after 'DOMContentLoaded' already fired.
-   // This can happen if the script was loaded by other means.
-   if(document.readyState === "complete"){
-	onload();
-   }
+
+    // Initialize if we were loaded after 'DOMContentLoaded' already fired.
+    // This can happen if the script was loaded by other means.
+    if (document.readyState === "complete") {
+        window.setTimeout( function() { onload(); }, 20 );
+    }
 })();
 
 /*
@@ -8828,11 +9076,11 @@ x3dom.Texture.prototype.updateTexture = function()
 	if (tex._cf.textureProperties.node !== null) {
 		var texProp = tex._cf.textureProperties.node;
 		
-		this.wrapS = x3dom.Utils.boundaryModesDic(gl, texProp._vf.boundaryModeS.toUpperCase());
-        this.wrapT = x3dom.Utils.boundaryModesDic(gl, texProp._vf.boundaryModeT.toUpperCase());
+		this.wrapS = x3dom.Utils.boundaryModesDic(gl, texProp._vf.boundaryModeS);
+        this.wrapT = x3dom.Utils.boundaryModesDic(gl, texProp._vf.boundaryModeT);
 
-		this.minFilter = x3dom.Utils.minFilterDic(gl, texProp._vf.minificationFilter.toUpperCase());
-		this.magFilter = x3dom.Utils.magFilterDic(gl, texProp._vf.magnificationFilter.toUpperCase());
+		this.minFilter = x3dom.Utils.minFilterDic(gl, texProp._vf.minificationFilter);
+		this.magFilter = x3dom.Utils.magFilterDic(gl, texProp._vf.magnificationFilter);
 		
 		if (texProp._vf.generateMipMaps === true) {
 			this.genMipMaps = true;
@@ -9378,6 +9626,43 @@ x3dom.shader.light = function(numLights) {
 	return shaderPart;
 };
 
+/*******************************************************************************
+ * cotangent_frame
+ ********************************************************************************/
+x3dom.shader.TBNCalculation = function() {
+    var shaderPart = "";
+
+    shaderPart += "mat3 cotangent_frame(vec3 N, vec3 p, vec2 uv)\n" +
+        "{\n" +
+        "    // get edge vectors of the pixel triangle\n" +
+        "    vec3 dp1 = dFdx( p );\n" +
+        "    vec3 dp2 = dFdy( p );\n" +
+        "    vec2 duv1 = dFdx( uv );\n" +
+        "    vec2 duv2 = dFdy( uv );\n" +
+        "\n" +
+        "    // solve the linear system\n" +
+        "    vec3 dp2perp = cross( dp2, N );\n" +
+        "    vec3 dp1perp = cross( N, dp1 );\n" +
+        "    vec3 T = dp2perp * duv1.x + dp1perp * duv2.x;\n" +
+        "    vec3 B = dp2perp * duv1.y + dp1perp * duv2.y;\n" +
+        "\n" +
+        "    // construct a scale-invariant frame\n" +
+        "    float invmax = inversesqrt( max( dot(T,T), dot(B,B) ) );\n" +
+        "    return mat3( T * invmax, B * invmax, N );\n" +
+        "}\n\n";
+
+    shaderPart += "vec3 perturb_normal( vec3 N, vec3 V, vec2 texcoord )\n" +
+        "{\n" +
+        "    // assume N, the interpolated vertex normal and\n" +
+        "    // V, the view vector (vertex to eye)\n" +
+        "    vec3 map = texture2D(normalMap, texcoord ).xyz;\n" +
+        "    map = map * 255./127. - 128./127.;\n" +
+        "    mat3 TBN = cotangent_frame(N, -V, texcoord);\n" +
+        "    return normalize(TBN * map);\n" +
+        "}\n\n";
+
+    return shaderPart;
+};
 /*
  * X3DOM JavaScript Library
  * http://www.x3dom.org
@@ -9513,12 +9798,19 @@ x3dom.shader.DynamicShader.prototype.generateVertexShader = function(gl, propert
 		if(properties.TEXTRAFO){
 			shader += "uniform mat4 texTrafoMatrix;\n";
 		}
-		if(properties.NORMALMAP){
+
+		if(properties.NORMALMAP && !x3dom.caps.STD_DERIVATIVES) {
+
+            x3dom.debug.logWarning("Your System doesn't support the 'OES_STANDARD_DERIVATIVES' Extension. " +
+                                   "You must set tangents and binormals manually via the FloatVertexAttribute-Node " +
+                                   "to use normal maps");
+
 			shader += "attribute vec3 tangent;\n";
 			shader += "attribute vec3 binormal;\n";
 			shader += "varying vec3 fragTangent;\n";
 			shader += "varying vec3 fragBinormal;\n";
 		}
+
 		if(properties.CUBEMAP) {
 			shader += "varying vec3 fragViewDir;\n";
 			shader += "uniform mat4 viewMatrix;\n";
@@ -9767,7 +10059,8 @@ x3dom.shader.DynamicShader.prototype.generateVertexShader = function(gl, propert
                 shader += "fragTexcoord = vec2(0.03125 + 0.9375 * (PG_precisionLevel / 16.0), 1.0);";
 			// LOD LUT HACK ###
 		}
-		if(properties.NORMALMAP) {
+
+		if(properties.NORMALMAP  && !x3dom.caps.STD_DERIVATIVES) {
 			shader += "fragTangent  = (normalMatrix * vec4(tangent, 0.0)).xyz;\n";
 			shader += "fragBinormal = (normalMatrix * vec4(binormal, 0.0)).xyz;\n";
 		}
@@ -9853,11 +10146,6 @@ x3dom.shader.DynamicShader.prototype.generateFragmentShader = function(gl, prope
 			shader += "varying vec3 fragViewDir;\n";
 			shader += "uniform mat4 modelViewMatrixInverse;\n";
 		}
-		if(properties.NORMALMAP){
-			shader += "uniform sampler2D normalMap;\n";
-			shader += "varying vec3 fragTangent;\n";
-			shader += "varying vec3 fragBinormal;\n";
-		}
 		if(properties.SPECMAP){
 			shader += "uniform sampler2D specularMap;\n";
 		}
@@ -9870,6 +10158,17 @@ x3dom.shader.DynamicShader.prototype.generateFragmentShader = function(gl, prope
             shader += "uniform sampler2D diffuseDisplacementMap;\n";
             shader += "uniform float displacementWidth;\n";
             shader += "uniform float displacementHeight;\n";
+        }
+        if(properties.NORMALMAP){
+            shader += "uniform sampler2D normalMap;\n";
+
+            if(x3dom.caps.STD_DERIVATIVES) {
+                shader += "#extension GL_OES_standard_derivatives:enable\n";
+                shader += x3dom.shader.TBNCalculation();
+            } else {
+                shader += "varying vec3 fragTangent;\n";
+                shader += "varying vec3 fragBinormal;\n";
+            }
         }
 	}
 	
@@ -9912,19 +10211,23 @@ x3dom.shader.DynamicShader.prototype.generateFragmentShader = function(gl, prope
 		shader += "vec3 eye 	  = -fragPosition;\n";
 		
 		//Normalmap
-		if(properties.NORMALMAP){                
-			shader += "vec3 t = normalize( fragTangent );\n";
-			shader += "vec3 b = normalize( fragBinormal );\n";
+		if(properties.NORMALMAP){
 			shader += "vec3 n = normalize( fragNormal );\n";
-		
-			shader += "mat3 tangentToWorld = mat3(t, b, n);\n";
-		
-			shader += "normal = texture2D( normalMap, vec2(fragTexcoord.x, 1.0-fragTexcoord.y) ).rgb;\n";
-			shader += "normal = 2.0 * normal - 1.0;\n";
-			shader += "normal = normalize( normal * tangentToWorld );\n";
-			
-			shader += "normal.y = -normal.y;\n";
-			shader += "normal.x = -normal.x;\n";
+
+            if (x3dom.caps.STD_DERIVATIVES) {
+                shader += "normal = perturb_normal( n, fragPosition, vec2(fragTexcoord.x, 1.0-fragTexcoord.y) );\n";
+            } else {
+                shader += "vec3 t = normalize( fragTangent );\n";
+                shader += "vec3 b = normalize( fragBinormal );\n";
+                shader += "mat3 tangentToWorld = mat3(t, b, n);\n";
+
+                shader += "normal = texture2D( normalMap, vec2(fragTexcoord.x, 1.0-fragTexcoord.y) ).rgb;\n";
+                shader += "normal = 2.0 * normal - 1.0;\n";
+                shader += "normal = normalize( normal * tangentToWorld );\n";
+
+                shader += "normal.y = -normal.y;\n";
+                shader += "normal.x = -normal.x;\n";
+            }
 		}
 		
 		//Solid
@@ -10773,6 +11076,33 @@ x3dom.shader.PickingShader.prototype.generateVertexShader = function(gl)
 {
 	var shader = "";
 
+    var popUniforms = "";
+    var popDecoder = "";
+
+    // leave possibility to disable this stuff...
+    {
+        popUniforms +=  "uniform float popGeometry;\n" +
+                        "uniform float PG_precisionLevel;\n" +
+                        "uniform float PG_powPrecision;\n" +
+                        "uniform vec3 PG_maxBBSize;\n" +
+                        "uniform vec3 PG_bbMin;\n" +
+                        "uniform vec3 PG_bbMaxModF;\n" +
+                        "uniform vec3 PG_bboxShiftVec;\n";
+
+        popDecoder +=   "   else if (popGeometry != 0.0) {\n" +
+                        "		vec3 offsetVec = step(pos / bgPrecisionMax, PG_bbMaxModF) * PG_bboxShiftVec;\n" +
+                        "		if (PG_precisionLevel <= 2.0) {\n" +
+                        "   		pos = floor(pos / PG_powPrecision) * PG_powPrecision;\n" +
+                        "   		pos /= (65536.0 - PG_powPrecision);\n" +
+                        "		}\n" +
+                        "		else {\n" +
+                        "   		pos /= bgPrecisionMax;\n" +
+                        "		}\n" +
+                        "		pos = (pos + offsetVec + PG_bbMin) * PG_maxBBSize;\n" +
+                        "	}\n" +
+                        "   else\n";
+    }
+
     if (!x3dom.caps.MOBILE) {
         shader =    "attribute vec3 position;\n" +
                     "attribute vec2 texcoord;\n" +
@@ -10785,6 +11115,7 @@ x3dom.shader.PickingShader.prototype.generateVertexShader = function(gl)
 					"varying vec3 worldCoord;\n" +
 					"varying vec2 idCoord;\n" +
 					"uniform float writeShadowIDs;\n" +
+                    //image geometry
 					"uniform float imageGeometry;\n" +
 					"uniform vec3 IG_bboxMin;\n" +
 					"uniform vec3 IG_bboxMax;\n" +
@@ -10795,9 +11126,13 @@ x3dom.shader.PickingShader.prototype.generateVertexShader = function(gl)
 					"uniform sampler2D IG_indexTexture;\n" +
 					"uniform sampler2D IG_coordinateTexture;\n" +
 					"uniform vec2 IG_implicitMeshSize;\n" +
-					
+                    //pop geometry
+                    popUniforms +
+
 					"void main(void) {\n" +
 					"   gl_PointSize = 2.0;\n" +
+                    "   vec3 pos = position;\n" +
+
 					"   if (writeShadowIDs > 0.0) {\n" +
 					"	    idCoord = vec2((texcoord.x + writeShadowIDs) / 256.0);\n" +
     				"       idCoord.x = floor(idCoord.x) / 255.0;\n" +
@@ -10814,15 +11149,16 @@ x3dom.shader.PickingShader.prototype.generateVertexShader = function(gl)
 					"			vec2 halfPixel = vec2(0.5/IG_coordTextureWidth, 0.5/IG_coordTextureHeight);\n" +
 					"			IG_texCoord = vec2(position.x*(IG_implicitMeshSize.x/IG_coordTextureWidth), position.y*(IG_implicitMeshSize.y/IG_coordTextureHeight)) + halfPixel;\n" +
 					"		}\n" +
-					"		vec3 pos = texture2D( IG_coordinateTexture, IG_texCoord ).rgb;\n" +
+					"		pos = texture2D( IG_coordinateTexture, IG_texCoord ).rgb;\n" +
 					"	 	pos = pos * (IG_bboxMax - IG_bboxMin) + IG_bboxMin;\n" +
-					"    	worldCoord = (modelMatrix * vec4(pos, 1.0)).xyz - from;\n" +
-					"		gl_Position = modelViewProjectionMatrix * vec4(pos, 1.0);\n" +
-					"	} else {\n" +
-					"		vec3 pos = bgCenter + bgSize * position / bgPrecisionMax;\n" +
-					"		worldCoord = (modelMatrix * vec4(pos, 1.0)).xyz - from;\n" +
-					"		gl_Position = modelViewProjectionMatrix * vec4(pos, 1.0);\n" +
+                    "	} \n" +
+
+                    popDecoder +
+                    "   {\n" +
+					"		pos = bgCenter + bgSize * pos / bgPrecisionMax;\n" +
 					"	}\n" +
+                    "	worldCoord = (modelMatrix * vec4(pos, 1.0)).xyz - from;\n" +
+                    "	gl_Position = modelViewProjectionMatrix * vec4(pos, 1.0);\n" +
 					"}\n";
     }
     else {
@@ -10837,15 +11173,22 @@ x3dom.shader.PickingShader.prototype.generateVertexShader = function(gl)
                     "uniform vec3 from;\n" +
                     "varying vec3 worldCoord;\n" +
                     "varying vec2 idCoord;\n" +
+                    //pop geometry
+                    popUniforms +
                     
                     "void main(void) {\n" +
                     "    gl_PointSize = 2.0;\n" +
+                    "    vec3 pos = position;\n" +
 					"    if (writeShadowIDs > 0.0) {\n" +
 					"	    idCoord = vec2((texcoord.x + writeShadowIDs) / 256.0);\n" +
     				"       idCoord.x = floor(idCoord.x) / 255.0;\n" +
     				"       idCoord.y = fract(idCoord.y) * 1.00392156862745;\n" +
 					"	 }\n" +
-                    "    vec3 pos = bgCenter + bgSize * position / bgPrecisionMax;\n" +
+
+                    popDecoder +
+                    "	 {\n" +
+                    "       pos = bgCenter + bgSize * pos / bgPrecisionMax;\n" +
+                    "	 }\n" +
                     "    worldCoord = (modelMatrix * vec4(pos, 1.0)).xyz - from;\n" +
                     "    gl_Position = modelViewProjectionMatrix * vec4(pos, 1.0);\n" +
                     "}\n";
@@ -10867,39 +11210,39 @@ x3dom.shader.PickingShader.prototype.generateVertexShader = function(gl)
  */
 x3dom.shader.PickingShader.prototype.generateFragmentShader = function(gl)
 {
-  var shader = "#ifdef GL_FRAGMENT_PRECISION_HIGH\n";
-  shader += "precision highp float;\n";
-  shader += "#else\n";
-  shader += " precision mediump float;\n";
-  shader += "#endif\n\n";
+    var shader = "#ifdef GL_FRAGMENT_PRECISION_HIGH\n";
+    shader +=    " precision highp float;\n";
+    shader +=    "#else\n";
+    shader +=    " precision mediump float;\n";
+    shader +=    "#endif\n\n";
 
-	shader += "uniform float writeShadowIDs;\n" +
-					"uniform float highBit;\n" +
-					"uniform float lowBit;\n" +
-					"uniform float sceneSize;\n" +
-					"varying vec3 worldCoord;\n" +
-					"varying vec2 idCoord;\n" +
-					
-					"void main(void) {\n" +
-					"    vec4 col = vec4(0.0, 0.0, highBit, lowBit);\n" +
-					"    if (writeShadowIDs > 0.0) {\n" +
-    				"       col.ba = idCoord;\n" +
-					"	 }\n" +
-					"    float d = length(worldCoord) / sceneSize;\n" +
-					"    vec2 comp = fract(d * vec2(256.0, 1.0));\n" +
-					"    col.rg = comp - (comp.rr * vec2(0.0, 1.0/256.0));\n" +
-					"    gl_FragColor = col;\n" +
-					"}\n";
+    shader +=   "uniform float writeShadowIDs;\n" +
+                "uniform float highBit;\n" +
+                "uniform float lowBit;\n" +
+                "uniform float sceneSize;\n" +
+                "varying vec3 worldCoord;\n" +
+                "varying vec2 idCoord;\n" +
+
+                "void main(void) {\n" +
+                "    vec4 col = vec4(0.0, 0.0, highBit, lowBit);\n" +
+                "    if (writeShadowIDs > 0.0) {\n" +
+                "       col.ba = idCoord;\n" +
+                "	 }\n" +
+                "    float d = length(worldCoord) / sceneSize;\n" +
+                "    vec2 comp = fract(d * vec2(256.0, 1.0));\n" +
+                "    col.rg = comp - (comp.rr * vec2(0.0, 1.0/256.0));\n" +
+                "    gl_FragColor = col;\n" +
+                "}\n";
 
     var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-	gl.shaderSource(fragmentShader, shader);
+    gl.shaderSource(fragmentShader, shader);
     gl.compileShader(fragmentShader);
-		
-	if(!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)){
-		x3dom.debug.logError("[PickingShader] FragmentShader " + gl.getShaderInfoLog(fragmentShader));		
-	}
-	
-	return fragmentShader;
+
+    if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
+        x3dom.debug.logError("[PickingShader] FragmentShader " + gl.getShaderInfoLog(fragmentShader));
+    }
+
+    return fragmentShader;
 };
 
 /*
@@ -11769,15 +12112,15 @@ x3dom.shader.ShadowShader.prototype.generateVertexShader = function(gl)
 					"uniform sampler2D IG_indexTexture;\n" +
 					"uniform sampler2D IG_coordinateTexture;\n" +
 					"uniform vec2 IG_implicitMeshSize;\n" +
-					//pop geometry 
-					"uniform float popGeometry;\n" +
-					"uniform float PG_precisionLevel;\n" +
-					"uniform float PG_powPrecision;\n" +
-					"uniform vec3 PG_bbMin;\n" +
-					"uniform vec3 PG_bbMaxModF;\n" +
-					"uniform vec3 PG_bboxShiftVec;\n" +
-					"uniform float PG_numAnchorVertices;\n" +
-					"attribute float PG_vertexID;\n" +
+                    //pop geometry
+                    "uniform float popGeometry;\n" +
+                    "uniform float PG_precisionLevel;\n" +
+                    "uniform float PG_powPrecision;\n" +
+                    "uniform vec3 PG_maxBBSize;\n" +
+                    "uniform vec3 PG_bbMin;\n" +
+                    "uniform vec3 PG_bbMaxModF;\n" +
+                    "uniform vec3 PG_bboxShiftVec;\n" +
+
 					//MAIN
 					"void main(void) {\n" +
 					"	vec3 pos;\n" +
@@ -11797,16 +12140,16 @@ x3dom.shader.ShadowShader.prototype.generateVertexShader = function(gl)
 					"	 	pos = pos * (IG_bboxMax - IG_bboxMin) + IG_bboxMin;\n" +
 					"	} else if (popGeometry != 0.0){\n" +
 						//PG
-					"		pos = position;\n" +
-					"		vec3 offsetVec = step(pos / bgPrecisionMax, PG_bbMaxModF) * PG_bboxShiftVec;\n" +
-					"		if ((PG_precisionLevel <= 2.0) || PG_vertexID >= PG_numAnchorVertices) {\n" +
-					"   		pos = floor(position / PG_powPrecision) * PG_powPrecision;\n" +
-					"   		pos /= (65536.0 - PG_powPrecision);\n" +
-					"		}\n" +
-					"		else {\n" +
-					"   		pos /= bgPrecisionMax;\n" +
-					"		}\n" +
-					"		pos = (pos + offsetVec + PG_bbMin) * bgSize;\n" +
+                    "		pos = position;\n" +
+                    "		vec3 offsetVec = step(pos / bgPrecisionMax, PG_bbMaxModF) * PG_bboxShiftVec;\n" +
+                    "		if (PG_precisionLevel <= 2.0) {\n" +
+                    "   		pos = floor(pos / PG_powPrecision) * PG_powPrecision;\n" +
+                    "   		pos /= (65536.0 - PG_powPrecision);\n" +
+                    "		}\n" +
+                    "		else {\n" +
+                    "   		pos /= bgPrecisionMax;\n" +
+                    "		}\n" +
+                    "		pos = (pos + offsetVec + PG_bbMin) * PG_maxBBSize;\n" +
 					"	} else {\n" +
 						//BG
 					"		pos = bgCenter + bgSize * position / bgPrecisionMax;\n" +
@@ -12286,14 +12629,20 @@ x3dom.gfx_webgl = (function () {
                         x3dom.caps.ALIASED_LINE_WIDTH_RANGE = ctx.getParameter(ctx.ALIASED_LINE_WIDTH_RANGE);
                         x3dom.caps.ALIASED_POINT_SIZE_RANGE = ctx.getParameter(ctx.ALIASED_POINT_SIZE_RANGE);
                         x3dom.caps.SAMPLES = ctx.getParameter(ctx.SAMPLES);
+                        x3dom.caps.INDEX_UINT = ctx.getExtension("OES_element_index_uint");
                         x3dom.caps.FP_TEXTURES = ctx.getExtension("OES_texture_float");
                         x3dom.caps.FPL_TEXTURES = ctx.getExtension("OES_texture_float_linear");
+                        x3dom.caps.STD_DERIVATIVES = ctx.getExtension("OES_standard_derivatives");
                         x3dom.caps.EXTENSIONS = ctx.getSupportedExtensions();
 
                         x3dom.debug.logInfo("\nVendor: " + x3dom.caps.VENDOR + ", " +
                             "Renderer: " + x3dom.caps.RENDERER + ", " + "Version: " + x3dom.caps.VERSION + ", " +
                             "ShadingLangV.: " + x3dom.caps.SHADING_LANGUAGE_VERSION
                             + ", MSAA samples: " + x3dom.caps.SAMPLES + "\nExtensions: " + x3dom.caps.EXTENSIONS);
+
+                        if (x3dom.caps.INDEX_UINT) {
+                            x3dom.Utils.maxIndexableCoords = 4294967295;
+                        }
 
                         x3dom.caps.MOBILE = (function (a) {
                             return (/android.+mobile|avantgo|bada\/|blackberry|blazer|compal|elaine|fennec|hiptop|iemobile|ip(hone|od)|iris|kindle|lge |maemo|midp|mmp|opera m(ob|in)i|palm( os)?|phone|p(ixi|re)\/|plucker|pocket|psp|symbian|treo|up\.(browser|link)|vodafone|wap|windows (ce|phone)|xda|xiino/i.test(a) || /1207|6310|6590|3gso|4thp|50[1-6]i|770s|802s|a wa|abac|ac(er|oo|s\-)|ai(ko|rn)|al(av|ca|co)|amoi|an(ex|ny|yw)|aptu|ar(ch|go)|as(te|us)|attw|au(di|\-m|r |s )|avan|be(ck|ll|nq)|bi(lb|rd)|bl(ac|az)|br(e|v)w|bumb|bw\-(n|u)|c55\/|capi|ccwa|cdm\-|cell|chtm|cldc|cmd\-|co(mp|nd)|craw|da(it|ll|ng)|dbte|dc\-s|devi|dica|dmob|do(c|p)o|ds(12|\-d)|el(49|ai)|em(l2|ul)|er(ic|k0)|esl8|ez([4-7]0|os|wa|ze)|fetc|fly(\-|_)|g1 u|g560|gene|gf\-5|g\-mo|go(\.w|od)|gr(ad|un)|haie|hcit|hd\-(m|p|t)|hei\-|hi(pt|ta)|hp( i|ip)|hs\-c|ht(c(\-| |_|a|g|p|s|t)|tp)|hu(aw|tc)|i\-(20|go|ma)|i230|iac( |\-|\/)|ibro|idea|ig01|ikom|im1k|inno|ipaq|iris|ja(t|v)a|jbro|jemu|jigs|kddi|keji|kgt( |\/)|klon|kpt |kwc\-|kyo(c|k)|le(no|xi)|lg( g|\/(k|l|u)|50|54|e\-|e\/|\-[a-w])|libw|lynx|m1\-w|m3ga|m50\/|ma(te|ui|xo)|mc(01|21|ca)|m\-cr|me(di|rc|ri)|mi(o8|oa|ts)|mmef|mo(01|02|bi|de|do|t(\-| |o|v)|zz)|mt(50|p1|v )|mwbp|mywa|n10[0-2]|n20[2-3]|n30(0|2)|n50(0|2|5)|n7(0(0|1)|10)|ne((c|m)\-|on|tf|wf|wg|wt)|nok(6|i)|nzph|o2im|op(ti|wv)|oran|owg1|p800|pan(a|d|t)|pdxg|pg(13|\-([1-8]|c))|phil|pire|pl(ay|uc)|pn\-2|po(ck|rt|se)|prox|psio|pt\-g|qa\-a|qc(07|12|21|32|60|\-[2-7]|i\-)|qtek|r380|r600|raks|rim9|ro(ve|zo)|s55\/|sa(ge|ma|mm|ms|ny|va)|sc(01|h\-|oo|p\-)|sdk\/|se(c(\-|0|1)|47|mc|nd|ri)|sgh\-|shar|sie(\-|m)|sk\-0|sl(45|id)|sm(al|ar|b3|it|t5)|so(ft|ny)|sp(01|h\-|v\-|v )|sy(01|mb)|t2(18|50)|t6(00|10|18)|ta(gt|lk)|tcl\-|tdg\-|tel(i|m)|tim\-|t\-mo|to(pl|sh)|ts(70|m\-|m3|m5)|tx\-9|up(\.b|g1|si)|utst|v400|v750|veri|vi(rg|te)|vk(40|5[0-3]|\-v)|vm40|voda|vulc|vx(52|53|60|61|70|80|81|83|85|98)|w3c(\-| )|webc|whit|wi(g |nc|nw)|wmlb|wonu|x700|xda(\-|2|g)|yas\-|your|zeto|zte\-/i.test(a.substr(0, 4)))
@@ -12439,7 +12788,15 @@ x3dom.gfx_webgl = (function () {
                             indicesBuffer = gl.createBuffer();
                             shape._webgl.buffers[q5] = indicesBuffer;
 
-                            indexArray = new Uint16Array(shape._webgl.indexes[q]);
+                            // explicitly check first positions array for consistency
+                            if (x3dom.caps.INDEX_UINT && (geoNode._mesh._positions[0].length / 3 > 65535)) {
+                                indexArray = new Uint32Array(shape._webgl.indexes[q]);
+                                shape._webgl.indexType = gl.UNSIGNED_INT;
+                            }
+                            else {
+                                indexArray = new Uint16Array(shape._webgl.indexes[q]);
+                                shape._webgl.indexType = gl.UNSIGNED_SHORT;
+                            }
 
                             gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indicesBuffer);
                             gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indexArray, gl.STATIC_DRAW);
@@ -12615,7 +12972,7 @@ x3dom.gfx_webgl = (function () {
 
                         if (sp.position !== undefined) {
                             gl.deleteBuffer(this._webgl.buffers[q5 + 1]);
-                            gl.deleteBuffer(this._webgl.buffers[q5  ]);
+                            gl.deleteBuffer(this._webgl.buffers[q5]);
                         }
 
                         if (sp.normal !== undefined) {
@@ -12642,8 +12999,12 @@ x3dom.gfx_webgl = (function () {
                     if (delGL === undefined)
                         delGL = true;
 
-                    if (delGL)
+                    if (delGL) {
                         delete this._webgl;
+
+                        // be optimistic, one shape removed makes room for another one
+                        x3dom.BinaryContainerLoader.outOfMemory = false;
+                    }
                 }
             };  // shape._cleanupGLObjects()
         }
@@ -12657,6 +13018,7 @@ x3dom.gfx_webgl = (function () {
             indexes: geoNode._mesh._indices,
             //indicesBuffer,positionBuffer,normalBuffer,texcBuffer,colorBuffer
             //buffers: [{},{},{},{},{}],
+            indexType: gl.UNSIGNED_SHORT,
             coordType: gl.FLOAT,
             normalType: gl.FLOAT,
             texCoordType: gl.FLOAT,
@@ -12688,54 +13050,18 @@ x3dom.gfx_webgl = (function () {
         shape._webgl.dynamicFields = [];
 
         //Set Geometry Primitive Type
-        if (x3dom.isa(geoNode, x3dom.nodeTypes.PointSet) ||
-            x3dom.isa(geoNode, x3dom.nodeTypes.Polypoint2D))
-        {
-            shape._webgl.primType = gl.POINTS;
-        }
-        else if (x3dom.isa(geoNode, x3dom.nodeTypes.IndexedLineSet) ||
-                 x3dom.isa(geoNode, x3dom.nodeTypes.Circle2D) ||
-                 x3dom.isa(geoNode, x3dom.nodeTypes.Arc2D) ||
-                 x3dom.isa(geoNode, x3dom.nodeTypes.Polyline2D))
-        {
-            shape._webgl.primType = gl.LINES;
-        }
-        else if (x3dom.isa(geoNode, x3dom.nodeTypes.IndexedTriangleStripSet) &&
-                 geoNode._mesh._primType.toUpperCase() == 'TRIANGLESTRIP')
-        {
-            shape._webgl.primType = gl.TRIANGLE_STRIP;
-        }
-        else if (x3dom.isa(geoNode, x3dom.nodeTypes.ImageGeometry) ||
-                 x3dom.isa(geoNode, x3dom.nodeTypes.BinaryGeometry) ||
-                 x3dom.isa(geoNode, x3dom.nodeTypes.PopGeometry) ||
-                 x3dom.isa(geoNode, x3dom.nodeTypes.BitLODGeometry) ||
-                 x3dom.isa(geoNode, x3dom.nodeTypes.Plane))
+        if (x3dom.isa(geoNode, x3dom.nodeTypes.X3DBinaryContainerGeometryNode))
         {
             shape._webgl.primType = [];
 
             for (var primCnt = 0; primCnt < geoNode._vf.primType.length; ++primCnt)
             {
-                switch (geoNode._vf.primType[primCnt].toUpperCase())
-                {
-                    case 'POINTS':
-                        shape._webgl.primType.push(gl.POINTS);
-                        break;
-                    case 'LINES':
-                        shape._webgl.primType.push(gl.LINES);
-                        break;
-                    case 'TRIANGLESTRIP':
-                        shape._webgl.primType.push(gl.TRIANGLE_STRIP);
-                        break;
-                    case 'TRIANGLES':
-                    default:
-                        shape._webgl.primType.push(gl.TRIANGLES);
-                        break;
-                }
+                shape._webgl.primType.push(x3dom.Utils.primTypeDic(gl, geoNode._vf.primType[primCnt]));
             }
         }
         else
         {
-            shape._webgl.primType = gl.TRIANGLES;
+            shape._webgl.primType = x3dom.Utils.primTypeDic(gl, geoNode._mesh._primType);
         }
 
         // Binary container geometries need special handling
@@ -12766,7 +13092,15 @@ x3dom.gfx_webgl = (function () {
                     indicesBuffer = gl.createBuffer();
                     shape._webgl.buffers[q5] = indicesBuffer;
 
-                    indexArray = new Uint16Array(shape._webgl.indexes[q]);
+                    // explicitly check first positions array for consistency
+                    if (x3dom.caps.INDEX_UINT && (shape._webgl.positions[0].length / 3 > 65535)) {
+                        indexArray = new Uint32Array(shape._webgl.indexes[q]);
+                        shape._webgl.indexType = gl.UNSIGNED_INT;
+                    }
+                    else {
+                        indexArray = new Uint16Array(shape._webgl.indexes[q]);
+                        shape._webgl.indexType = gl.UNSIGNED_SHORT;
+                    }
 
                     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indicesBuffer);
                     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indexArray, gl.STATIC_DRAW);
@@ -13025,22 +13359,25 @@ x3dom.gfx_webgl = (function () {
 
                 tmp.reverse();
 
+                var alpha = Math.floor((1.0 - bgnd.getTransparency()) * 255);
+
                 for (i = 0; i < tmp.length; i++) {
-                    arr[3 * i + 0] = Math.floor(tmp[i].r * 255);
-                    arr[3 * i + 1] = Math.floor(tmp[i].g * 255);
-                    arr[3 * i + 2] = Math.floor(tmp[i].b * 255);
+                    arr.push(Math.floor(tmp[i].r * 255),
+                             Math.floor(tmp[i].g * 255),
+                             Math.floor(tmp[i].b * 255),
+                             alpha);
                 }
 
                 var pixels = new Uint8Array(arr);
-                var format = gl.RGB;
+                var format = gl.RGBA;
 
-                N = (pixels.length) / 3;
+                N = pixels.length / 4;
 
                 gl.bindTexture(gl.TEXTURE_2D, texture);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 
                 gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
                 gl.texImage2D(gl.TEXTURE_2D, 0, format, 1, N, 0, format, gl.UNSIGNED_BYTE, pixels);
@@ -13049,7 +13386,7 @@ x3dom.gfx_webgl = (function () {
                 bgnd._webgl.shader = this.cache.getShader(gl, x3dom.shader.BACKGROUND_SKYTEXTURE);
             }
             else {
-                // TODO; impl. gradient bg etc., e.g. via canvas 2d?
+                // Impl. gradient bg etc., e.g. via canvas 2d? But can be done via CSS anyway...
                 bgnd._webgl = {};
             }
         }
@@ -13099,6 +13436,8 @@ x3dom.gfx_webgl = (function () {
         bgnd._webgl.render = function (gl, mat_view, mat_proj)
         {
             var sp = bgnd._webgl.shader;
+            var alpha = 1.0 - bgnd.getTransparency();
+
             var mat_scene = null;
             var projMatrix_22 = mat_proj._22,
                 projMatrix_23 = mat_proj._23;
@@ -13107,6 +13446,7 @@ x3dom.gfx_webgl = (function () {
             if ((sp !== undefined && sp !== null) &&
                 (sp.texcoord !== undefined && sp.texcoord !== null) &&
                 (bgnd._webgl.texture !== undefined && bgnd._webgl.texture !== null)) {
+                gl.clearColor(0, 0, 0, alpha);
                 gl.clearDepth(1.0);
                 gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
 
@@ -13120,7 +13460,6 @@ x3dom.gfx_webgl = (function () {
                 if (!sp.tex) {
                     sp.tex = 0;
                 }
-                sp.alpha = 1.0;
 
                 // adapt projection matrix to better near/far
                 mat_proj._22 = 100001 / 99999;
@@ -13143,8 +13482,8 @@ x3dom.gfx_webgl = (function () {
                 gl.activeTexture(gl.TEXTURE0);
                 gl.bindTexture(gl.TEXTURE_2D, bgnd._webgl.texture);
 
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
@@ -13166,19 +13505,19 @@ x3dom.gfx_webgl = (function () {
                 gl.disableVertexAttribArray(sp.position);
                 gl.disableVertexAttribArray(sp.texcoord);
 
-                gl.clear(gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
+                gl.clear(gl.DEPTH_BUFFER_BIT);
             }
             else if (!sp || !bgnd._webgl.texture ||
-                (bgnd._webgl.texture.textureCubeReady !== undefined &&
-                    bgnd._webgl.texture.textureCubeReady !== true)) {
+                    (bgnd._webgl.texture.textureCubeReady !== undefined &&
+                     bgnd._webgl.texture.textureCubeReady !== true)) {
                 var bgCol = bgnd.getSkyColor().toGL();
-                bgCol[3] = 1.0 - bgnd.getTransparency();
 
-                gl.clearColor(bgCol[0], bgCol[1], bgCol[2], bgCol[3]);
+                gl.clearColor(bgCol[0], bgCol[1], bgCol[2], alpha);
                 gl.clearDepth(1.0);
                 gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
             }
             else {
+                gl.clearColor(0, 0, 0, alpha);
                 gl.clearDepth(1.0);
                 gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
 
@@ -13215,17 +13554,17 @@ x3dom.gfx_webgl = (function () {
                     gl.activeTexture(gl.TEXTURE0);
                     gl.bindTexture(gl.TEXTURE_CUBE_MAP, bgnd._webgl.texture);
 
-                    gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-                    gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
                     gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
                     gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+                    gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                    gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
                 }
                 else {
                     gl.activeTexture(gl.TEXTURE0);
                     gl.bindTexture(gl.TEXTURE_2D, bgnd._webgl.texture);
 
-                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
                     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
                     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
                     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
                 }
@@ -13239,16 +13578,15 @@ x3dom.gfx_webgl = (function () {
 
                 gl.disableVertexAttribArray(sp.position);
 
+                gl.activeTexture(gl.TEXTURE0);
                 if (bgnd._webgl.texture.textureCubeReady) {
-                    gl.activeTexture(gl.TEXTURE0);
                     gl.bindTexture(gl.TEXTURE_CUBE_MAP, null);
                 }
                 else {
-                    gl.activeTexture(gl.TEXTURE0);
                     gl.bindTexture(gl.TEXTURE_2D, null);
                 }
 
-                gl.clear(gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
+                gl.clear(gl.DEPTH_BUFFER_BIT);
             }
         };
     };
@@ -13320,8 +13658,8 @@ x3dom.gfx_webgl = (function () {
             gl.activeTexture(gl.TEXTURE0);
             gl.bindTexture(gl.TEXTURE_2D, scene._fgnd._webgl.texture);
 
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
@@ -13344,7 +13682,7 @@ x3dom.gfx_webgl = (function () {
     /*****************************************************************************
      * Render Shadow-Pass
      *****************************************************************************/
-    Context.prototype.renderShadowPass = function (gl, viewarea, mat_scene, mat_view, targetFbo, offset, isCameraView)
+    Context.prototype.renderShadowPass = function (gl, viewarea, mat_scene, mat_view, targetFbo, camOffset, isCameraView)
     {
         var scene = viewarea._scene;
         var sp = scene._webgl.shadowShader;
@@ -13355,7 +13693,17 @@ x3dom.gfx_webgl = (function () {
         this.stateManager.useProgram(sp);
 
         sp.cameraView = isCameraView;
-        sp.offset = offset;
+        sp.offset = camOffset;
+
+        // workaround for old graphics cards/ drivers
+        {
+            sp.PG_precisionLevel = 1.0;
+            sp.PG_powPrecision = 1.0;
+            sp.PG_maxBBSize = [0, 0, 0];
+            sp.PG_bbMin = [0, 0, 0];
+            sp.PG_bbMaxModF = [0, 0, 0];
+            sp.PG_bboxShiftVec = [0, 0, 0];
+        }
 
         gl.clearColor(1.0, 1.0, 1.0, 0.0);
         gl.clearDepth(1.0);
@@ -13366,19 +13714,23 @@ x3dom.gfx_webgl = (function () {
         this.stateManager.enable(gl.CULL_FACE);
         this.stateManager.disable(gl.BLEND);
 
-        var bgCenter = new x3dom.fields.SFVec3f(0, 0, 0).toGL();
-        var bgSize = new x3dom.fields.SFVec3f(1, 1, 1).toGL();
+        var bgCenter = x3dom.fields.SFVec3f.NullVector.toGL();
+        var bgSize = x3dom.fields.SFVec3f.OneVector.toGL();
+
+        var env = scene.getEnvironment();
+        var excludeTrans = env._vf.shadowExcludeTransparentObjects;
 
         var i, n = scene.drawableCollection.length;
 
-        for (i = 0; i < n; i++) {
+        for (i = 0; i < n; i++)
+        {
             var drawable = scene.drawableCollection.get(i);
             var trafo = drawable.transform;
             var shape = drawable.shape;
 
             var s_gl = shape._webgl;
 
-            if (!s_gl) {
+            if (!s_gl || (excludeTrans && drawable.sortType == 'transparent')) {
                 continue;
             }
 
@@ -13392,8 +13744,7 @@ x3dom.gfx_webgl = (function () {
             sp.popGeometry = s_gl.popGeometry;
 
             if (s_gl.coordType != gl.FLOAT) {
-                if (s_gl.bitLODGeometry != 0 || s_gl.popGeometry != 0 ||
-                    (s_msh._numPosComponents == 4 && x3dom.Utils.isUnsignedType(s_geo._vf.coordType))) {
+                if (!s_gl.popGeometry && (s_gl.bitLODGeometry || x3dom.Utils.isUnsignedType(s_geo._vf.coordType))) {
                     sp.bgCenter = s_geo.getMin().toGL();
                 }
                 else {
@@ -13457,12 +13808,25 @@ x3dom.gfx_webgl = (function () {
                         sp.IG_indexTexture = texUnit++;
                     }
                 }
-
                 if (s_geo.getCoordinateTexture(0)) {
                     if (!sp.IG_coordinateTexture) {
                         sp.IG_coordinateTexture = texUnit++;
                     }
                 }
+            }
+
+            if (shape.isSolid()) {
+                this.stateManager.enable(gl.CULL_FACE);
+
+                if (shape.isCCW()) {
+                    this.stateManager.frontFace(gl.CCW);
+                }
+                else {
+                    this.stateManager.frontFace(gl.CW);
+                }
+            }
+            else {
+                this.stateManager.disable(gl.CULL_FACE);
             }
 
             //PopGeometry: adapt LOD and set shader variables
@@ -13475,94 +13839,65 @@ x3dom.gfx_webgl = (function () {
             //== end== code stolen from picking pass
             for (var q = 0, q_n = s_gl.positions.length; q < q_n; q++) {
                 var q5 = 5 * q;
-                var v, v_n, off;
+                var v, v_n, offset;
 
+                if ( !(sp.position !== undefined && s_gl.buffers[q5 + 1] && s_gl.indexes[q]) )
+                    continue;
+
+                // set buffers
                 if (s_gl.buffers[q5]) {
                     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, s_gl.buffers[q5]);
                 }
-                if (sp.position !== undefined && s_gl.buffers[q5 + 1]) {
-                    gl.bindBuffer(gl.ARRAY_BUFFER, s_gl.buffers[q5 + 1]);
 
-                    gl.vertexAttribPointer(sp.position,
-                        s_msh._numPosComponents, s_gl.coordType, false,
-                        shape._coordStrideOffset[0], shape._coordStrideOffset[1]);
-                    gl.enableVertexAttribArray(sp.position);
+                gl.bindBuffer(gl.ARRAY_BUFFER, s_gl.buffers[q5 + 1]);
+
+                gl.vertexAttribPointer(sp.position,
+                    s_msh._numPosComponents, s_gl.coordType, false,
+                    shape._coordStrideOffset[0], shape._coordStrideOffset[1]);
+                gl.enableVertexAttribArray(sp.position);
+
+                if (s_gl.binaryGeometry > 0 || s_gl.popGeometry > 0 || s_gl.bitLODGeometry > 0) {
+                    for (v = 0, offset = 0, v_n = s_geo._vf.vertexCount.length; v < v_n; v++) {
+                        gl.drawElements(s_gl.primType[v], s_geo._vf.vertexCount[v], s_gl.indexType,
+                                        x3dom.Utils.getByteAwareOffset(offset, s_gl.indexType, gl));
+                        offset += s_geo._vf.vertexCount[v];
+                    }
                 }
-
-                if (s_gl.popGeometry !== 0 && s_gl.buffers[q5 + 5]) {
-                    //special case: mimic gl_VertexID
-                    gl.bindBuffer(gl.ARRAY_BUFFER, s_gl.buffers[q5 + 5]);
-
-                    gl.vertexAttribPointer(sp.PG_vertexID, 1, gl.FLOAT, false, 4, 0);
-                    gl.enableVertexAttribArray(sp.PG_vertexID);
-                }
-
-                if (shape.isSolid()) {
-                    this.stateManager.enable(gl.CULL_FACE);
-
-                    if (shape.isCCW()) {
-                        this.stateManager.frontFace(gl.CCW);
+                else if (s_gl.binaryGeometry < 0 || s_gl.popGeometry < 0 || s_gl.bitLODGeometry < 0 || s_gl.imageGeometry) {
+                    if (s_gl.bitLODtotalVertexCount !== undefined) {
+                        gl.drawArrays(gl.TRIANGLES, 0, s_gl.bitLODtotalVertexCount);
                     }
                     else {
-                        this.stateManager.frontFace(gl.CW);
+                        for (v = 0, offset = 0, v_n = s_geo._vf.vertexCount.length; v < v_n; v++) {
+                            gl.drawArrays(s_gl.primType[v], offset, s_geo._vf.vertexCount[v]);
+                            offset += s_geo._vf.vertexCount[v];
+                        }
                     }
+                }
+                else if (s_geo.hasIndexOffset()) {
+                    var indOff = shape.tessellationProperties();
+                    for (v = 0, v_n = indOff.length; v < v_n; v++) {
+                        gl.drawElements(s_gl.primType, indOff[v].count, s_gl.indexType,
+                            indOff[v].offset * x3dom.Utils.getOffsetMultiplier(s_gl.indexType, gl));
+                    }
+                }
+                else if (s_gl.indexes[q].length == 0) {
+                    gl.drawArrays(s_gl.primType, 0, s_gl.positions[q].length / 3);
                 }
                 else {
-                    this.stateManager.disable(gl.CULL_FACE);
+                    gl.drawElements(s_gl.primType, s_gl.indexes[q].length, s_gl.indexType, 0);
                 }
 
-                if (s_gl.indexes && s_gl.indexes[q5]) {
-                    if (s_gl.imageGeometry != 0 || s_gl.binaryGeometry < 0 || s_gl.popGeometry < 0 || s_gl.bitLODGeometry < 0) {
-                        if (s_gl.bitLODGeometry != 0 && s_geo._vf.normalPerVertex === false) {
-                            var totalVertexCount = 0;
-                            for (v = 0, v_n = s_geo._vf.vertexCount.length; v < v_n; v++) {
-                                if (s_gl.primType[v] == gl.TRIANGLES) {
-                                    totalVertexCount += s_geo._vf.vertexCount[v];
-                                }
-                                else if (s_gl.primType[v] == gl.TRIANGLE_STRIP) {
-                                    totalVertexCount += (s_geo._vf.vertexCount[v] - 2) * 3;
-                                }
-                            }
-                            gl.drawArrays(gl.TRIANGLES, 0, totalVertexCount);
-                        }
-                        else {
-                            for (v = 0, off = 0, v_n = s_geo._vf.vertexCount.length; v < v_n; v++) {
-                                gl.drawArrays(s_gl.primType[v], off, s_geo._vf.vertexCount[v]);
-                                off += s_geo._vf.vertexCount[v];
-                            }
-                        }
-                    }
-                    else if (s_gl.binaryGeometry > 0 || s_gl.popGeometry > 0 || s_gl.bitLODGeometry > 0) {
-                        for (v = 0, off = 0, v_n = s_geo._vf.vertexCount.length; v < v_n; v++) {
-                            gl.drawElements(s_gl.primType[v], s_geo._vf.vertexCount[v], gl.UNSIGNED_SHORT, 2 * off);
-                            off += s_geo._vf.vertexCount[v];
-                        }
-                    }
-                    else if (s_geo.hasIndexOffset()) {
-                        // IndexedTriangleStripSet with primType TRIANGLE_STRIP,
-                        // and Patch geometry from external BVHRefiner component
-                        var indOff = shape.tessellationProperties();
-                        for (v = 0, v_n = indOff.length; v < v_n; v++) {
-                            gl.drawElements(s_gl.primType, indOff[v].count, gl.UNSIGNED_SHORT, indOff[v].offset);
-                        }
-                    }
-                    else {
-                        gl.drawElements(s_gl.primType, s_gl.indexes[q5].length, gl.UNSIGNED_SHORT, 0);
-                    }
-                }
+                gl.disableVertexAttribArray(sp.position);
+            }
 
-                //Clean Texture units for IG
-                if (s_gl.imageGeometry != 0 && !x3dom.caps.MOBILE) {
-                    gl.activeTexture(gl.TEXTURE0);
+            //Clean Texture units for IG
+            if (s_gl.imageGeometry != 0 && !x3dom.caps.MOBILE) {
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_2D, null);
+                if (s_gl.imageGeometry == 1) {
+                    gl.activeTexture(gl.TEXTURE1);
                     gl.bindTexture(gl.TEXTURE_2D, null);
-                    if (s_gl.imageGeometry == 1) {
-                        gl.activeTexture(gl.TEXTURE1);
-                        gl.bindTexture(gl.TEXTURE_2D, null);
-                    }
-                }
-
-                if (sp.position !== undefined && s_gl.buffers[q5 + 1]) {
-                    gl.disableVertexAttribArray(sp.position);
                 }
             }
         }
@@ -13577,59 +13912,75 @@ x3dom.gfx_webgl = (function () {
     Context.prototype.renderPickingPass = function (gl, scene, mat_view, mat_scene, from, sceneSize,
                                                     pickMode, lastX, lastY, width, height)
     {
-        this.stateManager.bindFramebuffer(gl.FRAMEBUFFER, scene._webgl.fboPick.fbo);
+        var ps = scene._webgl.pickScale;
+        var bufHeight = scene._webgl.fboPick.height;
+        var x = lastX * ps;
+        var y = (bufHeight - 1) - lastY * ps;
+        var sp = null;
 
-        this.stateManager.viewport(0, 0, scene._webgl.fboPick.width, scene._webgl.fboPick.height);
+        switch (pickMode) {
+            case 0: sp = scene._webgl.pickShader;         break;
+            case 1: sp = scene._webgl.pickColorShader;    break;
+            case 2: sp = scene._webgl.pickTexCoordShader; break;
+            case 3: sp = scene._webgl.pickShader24;       break;
+            case 4: sp = scene._webgl.pickShaderId;       break;
+            default: break;
+        }
+        if (!sp) {   // error
+            return;
+        }
+
+        this.stateManager.bindFramebuffer(gl.FRAMEBUFFER, scene._webgl.fboPick.fbo);
+        this.stateManager.viewport(0, 0, scene._webgl.fboPick.width, bufHeight);
+
+        //gl.scissor(x, y, width, height);
+        //gl.enable(gl.SCISSOR_TEST);
 
         gl.clearColor(0.0, 0.0, 0.0, 0.0);
         gl.clearDepth(1.0);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        var viewarea = scene.drawableCollection.viewarea;
+        var env = scene.getEnvironment();
+        var n = scene.drawableCollection.length;
+
+        if (env._vf.smallFeatureCulling && env._lowPriorityThreshold < 1 && viewarea.isMoving()) {
+            n = Math.floor(n * env._lowPriorityThreshold);
+            if (!n && scene.drawableCollection.length)
+                n = 1;   // render at least one object
+        }
+
+        var bgCenter = x3dom.fields.SFVec3f.NullVector.toGL();
+        var bgSize = x3dom.fields.SFVec3f.OneVector.toGL();
 
         this.stateManager.depthFunc(gl.LEQUAL);
         this.stateManager.enable(gl.DEPTH_TEST);
         this.stateManager.enable(gl.CULL_FACE);
         this.stateManager.disable(gl.BLEND);
 
-        var sp = null;
-
-        switch (pickMode) {
-            case 0:
-                sp = scene._webgl.pickShader;
-                break;
-            case 1:
-                sp = scene._webgl.pickColorShader;
-                break;
-            case 2:
-                sp = scene._webgl.pickTexCoordShader;
-                break;
-            case 3:
-                sp = scene._webgl.pickShader24;
-                break;
-            case 4:
-                sp = scene._webgl.pickShaderId;
-                break;
-            default:
-                break;
-        }
-
-        if (!sp) {  // error
-            return;
-        }
-
         this.stateManager.useProgram(sp);
 
-        var bgCenter = new x3dom.fields.SFVec3f(0, 0, 0).toGL();
-        var bgSize = new x3dom.fields.SFVec3f(1, 1, 1).toGL();
+        // workaround for old graphics cards/ drivers
+        if (pickMode == 0)  //pop geo only here impl.
+        {
+            sp.PG_precisionLevel = 1.0;
+            sp.PG_powPrecision = 1.0;
+            sp.PG_maxBBSize = [0, 0, 0];
+            sp.PG_bbMin = [0, 0, 0];
+            sp.PG_bbMaxModF = [0, 0, 0];
+            sp.PG_bboxShiftVec = [0, 0, 0];
+        }
 
-        gl.lineWidth(2);    // bigger lines for better picking
+        this.stateManager.lineWidth(2);     // bigger lines for better picking
 
-        for (var i = 0, n = scene.drawableCollection.length; i < n; i++) {
+        for (var i = 0; i < n; i++)
+        {
             var drawable = scene.drawableCollection.get(i);
             var trafo = drawable.transform;
             var shape = drawable.shape;
             var s_gl = shape._webgl;
 
-            if (shape._objectID < 1 || !s_gl || !shape._vf.isPickable) {
+            if (!s_gl || shape._objectID < 1 || !shape._vf.isPickable) {
                 continue;
             }
 
@@ -13639,7 +13990,7 @@ x3dom.gfx_webgl = (function () {
             sp.modelMatrix = trafo.toGL();
             sp.modelViewProjectionMatrix = mat_scene.mult(trafo).toGL();
 
-            sp.lowBit = (shape._objectID & 255) / 255.0;
+            sp.lowBit  = (shape._objectID & 255) / 255.0;
             sp.highBit = (shape._objectID >>> 8) / 255.0;
 
             sp.from = from.toGL();
@@ -13647,17 +13998,19 @@ x3dom.gfx_webgl = (function () {
 
             //Set ImageGeometry switch
             sp.imageGeometry = s_gl.imageGeometry;
+            sp.popGeometry = s_gl.popGeometry;
 
             // Set IDs perVertex switch
             sp.writeShadowIDs = (s_gl.binaryGeometry != 0 && s_geo._vf.idsPerVertex) ?
-                (x3dom.nodeTypes.Shape.objectID + 2) : 0;
+                                (x3dom.nodeTypes.Shape.objectID + 2) : 0;
 
             if (s_gl.coordType != gl.FLOAT) {
-                if (s_gl.bitLODGeometry != 0 || s_gl.popGeometry != 0 ||
-                    (s_msh._numPosComponents == 4 && x3dom.Utils.isUnsignedType(s_geo._vf.coordType)))
+                if (!s_gl.popGeometry && (s_gl.bitLODGeometry || x3dom.Utils.isUnsignedType(s_geo._vf.coordType))) {
                     sp.bgCenter = s_geo.getMin().toGL();
-                else
+                }
+                else {
                     sp.bgCenter = s_geo._vf.position.toGL();
+                }
                 sp.bgSize = s_geo._vf.size.toGL();
                 sp.bgPrecisionMax = s_geo.getPrecisionMax('coordType');
             }
@@ -13714,7 +14067,6 @@ x3dom.gfx_webgl = (function () {
                         sp.IG_indexTexture = texUnit++;
                     }
                 }
-
                 if (s_geo.getCoordinateTexture(0)) {
                     if (!sp.IG_coordinateTexture) {
                         sp.IG_coordinateTexture = texUnit++;
@@ -13722,21 +14074,48 @@ x3dom.gfx_webgl = (function () {
                 }
             }
 
+            if (shape.isSolid()) {
+                this.stateManager.enable(gl.CULL_FACE);
+
+                if (shape.isCCW()) {
+                    this.stateManager.frontFace(gl.CCW);
+                }
+                else {
+                    this.stateManager.frontFace(gl.CW);
+                }
+            }
+            else {
+                this.stateManager.disable(gl.CULL_FACE);
+            }
+
+            //PopGeometry: adapt LOD and set shader variables
+            if (s_gl.popGeometry) {
+                var model_view = mat_view.mult(trafo);
+                // FIXME; viewarea's width/height twice as big as render buffer size, which leads to too high precision
+                // the correct viewarea here would be one that holds this half-sized render buffer
+                this.updatePopState(drawable, s_geo, sp, s_gl, scene, model_view, viewarea, this.x3dElem.runtime.fps);
+            }
+
+
             for (var q = 0, q_n = s_gl.positions.length; q < q_n; q++) {
                 var q5 = 5 * q;
                 var v, v_n, offset;
 
+                if ( !(sp.position !== undefined && s_gl.buffers[q5 + 1] && s_gl.indexes[q]) )
+                    continue;
+
+                // set buffers
                 if (s_gl.buffers[q5]) {
                     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, s_gl.buffers[q5]);
                 }
-                if (sp.position !== undefined && s_gl.buffers[q5 + 1]) {
-                    gl.bindBuffer(gl.ARRAY_BUFFER, s_gl.buffers[q5 + 1]);
 
-                    gl.vertexAttribPointer(sp.position,
-                        s_msh._numPosComponents, s_gl.coordType, false,
-                        shape._coordStrideOffset[0], shape._coordStrideOffset[1]);
-                    gl.enableVertexAttribArray(sp.position);
-                }
+                gl.bindBuffer(gl.ARRAY_BUFFER, s_gl.buffers[q5 + 1]);
+
+                gl.vertexAttribPointer(sp.position,
+                    s_msh._numPosComponents, s_gl.coordType, false,
+                    shape._coordStrideOffset[0], shape._coordStrideOffset[1]);
+                gl.enableVertexAttribArray(sp.position);
+
                 if (sp.texcoord !== undefined && s_gl.buffers[q5 + 3]) {
                     gl.bindBuffer(gl.ARRAY_BUFFER, s_gl.buffers[q5 + 3]);
 
@@ -13754,77 +14133,41 @@ x3dom.gfx_webgl = (function () {
                     gl.enableVertexAttribArray(sp.color);
                 }
 
-                if (shape.isSolid()) {
-                    this.stateManager.enable(gl.CULL_FACE);
-
-                    if (shape.isCCW()) {
-                        this.stateManager.frontFace(gl.CCW);
+                // render mesh
+                if (s_gl.binaryGeometry > 0 || s_gl.popGeometry > 0 || s_gl.bitLODGeometry > 0) {
+                    for (v = 0, offset = 0, v_n = s_geo._vf.vertexCount.length; v < v_n; v++) {
+                        gl.drawElements(s_gl.primType[v], s_geo._vf.vertexCount[v], s_gl.indexType,
+                                        x3dom.Utils.getByteAwareOffset(offset, s_gl.indexType, gl));
+                        offset += s_geo._vf.vertexCount[v];
+                    }
+                }
+                else if (s_gl.binaryGeometry < 0 || s_gl.popGeometry < 0 || s_gl.bitLODGeometry < 0 || s_gl.imageGeometry) {
+                    if (s_gl.bitLODtotalVertexCount !== undefined) {
+                        gl.drawArrays(gl.TRIANGLES, 0, s_gl.bitLODtotalVertexCount);
                     }
                     else {
-                        this.stateManager.frontFace(gl.CW);
-                    }
-                }
-                else {
-                    this.stateManager.disable(gl.CULL_FACE);
-                }
-
-                if (s_gl.primType == gl.POINTS && (typeof s_gl.primType).toString() != "object") {
-                    gl.drawArrays(gl.POINTS, 0, s_gl.positions[q].length / 3);
-                }
-                else if (s_gl.indexes && s_gl.indexes[q]) {
-                    if (s_gl.imageGeometry != 0 ||
-                        s_gl.binaryGeometry < 0 || s_gl.popGeometry < 0 || s_gl.bitLODGeometry < 0) {
-                        if (s_gl.bitLODGeometry != 0 && s_geo._vf.normalPerVertex === false) {
-                            var totalVertexCount = 0;
-                            for (v = 0, v_n = s_geo._vf.vertexCount.length; v < v_n; v++) {
-                                if (s_gl.primType[v] == gl.TRIANGLES) {
-                                    totalVertexCount += s_geo._vf.vertexCount[v];
-                                }
-                                else if (s_gl.primType[v] == gl.TRIANGLE_STRIP) {
-                                    totalVertexCount += (s_geo._vf.vertexCount[v] - 2) * 3;
-                                }
-                            }
-                            gl.drawArrays(gl.TRIANGLES, 0, totalVertexCount);
-                        }
-                        else {
-                            for (v = 0, offset = 0, v_n = s_geo._vf.vertexCount.length; v < v_n; v++) {
-                                gl.drawArrays(s_gl.primType[v], offset, s_geo._vf.vertexCount[v]);
-                                offset += s_geo._vf.vertexCount[v];
-                            }
-                        }
-                    }
-                    else if (s_gl.binaryGeometry > 0 || s_gl.popGeometry > 0 || s_gl.bitLODGeometry > 0) {
                         for (v = 0, offset = 0, v_n = s_geo._vf.vertexCount.length; v < v_n; v++) {
-                            gl.drawElements(s_gl.primType[v], s_geo._vf.vertexCount[v], gl.UNSIGNED_SHORT, 2 * offset);
+                            gl.drawArrays(s_gl.primType[v], offset, s_geo._vf.vertexCount[v]);
                             offset += s_geo._vf.vertexCount[v];
                         }
                     }
-                    else if (s_geo.hasIndexOffset()) {
-                        // IndexedTriangleStripSet with primType TRIANGLE_STRIP,
-                        // and Patch geometry from external BVHRefiner component
-                        var indOff = shape.tessellationProperties();
-                        for (v = 0, v_n = indOff.length; v < v_n; v++) {
-                            gl.drawElements(s_gl.primType, indOff[v].count, gl.UNSIGNED_SHORT, indOff[v].offset);
-                        }
+                }
+                else if (s_geo.hasIndexOffset()) {
+                    var indOff = shape.tessellationProperties();
+                    for (v = 0, v_n = indOff.length; v < v_n; v++) {
+                        gl.drawElements(s_gl.primType, indOff[v].count, s_gl.indexType,
+                            indOff[v].offset * x3dom.Utils.getOffsetMultiplier(s_gl.indexType, gl));
                     }
-                    else {
-                        gl.drawElements(s_gl.primType, s_gl.indexes[q].length, gl.UNSIGNED_SHORT, 0);
-                    }
+                }
+                else if (s_gl.indexes[q].length == 0) {
+                    gl.drawArrays(s_gl.primType, 0, s_gl.positions[q].length / 3);
+                }
+                else {
+                    gl.drawElements(s_gl.primType, s_gl.indexes[q].length, s_gl.indexType, 0);
                 }
 
-                //Clean Texture units for IG
-                if (s_gl.imageGeometry != 0 && !x3dom.caps.MOBILE) {
-                    gl.activeTexture(gl.TEXTURE0);
-                    gl.bindTexture(gl.TEXTURE_2D, null);
-                    if (s_gl.imageGeometry == 1) {
-                        gl.activeTexture(gl.TEXTURE1);
-                        gl.bindTexture(gl.TEXTURE_2D, null);
-                    }
-                }
+                gl.disableVertexAttribArray(sp.position);
 
-                if (sp.position !== undefined && s_gl.buffers[q5 + 1]) {
-                    gl.disableVertexAttribArray(sp.position);
-                }
                 if (sp.texcoord !== undefined && s_gl.buffers[q5 + 3]) {
                     gl.disableVertexAttribArray(sp.texcoord);
                 }
@@ -13832,15 +14175,24 @@ x3dom.gfx_webgl = (function () {
                     gl.disableVertexAttribArray(sp.color);
                 }
             }
+
+            //Clean Texture units for IG
+            if (s_gl.imageGeometry != 0 && !x3dom.caps.MOBILE) {
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_2D, null);
+                if (s_gl.imageGeometry == 1) {
+                    gl.activeTexture(gl.TEXTURE1);
+                    gl.bindTexture(gl.TEXTURE_2D, null);
+                }
+            }
         }
 
-        gl.lineWidth(1);
+        this.stateManager.lineWidth(1);
+
         gl.flush();
 
         try {
-            var x = lastX * scene._webgl.pickScale,
-                y = scene._webgl.fboPick.height - 1 - lastY * scene._webgl.pickScale;
-            // 4 = 1 * 1 * 4; then take width x height window
+            // 4 = 1 * 1 * 4; then take width x height window (exception pickRect)
             var data = new Uint8Array(4 * width * height);
 
             gl.readPixels(x, y, width, height, gl.RGBA, gl.UNSIGNED_BYTE, data);
@@ -13849,10 +14201,12 @@ x3dom.gfx_webgl = (function () {
         }
         catch (se) {
             scene._webgl.fboPick.pixelData = [];
-            //No Exception on file:// when starting with additional flags:
-            //  chrome.exe --disable-web-security
+            // No Exception on file:// when starting with additional flags:
+            //    chrome.exe --disable-web-security
             x3dom.debug.logException(se + " (cannot pick)");
         }
+
+        //gl.disable(gl.SCISSOR_TEST);
 
         this.stateManager.bindFramebuffer(gl.FRAMEBUFFER, null);
     };
@@ -13866,7 +14220,7 @@ x3dom.gfx_webgl = (function () {
         var shape = drawable.shape;
         var transform = drawable.transform;
 
-        if (!shape || !shape._webgl) {
+        if (!shape || !shape._webgl || !transform) {
             x3dom.debug.logError("[Context|RenderShape] No valid Shape!");
             return;
         }
@@ -13892,8 +14246,7 @@ x3dom.gfx_webgl = (function () {
         var tex = null;
 
         if (s_gl.coordType != gl.FLOAT) {
-            if (s_gl.popGeometry === 0 && ( s_gl.bitLODGeometry != 0 ||
-                (s_msh._numPosComponents == 4 && x3dom.Utils.isUnsignedType(s_geo._vf.coordType)) )) {
+            if (!s_gl.popGeometry && (s_gl.bitLODGeometry || x3dom.Utils.isUnsignedType(s_geo._vf.coordType))) {
                 sp.bgCenter = s_geo.getMin().toGL();
             }
             else {
@@ -13950,6 +14303,7 @@ x3dom.gfx_webgl = (function () {
         //===========================================================================
         // Set fog
         //===========================================================================
+        // TODO: when no state/shader switch happens, all light/fog/... uniforms don't need to be set again
         var fog = scene.getFog();
 
         if (fog) {
@@ -13964,42 +14318,40 @@ x3dom.gfx_webgl = (function () {
         var mat = s_app ? s_app._cf.material.node : null;
         var shader = s_app ? s_app._shader : null;
 
-        if (mat || s_gl.csshader) {
-            if (s_gl.csshader) {
-                sp.diffuseColor = shader._vf.diffuseFactor.toGL();
-                sp.specularColor = shader._vf.specularFactor.toGL();
-                sp.emissiveColor = shader._vf.emissiveFactor.toGL();
-                sp.shininess = shader._vf.shininessFactor;
-                sp.ambientIntensity = (shader._vf.ambientFactor.x +
-                    shader._vf.ambientFactor.y +
-                    shader._vf.ambientFactor.z) / 3;
-                sp.transparency = 1.0 - shader._vf.alphaFactor;
+        if (s_gl.csshader) {
+            sp.diffuseColor = shader._vf.diffuseFactor.toGL();
+            sp.specularColor = shader._vf.specularFactor.toGL();
+            sp.emissiveColor = shader._vf.emissiveFactor.toGL();
+            sp.shininess = shader._vf.shininessFactor;
+            sp.ambientIntensity = (shader._vf.ambientFactor.x +
+                                   shader._vf.ambientFactor.y +
+                                   shader._vf.ambientFactor.z) / 3;
+            sp.transparency = 1.0 - shader._vf.alphaFactor;
 
-                if (shader.getDisplacementMap()) {
-                  tex = x3dom.Utils.findTextureByName(s_gl.texture, "displacementMap");
-                  sp.displacementWidth = tex.texture.width;
-                  sp.displacementHeight = tex.texture.height;
-                  sp.displacementFactor = shader._vf.displacementFactor;
-                  sp.displacementAxis = (shader._vf.displacementAxis == "x") ? 0.0 :
-                                        (shader._vf.displacementAxis == "y") ? 1.0 : 2.0;
-                }
-                else if (shader.getDiffuseDisplacementMap()) {
-                    tex = x3dom.Utils.findTextureByName(s_gl.texture, "diffuseDisplacementMap");
-                    sp.displacementWidth = tex.texture.width;
-                    sp.displacementHeight = tex.texture.height;
-                    sp.displacementFactor = shader._vf.displacementFactor;
-                    sp.displacementAxis = (shader._vf.displacementAxis == "x") ? 0.0 :
-                                          (shader._vf.displacementAxis == "y") ? 1.0 : 2.0;
-                }
+            if (shader.getDisplacementMap()) {
+              tex = x3dom.Utils.findTextureByName(s_gl.texture, "displacementMap");
+              sp.displacementWidth = tex.texture.width;
+              sp.displacementHeight = tex.texture.height;
+              sp.displacementFactor = shader._vf.displacementFactor;
+              sp.displacementAxis = (shader._vf.displacementAxis == "x") ? 0.0 :
+                                    (shader._vf.displacementAxis == "y") ? 1.0 : 2.0;
             }
-            else if (mat) {
-                sp.diffuseColor = mat._vf.diffuseColor.toGL();
-                sp.specularColor = mat._vf.specularColor.toGL();
-                sp.emissiveColor = mat._vf.emissiveColor.toGL();
-                sp.shininess = mat._vf.shininess;
-                sp.ambientIntensity = mat._vf.ambientIntensity;
-                sp.transparency = mat._vf.transparency;
+            else if (shader.getDiffuseDisplacementMap()) {
+                tex = x3dom.Utils.findTextureByName(s_gl.texture, "diffuseDisplacementMap");
+                sp.displacementWidth = tex.texture.width;
+                sp.displacementHeight = tex.texture.height;
+                sp.displacementFactor = shader._vf.displacementFactor;
+                sp.displacementAxis = (shader._vf.displacementAxis == "x") ? 0.0 :
+                                      (shader._vf.displacementAxis == "y") ? 1.0 : 2.0;
             }
+        }
+        else if (mat) {
+            sp.diffuseColor = mat._vf.diffuseColor.toGL();
+            sp.specularColor = mat._vf.specularColor.toGL();
+            sp.emissiveColor = mat._vf.emissiveColor.toGL();
+            sp.shininess = mat._vf.shininess;
+            sp.ambientIntensity = mat._vf.ambientIntensity;
+            sp.transparency = mat._vf.transparency;
         }
         else {
             sp.diffuseColor = [1.0, 1.0, 1.0];
@@ -14035,54 +14387,51 @@ x3dom.gfx_webgl = (function () {
         //===========================================================================
         // Set Lights
         //===========================================================================
-        // TODO: when no state/shader switch happens, all light/fog/... uniforms don't need to be set again
-        if (numLights > 0) {
-            for (var p = 0; p < numLights; p++) {
-                // FIXME; getCurrentTransform() doesn't work for shared lights/objects!
-                var light_transform = mat_view.mult(slights[p].getCurrentTransform());
+        for (var p = 0; p < numLights; p++) {
+            // FIXME; getCurrentTransform() doesn't work for shared lights/objects!
+            var light_transform = mat_view.mult(slights[p].getCurrentTransform());
 
-                if (x3dom.isa(slights[p], x3dom.nodeTypes.DirectionalLight)) {
-                    sp['light' + p + '_Type'] = 0.0;
-                    sp['light' + p + '_On'] = (slights[p]._vf.on) ? 1.0 : 0.0;
-                    sp['light' + p + '_Color'] = slights[p]._vf.color.toGL();
-                    sp['light' + p + '_Intensity'] = slights[p]._vf.intensity;
-                    sp['light' + p + '_AmbientIntensity'] = slights[p]._vf.ambientIntensity;
-                    sp['light' + p + '_Direction'] = light_transform.multMatrixVec(slights[p]._vf.direction).toGL();
-                    sp['light' + p + '_Attenuation'] = [1.0, 1.0, 1.0];
-                    sp['light' + p + '_Location'] = [1.0, 1.0, 1.0];
-                    sp['light' + p + '_Radius'] = 0.0;
-                    sp['light' + p + '_BeamWidth'] = 0.0;
-                    sp['light' + p + '_CutOffAngle'] = 0.0;
-                    sp['light' + p + '_ShadowIntensity'] = slights[p]._vf.shadowIntensity;
-                }
-                else if (x3dom.isa(slights[p], x3dom.nodeTypes.PointLight)) {
-                    sp['light' + p + '_Type'] = 1.0;
-                    sp['light' + p + '_On'] = (slights[p]._vf.on) ? 1.0 : 0.0;
-                    sp['light' + p + '_Color'] = slights[p]._vf.color.toGL();
-                    sp['light' + p + '_Intensity'] = slights[p]._vf.intensity;
-                    sp['light' + p + '_AmbientIntensity'] = slights[p]._vf.ambientIntensity;
-                    sp['light' + p + '_Direction'] = [1.0, 1.0, 1.0];
-                    sp['light' + p + '_Attenuation'] = slights[p]._vf.attenuation.toGL();
-                    sp['light' + p + '_Location'] = light_transform.multMatrixPnt(slights[p]._vf.location).toGL();
-                    sp['light' + p + '_Radius'] = slights[p]._vf.radius;
-                    sp['light' + p + '_BeamWidth'] = 0.0;
-                    sp['light' + p + '_CutOffAngle'] = 0.0;
-                    sp['light' + p + '_ShadowIntensity'] = slights[p]._vf.shadowIntensity;
-                }
-                else if (x3dom.isa(slights[p], x3dom.nodeTypes.SpotLight)) {
-                    sp['light' + p + '_Type'] = 2.0;
-                    sp['light' + p + '_On'] = (slights[p]._vf.on) ? 1.0 : 0.0;
-                    sp['light' + p + '_Color'] = slights[p]._vf.color.toGL();
-                    sp['light' + p + '_Intensity'] = slights[p]._vf.intensity;
-                    sp['light' + p + '_AmbientIntensity'] = slights[p]._vf.ambientIntensity;
-                    sp['light' + p + '_Direction'] = light_transform.multMatrixVec(slights[p]._vf.direction).toGL();
-                    sp['light' + p + '_Attenuation'] = slights[p]._vf.attenuation.toGL();
-                    sp['light' + p + '_Location'] = light_transform.multMatrixPnt(slights[p]._vf.location).toGL();
-                    sp['light' + p + '_Radius'] = slights[p]._vf.radius;
-                    sp['light' + p + '_BeamWidth'] = slights[p]._vf.beamWidth;
-                    sp['light' + p + '_CutOffAngle'] = slights[p]._vf.cutOffAngle;
-                    sp['light' + p + '_ShadowIntensity'] = slights[p]._vf.shadowIntensity;
-                }
+            if (x3dom.isa(slights[p], x3dom.nodeTypes.DirectionalLight)) {
+                sp['light' + p + '_Type'] = 0.0;
+                sp['light' + p + '_On'] = (slights[p]._vf.on) ? 1.0 : 0.0;
+                sp['light' + p + '_Color'] = slights[p]._vf.color.toGL();
+                sp['light' + p + '_Intensity'] = slights[p]._vf.intensity;
+                sp['light' + p + '_AmbientIntensity'] = slights[p]._vf.ambientIntensity;
+                sp['light' + p + '_Direction'] = light_transform.multMatrixVec(slights[p]._vf.direction).toGL();
+                sp['light' + p + '_Attenuation'] = [1.0, 1.0, 1.0];
+                sp['light' + p + '_Location'] = [1.0, 1.0, 1.0];
+                sp['light' + p + '_Radius'] = 0.0;
+                sp['light' + p + '_BeamWidth'] = 0.0;
+                sp['light' + p + '_CutOffAngle'] = 0.0;
+                sp['light' + p + '_ShadowIntensity'] = slights[p]._vf.shadowIntensity;
+            }
+            else if (x3dom.isa(slights[p], x3dom.nodeTypes.PointLight)) {
+                sp['light' + p + '_Type'] = 1.0;
+                sp['light' + p + '_On'] = (slights[p]._vf.on) ? 1.0 : 0.0;
+                sp['light' + p + '_Color'] = slights[p]._vf.color.toGL();
+                sp['light' + p + '_Intensity'] = slights[p]._vf.intensity;
+                sp['light' + p + '_AmbientIntensity'] = slights[p]._vf.ambientIntensity;
+                sp['light' + p + '_Direction'] = [1.0, 1.0, 1.0];
+                sp['light' + p + '_Attenuation'] = slights[p]._vf.attenuation.toGL();
+                sp['light' + p + '_Location'] = light_transform.multMatrixPnt(slights[p]._vf.location).toGL();
+                sp['light' + p + '_Radius'] = slights[p]._vf.radius;
+                sp['light' + p + '_BeamWidth'] = 0.0;
+                sp['light' + p + '_CutOffAngle'] = 0.0;
+                sp['light' + p + '_ShadowIntensity'] = slights[p]._vf.shadowIntensity;
+            }
+            else if (x3dom.isa(slights[p], x3dom.nodeTypes.SpotLight)) {
+                sp['light' + p + '_Type'] = 2.0;
+                sp['light' + p + '_On'] = (slights[p]._vf.on) ? 1.0 : 0.0;
+                sp['light' + p + '_Color'] = slights[p]._vf.color.toGL();
+                sp['light' + p + '_Intensity'] = slights[p]._vf.intensity;
+                sp['light' + p + '_AmbientIntensity'] = slights[p]._vf.ambientIntensity;
+                sp['light' + p + '_Direction'] = light_transform.multMatrixVec(slights[p]._vf.direction).toGL();
+                sp['light' + p + '_Attenuation'] = slights[p]._vf.attenuation.toGL();
+                sp['light' + p + '_Location'] = light_transform.multMatrixPnt(slights[p]._vf.location).toGL();
+                sp['light' + p + '_Radius'] = slights[p]._vf.radius;
+                sp['light' + p + '_BeamWidth'] = slights[p]._vf.beamWidth;
+                sp['light' + p + '_CutOffAngle'] = slights[p]._vf.cutOffAngle;
+                sp['light' + p + '_ShadowIntensity'] = slights[p]._vf.shadowIntensity;
             }
         }
 
@@ -14106,6 +14455,121 @@ x3dom.gfx_webgl = (function () {
             sp['light' + numLights + '_CutOffAngle'] = 0.0;
             sp['light' + numLights + '_ShadowIntensity'] = 0.0;
         }
+
+
+        //===========================================================================
+        // Set DepthMode
+        //===========================================================================
+        var depthMode = s_app ? s_app._cf.depthMode.node : null;
+        if (depthMode)
+        {
+            if (depthMode._vf.enableDepthTest)
+            {
+                //Enable Depth Test
+                this.stateManager.enable(gl.DEPTH_TEST);
+
+                //Set Depth Mask
+                this.stateManager.depthMask(!depthMode._vf.readOnly);
+                
+                //Set Depth Function
+                this.stateManager.depthFunc(x3dom.Utils.depthFunc(gl, depthMode._vf.depthFunc));
+
+                //Set Depth Range
+                this.stateManager.depthRange(depthMode._vf.zNearRange, depthMode._vf.zFarRange);
+            }
+            else
+            {
+                //Disable Depth Test
+                this.stateManager.disable(gl.DEPTH_TEST);
+            }
+        } 
+        else //Set Defaults
+        {
+            this.stateManager.enable(gl.DEPTH_TEST);
+            this.stateManager.depthMask(true);
+            this.stateManager.depthFunc(gl.LEQUAL);
+        }
+
+        //===========================================================================
+        // Set BlendMode
+        //===========================================================================
+        var blendMode = s_app ? s_app._cf.blendMode.node : null;
+        if (blendMode)
+        {
+            var srcFactor  = x3dom.Utils.blendFunc(gl, blendMode._vf.srcFactor);
+            var destFactor = x3dom.Utils.blendFunc(gl, blendMode._vf.destFactor);
+
+            if (srcFactor && destFactor)
+            {
+                //Enable Blending
+                this.stateManager.enable(gl.BLEND);
+
+                //Set Blend Function
+                this.stateManager.blendFuncSeparate(srcFactor, destFactor, gl.ONE, gl.ONE);
+
+                //Set Blend Color
+                this.stateManager.blendColor(blendMode._vf.color.r,
+                                             blendMode._vf.color.g,
+                                             blendMode._vf.color.b,
+                                             1.0 - blendMode._vf.colorTransparency);
+
+                //Set Blend Equation
+                this.stateManager.blendEquation(x3dom.Utils.blendEquation(gl, blendMode._vf.equation));
+            }
+            else
+            {
+                this.stateManager.disable(gl.BLEND);
+            }
+        }
+        else //Set Defaults
+        {
+            this.stateManager.enable(gl.BLEND);
+            this.stateManager.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE);
+        }
+
+        //===========================================================================
+        // Set ColorMaskMode
+        //===========================================================================
+        var colorMaskMode = s_app ? s_app._cf.colorMaskMode.node : null;
+        if (colorMaskMode)
+        {
+            this.stateManager.colorMask(colorMaskMode._vf.maskR,
+                                        colorMaskMode._vf.maskG,
+                                        colorMaskMode._vf.maskB,
+                                        colorMaskMode._vf.maskA);
+        }
+        else //Set Defaults
+        {
+            this.stateManager.colorMask(true, true, true, true);
+        }
+
+        //===========================================================================
+        // Set LineProperties (only linewidthScaleFactor, interpreted as lineWidth)
+        //===========================================================================
+        var lineProperties = s_app ? s_app._cf.lineProperties.node : null;
+        if (lineProperties)
+        {
+            this.stateManager.lineWidth(lineProperties._vf.linewidthScaleFactor);
+        }
+        else //Set Defaults
+        {
+            this.stateManager.lineWidth(1);
+        }
+
+        if (shape.isSolid()) {
+            this.stateManager.enable(gl.CULL_FACE);
+
+            if (shape.isCCW()) {
+                this.stateManager.frontFace(gl.CCW);
+            }
+            else {
+                this.stateManager.frontFace(gl.CW);
+            }
+        }
+        else {
+            this.stateManager.disable(gl.CULL_FACE);
+        }
+
 
         // transformation matrices
         var model_view = mat_view.mult(transform);
@@ -14136,11 +14600,13 @@ x3dom.gfx_webgl = (function () {
             gl.texParameteri(tex.type, gl.TEXTURE_WRAP_T, tex.wrapT);
             gl.texParameteri(tex.type, gl.TEXTURE_MAG_FILTER, tex.magFilter);
             gl.texParameteri(tex.type, gl.TEXTURE_MIN_FILTER, tex.minFilter);
+
+            // THINKABOUTME: this is expensive and probably only required on change, track e.g. via stateManager
             if (tex.genMipMaps) {
                 gl.generateMipmap(tex.type);
             }
 
-            if (!shader || shader && !x3dom.isa(shader, x3dom.nodeTypes.ComposedShader)) {
+            if (!shader || !x3dom.isa(shader, x3dom.nodeTypes.ComposedShader)) {
                 if (!sp[tex.samplerName])
                     sp[tex.samplerName] = cnt;
             }
@@ -14151,24 +14617,12 @@ x3dom.gfx_webgl = (function () {
             sp.texTrafoMatrix = texTrafo.toGL();
         }
 
-        if (shape.isSolid()) {
-            this.stateManager.enable(gl.CULL_FACE);
-
-            if (shape.isCCW()) {
-                this.stateManager.frontFace(gl.CCW);
-            }
-            else {
-                this.stateManager.frontFace(gl.CW);
-            }
-        }
-        else {
-            this.stateManager.disable(gl.CULL_FACE);
-        }
 
         // TODO; FIXME; what if geometry with split mesh has dynamic fields?
         var attrib = null;
+        var df, df_n = s_gl.dynamicFields.length;
 
-        for (var df = 0, df_n = s_gl.dynamicFields.length; df < df_n; df++) {
+        for (df = 0; df < df_n; df++) {
             attrib = s_gl.dynamicFields[df];
 
             if (sp[attrib.name] !== undefined) {
@@ -14180,22 +14634,25 @@ x3dom.gfx_webgl = (function () {
         }
 
         // render object
-        var i, i_n, offset;
-
+        var v, v_n, offset;
+        
         for (var q = 0, q_n = s_gl.positions.length; q < q_n; q++) {
             var q5 = 5 * q;
+
+            if ( !(sp.position !== undefined && s_gl.buffers[q5 + 1] && s_gl.indexes[q]) )
+                continue;
 
             if (s_gl.buffers[q5]) {
                 gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, s_gl.buffers[q5]);
             }
-            if (sp.position !== undefined && s_gl.buffers[q5 + 1]) {
-                gl.bindBuffer(gl.ARRAY_BUFFER, s_gl.buffers[q5 + 1]);
 
-                gl.vertexAttribPointer(sp.position,
-                    s_msh._numPosComponents, s_gl.coordType, false,
-                    shape._coordStrideOffset[0], shape._coordStrideOffset[1]);
-                gl.enableVertexAttribArray(sp.position);
-            }
+            gl.bindBuffer(gl.ARRAY_BUFFER, s_gl.buffers[q5 + 1]);
+
+            gl.vertexAttribPointer(sp.position,
+                s_msh._numPosComponents, s_gl.coordType, false,
+                shape._coordStrideOffset[0], shape._coordStrideOffset[1]);
+            gl.enableVertexAttribArray(sp.position);
+
             if (sp.normal !== undefined && s_gl.buffers[q5 + 2]) {
                 gl.bindBuffer(gl.ARRAY_BUFFER, s_gl.buffers[q5 + 2]);
 
@@ -14220,7 +14677,7 @@ x3dom.gfx_webgl = (function () {
                     shape._colorStrideOffset[0], shape._colorStrideOffset[1]);
                 gl.enableVertexAttribArray(sp.color);
             }
-            if (s_gl.popGeometry !== 0 && s_gl.buffers[q5 + 5]) {
+            if (s_gl.popGeometry != 0 && s_gl.buffers[q5 + 5]) {
                 //special case: mimic gl_VertexID
                 gl.bindBuffer(gl.ARRAY_BUFFER, s_gl.buffers[q5 + 5]);
 
@@ -14228,77 +14685,72 @@ x3dom.gfx_webgl = (function () {
                 gl.enableVertexAttribArray(sp.PG_vertexID);
             }
 
+            // TODO: implement surface with additional wireframe render mode (independent from poly mode)
             var renderMode = viewarea.getRenderMode();
+
             if (renderMode > 0) {
-                // TODO: implement surface with additional wireframe render mode (independent from poly mode)
                 var polyMode = (renderMode == 1) ? gl.POINTS : gl.LINES;
 
-                if (s_gl.imageGeometry != 0 ||
-                    s_gl.binaryGeometry < 0 || s_gl.popGeometry < 0 || s_gl.bitLODGeometry < 0) {
-                    for (i = 0, offset = 0, i_n = s_geo._vf.vertexCount.length; i < i_n; i++) {
-                        gl.drawArrays(polyMode, offset, s_geo._vf.vertexCount[i]);
-                        offset += s_geo._vf.vertexCount[i];
+                if (s_gl.binaryGeometry > 0 || s_gl.popGeometry > 0 || s_gl.bitLODGeometry > 0) {
+                    for (v = 0, offset = 0, v_n = s_geo._vf.vertexCount.length; v < v_n; v++) {
+                        gl.drawElements(polyMode, s_geo._vf.vertexCount[v], s_gl.indexType,
+                                        x3dom.Utils.getByteAwareOffset(offset, s_gl.indexType, gl));
+                        offset += s_geo._vf.vertexCount[v];
                     }
                 }
-                else if (s_gl.binaryGeometry > 0 || s_gl.popGeometry > 0 || s_gl.bitLODGeometry > 0) {
-                    for (i = 0, offset = 0, i_n = s_geo._vf.vertexCount.length; i < i_n; i++) {
-                        gl.drawElements(polyMode, s_geo._vf.vertexCount[i], gl.UNSIGNED_SHORT, 2 * offset);
-                        offset += s_geo._vf.vertexCount[i];
+                else if (s_gl.binaryGeometry < 0 || s_gl.popGeometry < 0 || s_gl.bitLODGeometry < 0 ||
+                         s_gl.imageGeometry) {
+                    for (v = 0, offset = 0, v_n = s_geo._vf.vertexCount.length; v < v_n; v++) {
+                        gl.drawArrays(polyMode, offset, s_geo._vf.vertexCount[v]);
+                        offset += s_geo._vf.vertexCount[v];
                     }
+                }
+                else if (s_gl.indexes[q].length == 0) {
+                    gl.drawArrays(polyMode, 0, s_gl.positions[q].length / 3);
                 }
                 else {
-                    gl.drawElements(polyMode, s_gl.indexes[q].length, gl.UNSIGNED_SHORT, 0);
+                    gl.drawElements(polyMode, s_gl.indexes[q].length, s_gl.indexType, 0);
                 }
             }
-            else if (sp.position !== undefined && s_gl.buffers[q5 + 1]) {
-                if (s_gl.primType == gl.POINTS && (typeof s_gl.primType).toString() != "object") {
-                    gl.drawArrays(gl.POINTS, 0, s_gl.positions[q].length / 3);
+            else {
+                if (s_gl.binaryGeometry > 0 || s_gl.popGeometry > 0 || s_gl.bitLODGeometry > 0) {
+                    for (v = 0, offset = 0, v_n = s_geo._vf.vertexCount.length; v < v_n; v++) {
+                        gl.drawElements(s_gl.primType[v], s_geo._vf.vertexCount[v], s_gl.indexType,
+                                        x3dom.Utils.getByteAwareOffset(offset, s_gl.indexType, gl));
+                        offset += s_geo._vf.vertexCount[v];
+                    }
                 }
-                else if (s_gl.indexes && s_gl.indexes[q]) {
-                    if (s_gl.imageGeometry != 0 ||
-                        s_gl.binaryGeometry < 0 || s_gl.popGeometry < 0 || s_gl.bitLODGeometry < 0) {
-                        if (s_gl.bitLODGeometry != 0 && s_geo._vf.normalPerVertex === false) {
-                            var totalVertexCount = 0;
-                            for (i = 0, i_n = s_geo._vf.vertexCount.length; i < i_n; i++) {
-                                if (s_gl.primType[i] == gl.TRIANGLES) {
-                                    totalVertexCount += s_geo._vf.vertexCount[i];
-                                }
-                                else if (s_gl.primType[i] == gl.TRIANGLE_STRIP) {
-                                    totalVertexCount += (s_geo._vf.vertexCount[i] - 2) * 3;
-                                }
-                            }
-                            gl.drawArrays(gl.TRIANGLES, 0, totalVertexCount);
-                        }
-                        else {
-                            for (i = 0, offset = 0, i_n = s_geo._vf.vertexCount.length; i < i_n; i++) {
-                                gl.drawArrays(s_gl.primType[i], offset, s_geo._vf.vertexCount[i]);
-                                offset += s_geo._vf.vertexCount[i];
-                            }
-                        }
-                    }
-                    else if (s_gl.binaryGeometry > 0 || s_gl.popGeometry > 0 || s_gl.bitLODGeometry > 0) {
-                        for (i = 0, offset = 0, i_n = s_geo._vf.vertexCount.length; i < i_n; i++) {
-                            gl.drawElements(s_gl.primType[i], s_geo._vf.vertexCount[i], gl.UNSIGNED_SHORT, 2 * offset);
-                            offset += s_geo._vf.vertexCount[i];
-                        }
-                    }
-                    else if (s_geo.hasIndexOffset()) {
-                        // IndexedTriangleStripSet with primType TRIANGLE_STRIP,
-                        // and Patch geometry from external BVHRefiner component
-                        var indOff = shape.tessellationProperties();
-                        for (i = 0, i_n = indOff.length; i < i_n; i++) {
-                            gl.drawElements(s_gl.primType, indOff[i].count, gl.UNSIGNED_SHORT, indOff[i].offset);
-                        }
+                else if (s_gl.binaryGeometry < 0 || s_gl.popGeometry < 0 || s_gl.bitLODGeometry < 0 || s_gl.imageGeometry) {
+                    if (s_gl.bitLODtotalVertexCount !== undefined) {
+                        gl.drawArrays(gl.TRIANGLES, 0, s_gl.bitLODtotalVertexCount);
                     }
                     else {
-                        gl.drawElements(s_gl.primType, s_gl.indexes[q].length, gl.UNSIGNED_SHORT, 0);
+                        for (v = 0, offset = 0, v_n = s_geo._vf.vertexCount.length; v < v_n; v++) {
+                            gl.drawArrays(s_gl.primType[v], offset, s_geo._vf.vertexCount[v]);
+                            offset += s_geo._vf.vertexCount[v];
+                        }
                     }
+                }
+                else if (s_geo.hasIndexOffset()) {
+                    // IndexedTriangleStripSet with primType TRIANGLE_STRIP,
+                    // and Patch geometry from external BVHRefiner component
+                    var indOff = shape.tessellationProperties();
+                    for (v = 0, v_n = indOff.length; v < v_n; v++) {
+                        gl.drawElements(s_gl.primType, indOff[v].count, s_gl.indexType,
+                            indOff[v].offset * x3dom.Utils.getOffsetMultiplier(s_gl.indexType, gl));
+                    }
+                }
+                else if (s_gl.indexes[q].length == 0) {
+                    gl.drawArrays(s_gl.primType, 0, s_gl.positions[q].length / 3);
+                }
+                else {
+                    gl.drawElements(s_gl.primType, s_gl.indexes[q].length, s_gl.indexType, 0);
                 }
             }
 
-            if (sp.position !== undefined) {
-                gl.disableVertexAttribArray(sp.position);
-            }
+            // disable all used vertex attributes
+            gl.disableVertexAttribArray(sp.position);
+
             if (sp.normal !== undefined) {
                 gl.disableVertexAttribArray(sp.normal);
             }
@@ -14308,13 +14760,12 @@ x3dom.gfx_webgl = (function () {
             if (sp.color !== undefined) {
                 gl.disableVertexAttribArray(sp.color);
             }
-            if (s_gl.popGeometry !== 0 && sp.PG_vertexID !== undefined) {
-                //special case: mimic gl_VertexID
-                gl.disableVertexAttribArray(sp.PG_vertexID);
+            if (s_gl.popGeometry != 0 && sp.PG_vertexID !== undefined) {
+                gl.disableVertexAttribArray(sp.PG_vertexID);    // mimic gl_VertexID
             }
-        }
+        } // end for loop over attrib arrays
 
-        for (df = 0, df_n = s_gl.dynamicFields.length; df < df_n; df++) {
+        for (df = 0; df < df_n; df++) {
             attrib = s_gl.dynamicFields[df];
 
             if (sp[attrib.name] !== undefined) {
@@ -14323,43 +14774,58 @@ x3dom.gfx_webgl = (function () {
         }
 
         // update stats
-        if (s_gl.indexes && s_gl.indexes[0]) {
-            if (s_gl.imageGeometry != 0) {
-                for (i = 0, i_n = s_geo._vf.vertexCount.length; i < i_n; i++) {
-                    if (s_gl.primType[i] == gl.TRIANGLE_STRIP)
-                        this.numFaces += (s_geo._vf.vertexCount[i] - 2);
-                    else
-                        this.numFaces += (s_geo._vf.vertexCount[i] / 3);
-                }
-            }
-            else {
-                this.numFaces += s_msh._numFaces;
-            }
-        }
+        if (s_gl.imageGeometry) {
+            v_n = s_geo._vf.vertexCount.length;
+            this.numDrawCalls += v_n;
 
-        if (s_gl.imageGeometry != 0) {
-            i_n = s_geo._vf.vertexCount.length;
-            for (i = 0; i < i_n; i++)
-                this.numCoords += s_geo._vf.vertexCount[i];
-            this.numDrawCalls += i_n;
-        }
-        else if (s_gl.binaryGeometry != 0 || s_gl.popGeometry != 0 || s_gl.bitLODGeometry != 0) {
-            this.numCoords += s_msh._numCoords;
-            this.numDrawCalls += s_geo._vf.vertexCount.length;
+            for (v = 0; v < v_n; v++) {
+                if (s_gl.primType[v] == gl.TRIANGLE_STRIP)
+                    this.numFaces += (s_geo._vf.vertexCount[v] - 2);
+                else
+                    this.numFaces += (s_geo._vf.vertexCount[v] / 3);
+
+                this.numCoords += s_geo._vf.vertexCount[v];
+            }
         }
         else {
             this.numCoords += s_msh._numCoords;
+            this.numFaces  += s_msh._numFaces;
 
-            if (s_geo.hasIndexOffset()) {
-                indOff = shape.tessellationProperties();
-                this.numDrawCalls += indOff.length;
+            if (s_gl.binaryGeometry || s_gl.popGeometry || s_gl.bitLODGeometry) {
+                this.numDrawCalls += s_geo._vf.vertexCount.length;
+            }
+            else if (s_geo.hasIndexOffset()) {
+                this.numDrawCalls += shape.tessellationProperties().length;
             }
             else {
-                this.numDrawCalls += s_gl.positions.length;
+                this.numDrawCalls += q_n;
             }
         }
 
-        // cleanup
+        // reset to default values for possibly user defined render states
+        if (depthMode) {
+            this.stateManager.enable(gl.DEPTH_TEST);
+            this.stateManager.depthMask(true);
+            this.stateManager.depthFunc(gl.LEQUAL);
+            this.stateManager.depthRange(0, 1);
+        }
+
+        if (blendMode) {
+            this.stateManager.enable(gl.BLEND);
+            this.stateManager.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE);
+            this.stateManager.blendColor(1, 1, 1, 1);
+            this.stateManager.blendEquation(gl.FUNC_ADD);
+        }
+
+        if (colorMaskMode) {
+            this.stateManager.colorMask(true, true, true, true);
+        }
+
+        if (lineProperties) {
+            this.stateManager.lineWidth(1);
+        }
+
+        // cleanup textures
         var s_gl_tex = s_gl.texture;
         cnt_n = s_gl_tex ? s_gl_tex.length : 0;
 
@@ -14449,7 +14915,7 @@ x3dom.gfx_webgl = (function () {
         p_msh._numCoords = 0;
         p_msh._numFaces = 0;
 
-        //@todo: this assumes pure TRIANGLES data
+        //@todo: this assumes pure TRIANGLES data (and gets overwritten from shadow/picking pass!!!)
         for (var i = 0; i < currentLOD_min; ++i) {  // currentLOD breaks loop
             var numVerticesAtLevel_i = s_gl.numVerticesAtLevel[i];
             p_msh._numCoords += numVerticesAtLevel_i;
@@ -14493,7 +14959,7 @@ x3dom.gfx_webgl = (function () {
         var scene = viewarea._scene;
 
         // method requires that scene has already been rendered at least once
-        if (gl === null || scene === null || !scene._webgl || !scene.drawableCollection) {
+        if (!gl || !scene || !scene._webgl || !scene.drawableCollection) {
             return false;
         }
 
@@ -14509,11 +14975,9 @@ x3dom.gfx_webgl = (function () {
             case "texcoord": pickMode = 2; break;
         }
 
-        //t0 = new Date().getTime();
-
         x3dom.Utils.startMeasure("picking");
 
-        scene.updateVolume();
+        //scene.updateVolume();
 
         var mat_view, mat_scene;
 
@@ -14534,62 +14998,53 @@ x3dom.gfx_webgl = (function () {
         var _min = x3dom.fields.SFVec3f.copy(from);
         var _max = x3dom.fields.SFVec3f.copy(from);
 
-        if (_min.x > min.x) {
-            _min.x = min.x;
-        }
-        if (_min.y > min.y) {
-            _min.y = min.y;
-        }
-        if (_min.z > min.z) {
-            _min.z = min.z;
-        }
+        if (_min.x > min.x) { _min.x = min.x; }
+        if (_min.y > min.y) { _min.y = min.y; }
+        if (_min.z > min.z) { _min.z = min.z; }
 
-        if (_max.x < max.x) {
-            _max.x = max.x;
-        }
-        if (_max.y < max.y) {
-            _max.y = max.y;
-        }
-        if (_max.z < max.z) {
-            _max.z = max.z;
-        }
+        if (_max.x < max.x) { _max.x = max.x; }
+        if (_max.y < max.y) { _max.y = max.y; }
+        if (_max.z < max.z) { _max.z = max.z; }
 
         min.setValues(_min);
         max.setValues(_max);
 
         var sceneSize = max.subtract(min).length();
 
-        // render to texture for reading pixel values
-        this.renderPickingPass(gl, scene, mat_view, mat_scene,
-            from, sceneSize, pickMode, x, y, 2, 2);
+        var baseID = x3dom.nodeTypes.Shape.objectID + 2;    // for shadow ids
 
-        //var index = ( (scene._webgl.fboPick.height - 1 - scene._lastY) * 
-        //               scene._webgl.fboPick.width + scene._lastX ) * 4;
-        var index = 0;
-        if (index >= 0 && scene._webgl.fboPick.pixelData &&
-            index < scene._webgl.fboPick.pixelData.length)
+
+        // render to texture for reading pixel values
+        this.renderPickingPass(gl, scene, mat_view, mat_scene, from, sceneSize, pickMode, x, y, 2, 2);
+
+
+        var pixelData = scene._webgl.fboPick.pixelData;
+
+        if (pixelData && pixelData.length)
         {
             var pickPos = new x3dom.fields.SFVec3f(0, 0, 0);
             var pickNorm = new x3dom.fields.SFVec3f(0, 0, 1);
-            var objId = scene._webgl.fboPick.pixelData[index + 3], shapeId;
+
+            var index = 0;
+            var objId = pixelData[index + 3], shapeId;
 
             var pixelOffset = 1.0 / scene._webgl.pickScale;
             var denom = 1.0 / 256.0;
             var dist, line, lineoff, right, up;
 
             if (pickMode == 0) {
-                objId += 256 * scene._webgl.fboPick.pixelData[index + 2];
+                objId += 256 * pixelData[index + 2];
 
-                dist = (scene._webgl.fboPick.pixelData[index + 0] / 255.0) * denom +
-                       (scene._webgl.fboPick.pixelData[index + 1] / 255.0);
+                dist = (pixelData[index    ] / 255.0) * denom +
+                       (pixelData[index + 1] / 255.0);
 
                 line = viewarea.calcViewRay(x, y);
 
                 pickPos = line.pos.add(line.dir.multiply(dist * sceneSize));
 
                 index = 4;      // get right pixel
-                dist = (scene._webgl.fboPick.pixelData[index + 0] / 255.0) * denom +
-                       (scene._webgl.fboPick.pixelData[index + 1] / 255.0);
+                dist = (pixelData[index    ] / 255.0) * denom +
+                       (pixelData[index + 1] / 255.0);
 
                 lineoff = viewarea.calcViewRay(x + pixelOffset, y);
 
@@ -14597,8 +15052,8 @@ x3dom.gfx_webgl = (function () {
                 right = right.subtract(pickPos).normalize();
 
                 index = 8;      // get top pixel
-                dist = (scene._webgl.fboPick.pixelData[index + 0] / 255.0) * denom +
-                       (scene._webgl.fboPick.pixelData[index + 1] / 255.0);
+                dist = (pixelData[index    ] / 255.0) * denom +
+                       (pixelData[index + 1] / 255.0);
 
                 lineoff = viewarea.calcViewRay(x, y - pixelOffset);
 
@@ -14608,17 +15063,17 @@ x3dom.gfx_webgl = (function () {
                 pickNorm = right.cross(up).normalize();
             }
             else if (pickMode == 3) {
-                objId +=   256 * scene._webgl.fboPick.pixelData[index + 2] +
-                         65536 * scene._webgl.fboPick.pixelData[index + 1];
+                objId +=   256 * pixelData[index + 2] +
+                         65536 * pixelData[index + 1];
 
-                dist = scene._webgl.fboPick.pixelData[index + 0] / 255.0;
+                dist = pixelData[index] / 255.0;
 
                 line = viewarea.calcViewRay(x, y);
 
                 pickPos = line.pos.add(line.dir.multiply(dist * sceneSize));
 
                 index = 4;      // get right pixel
-                dist = scene._webgl.fboPick.pixelData[index + 0] / 255.0;
+                dist = pixelData[index] / 255.0;
 
                 lineoff = viewarea.calcViewRay(x + pixelOffset, y);
 
@@ -14626,7 +15081,7 @@ x3dom.gfx_webgl = (function () {
                 right = right.subtract(pickPos).normalize();
 
                 index = 8;      // get top pixel
-                dist = scene._webgl.fboPick.pixelData[index + 0] / 255.0;
+                dist = pixelData[index] / 255.0;
 
                 lineoff = viewarea.calcViewRay(x, y - pixelOffset);
 
@@ -14636,19 +15091,26 @@ x3dom.gfx_webgl = (function () {
                 pickNorm = right.cross(up).normalize();
             }
             else if (pickMode == 4) {
-                objId += 256 * scene._webgl.fboPick.pixelData[index + 2];
+                objId += 256 * pixelData[index + 2];
 
-                shapeId  =       scene._webgl.fboPick.pixelData[index + 1];
-                shapeId += 256 * scene._webgl.fboPick.pixelData[index + 0];
+                shapeId  =       pixelData[index + 1];
+                shapeId += 256 * pixelData[index    ];
+
+                // check if standard shape picked without special shadow id
+                if (objId == 0 && (shapeId > 0 && shapeId < baseID)) {
+                    objId = shapeId;
+                }
             }
             else {
-                pickPos.x = scene._webgl.fboPick.pixelData[index + 0];
-                pickPos.y = scene._webgl.fboPick.pixelData[index + 1];
-                pickPos.z = scene._webgl.fboPick.pixelData[index + 2];
+                pickPos.x = pixelData[index    ];
+                pickPos.y = pixelData[index + 1];
+                pickPos.z = pixelData[index + 2];
             }
             //x3dom.debug.logInfo(pickPos + " / " + objId);
 
-            var baseID = x3dom.nodeTypes.Shape.objectID + 2;
+            var eventType = "shadowObjectIdChanged";
+            var shadowObjectIdChanged, event;
+            var button = Math.max(buttonState >>> 8, buttonState & 255);
 
             if (objId >= baseID) {
                 objId -= baseID;
@@ -14673,45 +15135,29 @@ x3dom.gfx_webgl = (function () {
                     hitObject = viewarea._pickingInfo.pickObj._xmlNode;
                 }
 
+                shadowObjectIdChanged = (viewarea._pickingInfo.shadowObjectId != objId);
                 viewarea._pickingInfo.shadowObjectId = objId;
-
                 //x3dom.debug.logInfo(baseID + " + " + objId);
-                var eventType = "shadowObjectIdChanged";
 
-                try {
-                    if ( scene._xmlNode &&
-                        (scene._xmlNode["on" + eventType] ||
-                            scene._xmlNode.hasAttribute("on" + eventType) ||
-                            scene._listeners[eventType]) ) {
-                        var event = {
-                            target: scene._xmlNode,
-                            type: eventType,
-                            button: buttonState,
-                            layerX: x,
-                            layerY: y,
-                            shadowObjectId: objId,
-                            worldX: pickPos.x,
-                            worldY: pickPos.y,
-                            worldZ: pickPos.z,
-                            normalX: pickNorm.x,
-                            normalY: pickNorm.y,
-                            normalZ: pickNorm.z,
-                            hitPnt: pickPos.toGL(),
-                            hitObject: hitObject,
-                            cancelBubble: false,
-                            stopPropagation: function () {
-                                this.cancelBubble = true;
-                            },
-                            preventDefault: function () {
-                                this.cancelBubble = true;
-                            }
-                        };
-
-                        scene.callEvtHandler(("on" + eventType), event);
-                    }
-                }
-                catch (e) {
-                    x3dom.debug.logException(e);
+                if ((shadowObjectIdChanged || button) && scene._xmlNode &&
+                    (scene._xmlNode["on" + eventType] || scene._xmlNode.hasAttribute("on" + eventType) ||
+                     scene._listeners[eventType]))
+                {
+                    event = {
+                        target: scene._xmlNode,
+                        type: eventType,
+                        button: button, mouseup: ((buttonState >>> 8) > 0),
+                        layerX: x, layerY: y,
+                        shadowObjectId: objId,
+                        worldX: pickPos.x, worldY: pickPos.y, worldZ: pickPos.z,
+                        normalX: pickNorm.x, normalY: pickNorm.y, normalZ: pickNorm.z,
+                        hitPnt: pickPos.toGL(),
+                        hitObject: hitObject,
+                        cancelBubble: false,
+                        stopPropagation: function () { this.cancelBubble = true; },
+                        preventDefault:  function () { this.cancelBubble = true; }
+                    };
+                    scene.callEvtHandler(("on" + eventType), event);
                 }
 
                 if (scene._shadowIdMap && scene._shadowIdMap.mapping) {
@@ -14727,25 +15173,44 @@ x3dom.gfx_webgl = (function () {
                     }
                 }
             }
-            else if (objId > 0) {
-                //x3dom.debug.logInfo(x3dom.nodeTypes.Shape.idMap.nodeID[objId]._DEF + " // " +
-                //                    x3dom.nodeTypes.Shape.idMap.nodeID[objId]._xmlNode.localName);
-                viewarea._pickingInfo.pickPos = pickPos;
-                viewarea._pickingInfo.pickNorm = pickNorm;
-                viewarea._pickingInfo.pickObj = x3dom.nodeTypes.Shape.idMap.nodeID[objId];
-            }
             else {
-                viewarea._pickingInfo.pickObj = null;
-                //viewarea._pickingInfo.lastObj = null;
-                viewarea._pickingInfo.lastClickObj = null;
+                shadowObjectIdChanged = (viewarea._pickingInfo.shadowObjectId != -1);
+                viewarea._pickingInfo.shadowObjectId = -1;     // nothing hit
+
+                if ( shadowObjectIdChanged && scene._xmlNode &&
+                    (scene._xmlNode["on" + eventType] || scene._xmlNode.hasAttribute("on" + eventType) ||
+                     scene._listeners[eventType]) )
+                {
+                    event = {
+                        target: scene._xmlNode,
+                        type: eventType,
+                        button: button, mouseup: ((buttonState >>> 8) > 0),
+                        layerX: x, layerY: y,
+                        shadowObjectId: viewarea._pickingInfo.shadowObjectId,
+                        cancelBubble: false,
+                        stopPropagation: function () { this.cancelBubble = true; },
+                        preventDefault:  function () { this.cancelBubble = true; }
+                    };
+                    scene.callEvtHandler(("on" + eventType), event);
+                }
+
+                if (objId > 0) {
+                    //x3dom.debug.logInfo(x3dom.nodeTypes.Shape.idMap.nodeID[objId]._DEF + " // " +
+                    //                    x3dom.nodeTypes.Shape.idMap.nodeID[objId]._xmlNode.localName);
+                    viewarea._pickingInfo.pickPos = pickPos;
+                    viewarea._pickingInfo.pickNorm = pickNorm;
+                    viewarea._pickingInfo.pickObj = x3dom.nodeTypes.Shape.idMap.nodeID[objId];
+                }
+                else {
+                    viewarea._pickingInfo.pickObj = null;
+                    //viewarea._pickingInfo.lastObj = null;
+                    viewarea._pickingInfo.lastClickObj = null;
+                }
             }
         }
 
         var pickTime = x3dom.Utils.stopMeasure("picking");
         this.x3dElem.runtime.addMeasurement('PICKING', pickTime);
-
-        //t1 = new Date().getTime() - t0;
-        //x3dom.debug.logInfo("Picking time (idBuf): " + t1 + "ms");
 
         return true;
     };
@@ -14759,7 +15224,7 @@ x3dom.gfx_webgl = (function () {
         var scene = viewarea ? viewarea._scene : null;
 
         // method requires that scene has already been rendered at least once
-        if (gl === null || scene === null || !scene._webgl || !scene.drawableCollection)
+        if (!gl || !scene || !scene._webgl || !scene.drawableCollection)
             return false;
 
         // values not fully correct but unnecessary anyway, just to feed the shader
@@ -14768,19 +15233,19 @@ x3dom.gfx_webgl = (function () {
 
         var x = (x1 <= x2) ? x1 : x2;
         var y = (y1 >= y2) ? y1 : y2;
-        var width = (1 + Math.abs(x2 - x1)) * scene._webgl.pickScale;
+        var width  = (1 + Math.abs(x2 - x1)) * scene._webgl.pickScale;
         var height = (1 + Math.abs(y2 - y1)) * scene._webgl.pickScale;
 
         // render to texture for reading pixel values
         this.renderPickingPass(gl, scene, viewarea._last_mat_view, viewarea._last_mat_scene,
-            from, sceneSize, 0, x, y, (width < 1) ? 1 : width, (height < 1) ? 1 : height);
+               from, sceneSize, 0, x, y, (width < 1) ? 1 : width, (height < 1) ? 1 : height);
 
-        var index = 0;
+        var index;
         var pickedObjects = [];
 
         // get objects in rectangle
         for (index = 0; scene._webgl.fboPick.pixelData &&
-            index < scene._webgl.fboPick.pixelData.length; index += 4) {
+                        index < scene._webgl.fboPick.pixelData.length; index += 4) {
             var objId = scene._webgl.fboPick.pixelData[index + 3] +
                 scene._webgl.fboPick.pixelData[index + 2] * 256;
 
@@ -14969,8 +15434,7 @@ x3dom.gfx_webgl = (function () {
                 rt_tex.invalidateGLObject();
                 rt_tex._webgl = {};
                 rt_tex._webgl.fbo = this.initFbo(gl,
-                    rt_tex._vf.dimensions[0],
-                    rt_tex._vf.dimensions[1], nearestFilt, type);
+                                    rt_tex._vf.dimensions[0], rt_tex._vf.dimensions[1], nearestFilt, type);
                 x3dom.debug.logInfo("Init/resize RenderedTexture_" + rtl_i + " to size " +
                                     rt_tex._vf.dimensions[0] + " x " + rt_tex._vf.dimensions[1]);
             }			
@@ -15023,7 +15487,7 @@ x3dom.gfx_webgl = (function () {
         env.checkSanity();
 
         var bgnd = scene.getBackground();
-
+        // setup or update bgnd
         this.setupScene(gl, bgnd);
 
         this.numFaces = 0;
@@ -15039,18 +15503,16 @@ x3dom.gfx_webgl = (function () {
             var e_eventType = "viewpointChanged";
 
             try {
-                if (e_viewpoint._xmlNode &&
+                if ( e_viewpoint._xmlNode &&
                     (e_viewpoint._xmlNode["on" + e_eventType] ||
-                        e_viewpoint._xmlNode.hasAttribute("on" + e_eventType) ||
-                        e_viewpoint._listeners[e_eventType])) {
+                     e_viewpoint._xmlNode.hasAttribute("on" + e_eventType) ||
+                     e_viewpoint._listeners[e_eventType]) ) {
                     var e_viewtrafo = e_viewpoint.getCurrentTransform();
                     e_viewtrafo = e_viewtrafo.inverse().mult(mat_view);
-
                     var e_mat = e_viewtrafo.inverse();
 
                     var e_rotation = new x3dom.fields.Quaternion(0, 0, 1, 0);
                     e_rotation.setValue(e_mat);
-
                     var e_translation = e_mat.e3();
 
                     var e_event = {
@@ -15060,12 +15522,8 @@ x3dom.gfx_webgl = (function () {
                         position: e_translation,
                         orientation: e_rotation.toAxisAngle(),
                         cancelBubble: false,
-                        stopPropagation: function () {
-                            this.cancelBubble = true;
-                        },
-                        preventDefault: function () {
-                            this.cancelBubble = true;
-                        }
+                        stopPropagation: function () { this.cancelBubble = true; },
+                        preventDefault:  function () { this.cancelBubble = true; }
                     };
 
                     e_viewpoint.callEvtHandler(("on" + e_eventType), e_event);
@@ -15194,63 +15652,24 @@ x3dom.gfx_webgl = (function () {
         // calls gl.clear etc. (bgnd stuff)
         bgnd._webgl.render(gl, mat_view, mat_proj);
 
-        // HACK; fully impl. BlendMode and DepthMode (needs to be handled in renderShape just like Material etc.)
-        this.stateManager.depthMask(true);
-        this.stateManager.depthFunc(gl.LEQUAL);
-        this.stateManager.enable(gl.DEPTH_TEST);
-        this.stateManager.enable(gl.CULL_FACE);
-
-        //this.stateManager.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-        this.stateManager.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE);
-        this.stateManager.enable(gl.BLEND);
-
         x3dom.nodeTypes.PopGeometry.numRenderedVerts = 0;
         x3dom.nodeTypes.PopGeometry.numRenderedTris = 0;
 
         n = scene.drawableCollection.length;
 
         // Very, very experimental priority culling, currently coupled with frustum and small feature culling
-        // TODO; what about shadows, picking etc. (but picking needs all objects, though this is NYI)
+        // TODO; what about shadows?
         if (env._vf.smallFeatureCulling && env._lowPriorityThreshold < 1 && viewarea.isMoving()) {
             n = Math.floor(n * env._lowPriorityThreshold);
-            if (n == 0 && scene.drawableCollection.length > 0)
-                n = 1;    // render at least one object
+            if (!n && scene.drawableCollection.length)
+                n = 1;   // render at least one object
         }
 
+        // render all remaining shapes
         for (i = 0; i < n; i++) {
             var drawable = scene.drawableCollection.get(i);
 
-            var needEnableBlending = false;
-            var needEnableDepthMask = false;
-            var shapeApp = drawable.shape._cf.appearance.node;
-
-            // HACK; fully impl. BlendMode and DepthMode (needs to be handled in renderShape just like Material etc.)
-            {
-                if (shapeApp && shapeApp._cf.blendMode.node &&
-                    shapeApp._cf.blendMode.node._vf.srcFactor.toLowerCase() === "none" &&
-                    shapeApp._cf.blendMode.node._vf.destFactor.toLowerCase() === "none") {
-                    needEnableBlending = true;
-                    this.stateManager.disable(gl.BLEND);
-                }
-                if (shapeApp && shapeApp._cf.depthMode.node &&
-                    shapeApp._cf.depthMode.node._vf.readOnly === true) {
-                    needEnableDepthMask = true;
-                    this.stateManager.depthMask(false);
-                }
-            }
-
-            this.renderShape(drawable, viewarea, slights, numLights,
-                mat_view, mat_scene, mat_light, mat_proj, gl);
-
-            // HACK; fully impl. BlendMode and DepthMode (needs to be handled in renderShape just like Material etc.)
-            {
-                if (needEnableBlending) {
-                    this.stateManager.enable(gl.BLEND);
-                }
-                if (needEnableDepthMask) {
-                    this.stateManager.depthMask(true);
-                }
-            }
+            this.renderShape(drawable, viewarea, slights, numLights, mat_view, mat_scene, mat_light, mat_proj, gl);
         }
 
         if (shadowCount > 0)
@@ -15399,8 +15818,6 @@ x3dom.gfx_webgl = (function () {
         var transform, shape, drawable;
         var locScene = rt._cf.scene.node;
 
-        var needEnableBlending, needEnableDepthMask;
-
         if (!locScene || locScene === scene) {
             n = scene.drawableCollection.length;
 
@@ -15410,42 +15827,9 @@ x3dom.gfx_webgl = (function () {
             else {
                 for (i = 0; i < n; i++) {
                     drawable = scene.drawableCollection.get(i);
-                    transform = drawable.transform;
-                    shape = drawable.shape;
-
-                    if (!shape._vf.render) {
-                        continue;
-                    }
-
-                    needEnableBlending = false;
-                    needEnableDepthMask = false;
-
-                    // HACK; fully impl. BlendMode and DepthMode
-                    if (shape._cf.appearance.node) {
-                        var appearance = shape._cf.appearance.node;
-
-                        if (appearance._cf.blendMode.node &&
-                            appearance._cf.blendMode.node._vf.srcFactor.toLowerCase() === "none" &&
-                            appearance._cf.blendMode.node._vf.destFactor.toLowerCase() === "none") {
-                            needEnableBlending = true;
-                            this.stateManager.disable(gl.BLEND);
-                        }
-                        if (appearance._cf.depthMode.node &&
-                            appearance._cf.depthMode.node._vf.readOnly === true) {
-                            needEnableDepthMask = true;
-                            this.stateManager.depthMask(false);
-                        }
-                    }
 
                     this.renderShape(drawable, viewarea, slights, numLights,
-                        mat_view, mat_scene, mat_light, mat_proj, gl);
-
-                    if (needEnableBlending) {
-                        this.stateManager.enable(gl.BLEND);
-                    }
-                    if (needEnableDepthMask) {
-                        this.stateManager.depthMask(true);
-                    }
+                                     mat_view, mat_scene, mat_light, mat_proj, gl);
                 }
             }
         }
@@ -15467,7 +15851,8 @@ x3dom.gfx_webgl = (function () {
             locScene.numberOfNodes = 0;
             locScene.drawableCollection = new x3dom.DrawableCollection(drawableCollectionConfig);
 
-            locScene.collectDrawableObjects(x3dom.fields.SFMatrix4f.identity(), locScene.drawableCollection, true, false, 0);
+            locScene.collectDrawableObjects(x3dom.fields.SFMatrix4f.identity(),
+                                            locScene.drawableCollection, true, false, 0);
 
             locScene.drawableCollection.sort();
 
@@ -15479,42 +15864,13 @@ x3dom.gfx_webgl = (function () {
             else {
                 for (i = 0; i < n; i++) {
                     drawable = locScene.drawableCollection.get(i);
-                    transform = drawable.transform;
-                    shape = drawable.shape;
 
-                    if (!shape._vf.render) {
+                    if (!drawable.shape._vf.render) {
                         continue;
                     }
 
-                    needEnableBlending = false;
-                    needEnableDepthMask = false;
-
-                    // HACK; fully impl. BlendMode and DepthMode
-                    if (shape._cf.appearance.node) {
-                        appearance = shape._cf.appearance.node;
-
-                        if (appearance._cf.blendMode.node &&
-                            appearance._cf.blendMode.node._vf.srcFactor.toLowerCase() === "none" &&
-                            appearance._cf.blendMode.node._vf.destFactor.toLowerCase() === "none") {
-                            needEnableBlending = true;
-                            this.stateManager.disable(gl.BLEND);
-                        }
-                        if (appearance._cf.depthMode.node &&
-                            appearance._cf.depthMode.node._vf.readOnly === true) {
-                            needEnableDepthMask = true;
-                            this.stateManager.depthMask(false);
-                        }
-                    }
-
                     this.renderShape(drawable, viewarea, slights, numLights,
-                        mat_view, mat_scene, mat_light, mat_proj, gl);
-
-                    if (needEnableBlending) {
-                        this.stateManager.enable(gl.BLEND);
-                    }
-                    if (needEnableDepthMask) {
-                        this.stateManager.depthMask(true);
-                    }
+                                     mat_view, mat_scene, mat_light, mat_proj, gl);
                 }
             }
         }
@@ -15548,16 +15904,17 @@ x3dom.gfx_webgl = (function () {
 
         this.stateManager.useProgram(sp);
 
-        var bgCenter = new x3dom.fields.SFVec3f(0, 0, 0).toGL();
-        var bgSize = new x3dom.fields.SFVec3f(1, 1, 1).toGL();
+        var bgCenter = x3dom.fields.SFVec3f.NullVector.toGL();
+        var bgSize = x3dom.fields.SFVec3f.OneVector.toGL();
 
-        for (var i = 0, n = scene.drawableCollection.length; i < n; i++) {
+        for (var i = 0, n = scene.drawableCollection.length; i < n; i++)
+        {
             var drawable = scene.drawableCollection.get(i);
             var trafo = drawable.transform;
             var shape = drawable.shape;
             var s_gl = shape._webgl;
 
-            if (!s_gl || !shape._vf.render) {
+            if (!s_gl || !shape || !shape._vf.render) {
                 continue;
             }
 
@@ -15592,70 +15949,41 @@ x3dom.gfx_webgl = (function () {
                 sp.bgPrecisionNorMax = 1;
             }
 
-            if (s_gl.imageGeometry != 0 && !x3dom.caps.MOBILE)  // FIXME: mobile errors
-            {
-                sp.IG_bboxMin = s_geo.getMin().toGL();
-                sp.IG_bboxMax = s_geo.getMax().toGL();
-                sp.IG_implicitMeshSize = s_geo._vf.implicitMeshSize.toGL();  // FIXME
+            if (shape.isSolid()) {
+                this.stateManager.enable(gl.CULL_FACE);
 
-                var coordTex = x3dom.Utils.findTextureByName(s_gl.texture, "IG_coords0");
-                if (coordTex) {
-                    sp.IG_coordTextureWidth = coordTex.texture.width;
-                    sp.IG_coordTextureHeight = coordTex.texture.height;
-                }
-
-                if (s_gl.imageGeometry == 1) {
-                    var indexTex = x3dom.Utils.findTextureByName(s_gl.texture, "IG_index");
-                    if (indexTex) {
-                        sp.IG_indexTextureWidth = indexTex.texture.width;
-                        sp.IG_indexTextureHeight = indexTex.texture.height;
-                    }
-
-                    gl.activeTexture(gl.TEXTURE0);
-                    gl.bindTexture(gl.TEXTURE_2D, indexTex.texture);
-
-                    gl.activeTexture(gl.TEXTURE1);
-                    gl.bindTexture(gl.TEXTURE_2D, coordTex.texture);
+                if (shape.isCCW()) {
+                    this.stateManager.frontFace(gl.CCW);
                 }
                 else {
-                    gl.activeTexture(gl.TEXTURE0);
-                    gl.bindTexture(gl.TEXTURE_2D, coordTex.texture);
-                }
-
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-
-                var texUnit = 0;
-                if (s_geo.getIndexTexture()) {
-                    if (!sp.IG_indexTexture) {
-                        sp.IG_indexTexture = texUnit++;
-                    }
-                }
-
-                if (s_geo.getCoordinateTexture(0)) {
-                    if (!sp.IG_coordinateTexture) {
-                        sp.IG_coordinateTexture = texUnit++;
-                    }
+                    this.stateManager.frontFace(gl.CW);
                 }
             }
+            else {
+                this.stateManager.disable(gl.CULL_FACE);
+            }
 
+
+            // render shape
             for (var q = 0, q_n = s_gl.positions.length; q < q_n; q++) {
                 var q5 = 5 * q;
                 var v, v_n, offset;
 
+                if ( !(sp.position !== undefined && s_gl.buffers[q5 + 1] && s_gl.indexes[q]) )
+                    continue;
+
+                // bind buffers
                 if (s_gl.buffers[q5]) {
                     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, s_gl.buffers[q5]);
                 }
-                if (sp.position !== undefined && s_gl.buffers[q5 + 1]) {
-                    gl.bindBuffer(gl.ARRAY_BUFFER, s_gl.buffers[q5 + 1]);
 
-                    gl.vertexAttribPointer(sp.position,
-                        s_msh._numPosComponents, s_gl.coordType, false,
-                        shape._coordStrideOffset[0], shape._coordStrideOffset[1]);
-                    gl.enableVertexAttribArray(sp.position);
-                }
+                gl.bindBuffer(gl.ARRAY_BUFFER, s_gl.buffers[q5 + 1]);
+
+                gl.vertexAttribPointer(sp.position,
+                    s_msh._numPosComponents, s_gl.coordType, false,
+                    shape._coordStrideOffset[0], shape._coordStrideOffset[1]);
+                gl.enableVertexAttribArray(sp.position);
+
                 if (sp.normal !== undefined && s_gl.buffers[q5 + 2]) {
                     gl.bindBuffer(gl.ARRAY_BUFFER, s_gl.buffers[q5 + 2]);
 
@@ -15665,74 +15993,41 @@ x3dom.gfx_webgl = (function () {
                     gl.enableVertexAttribArray(sp.normal);
                 }
 
-                if (shape.isSolid()) {
-                    this.stateManager.enable(gl.CULL_FACE);
-
-                    if (shape.isCCW()) {
-                        this.stateManager.frontFace(gl.CCW);
+                // draw mesh
+                if (s_gl.binaryGeometry > 0 || s_gl.popGeometry > 0 || s_gl.bitLODGeometry > 0) {
+                    for (v = 0, offset = 0, v_n = s_geo._vf.vertexCount.length; v < v_n; v++) {
+                        gl.drawElements(s_gl.primType[v], s_geo._vf.vertexCount[v], s_gl.indexType,
+                                        x3dom.Utils.getByteAwareOffset(offset, s_gl.indexType, gl));
+                        offset += s_geo._vf.vertexCount[v];
+                    }
+                }
+                else if (s_gl.binaryGeometry < 0 || s_gl.popGeometry < 0 || s_gl.bitLODGeometry < 0 || s_gl.imageGeometry) {
+                    if (s_gl.bitLODtotalVertexCount !== undefined) {
+                        gl.drawArrays(gl.TRIANGLES, 0, s_gl.bitLODtotalVertexCount);
                     }
                     else {
-                        this.stateManager.frontFace(gl.CW);
-                    }
-                }
-                else {
-                    this.stateManager.disable(gl.CULL_FACE);
-                }
-
-                if (s_gl.indexes && s_gl.indexes[q]) {
-                    if (s_gl.imageGeometry != 0 ||
-                        s_gl.binaryGeometry < 0 || s_gl.popGeometry < 0 || s_gl.bitLODGeometry < 0) {
-                        if (s_gl.bitLODGeometry != 0 && s_geo._vf.normalPerVertex === false) {
-                            var totalVertexCount = 0;
-                            for (v = 0, v_n = s_geo._vf.vertexCount.length; v < v_n; v++) {
-                                if (s_gl.primType[v] == gl.TRIANGLES) {
-                                    totalVertexCount += s_geo._vf.vertexCount[v];
-                                }
-                                else if (s_gl.primType[v] == gl.TRIANGLE_STRIP) {
-                                    totalVertexCount += (s_geo._vf.vertexCount[v] - 2) * 3;
-                                }
-                            }
-                            gl.drawArrays(gl.TRIANGLES, 0, totalVertexCount);
-                        }
-                        else {
-                            for (v = 0, offset = 0, v_n = s_geo._vf.vertexCount.length; v < v_n; v++) {
-                                gl.drawArrays(s_gl.primType[v], offset, s_geo._vf.vertexCount[v]);
-                                offset += s_geo._vf.vertexCount[v];
-                            }
-                        }
-                    }
-                    else if (s_gl.binaryGeometry > 0 || s_gl.popGeometry > 0 || s_gl.bitLODGeometry > 0) {
                         for (v = 0, offset = 0, v_n = s_geo._vf.vertexCount.length; v < v_n; v++) {
-                            gl.drawElements(s_gl.primType[v], s_geo._vf.vertexCount[v], gl.UNSIGNED_SHORT, 2 * offset);
+                            gl.drawArrays(s_gl.primType[v], offset, s_geo._vf.vertexCount[v]);
                             offset += s_geo._vf.vertexCount[v];
                         }
                     }
-                    else if (s_geo.hasIndexOffset()) {
-                        // IndexedTriangleStripSet with primType TRIANGLE_STRIP,
-                        // and Patch geometry from external BVHRefiner component
-                        var indOff = shape.tessellationProperties();
-                        for (v = 0, v_n = indOff.length; v < v_n; v++) {
-                            gl.drawElements(s_gl.primType, indOff[v].count, gl.UNSIGNED_SHORT, indOff[v].offset);
-                        }
+                }
+                else if (s_geo.hasIndexOffset()) {
+                    var indOff = shape.tessellationProperties();
+                    for (v = 0, v_n = indOff.length; v < v_n; v++) {
+                        gl.drawElements(s_gl.primType, indOff[v].count, s_gl.indexType,
+                            indOff[v].offset * x3dom.Utils.getOffsetMultiplier(s_gl.indexType, gl));
                     }
-                    else {
-                        gl.drawElements(s_gl.primType, s_gl.indexes[q].length, gl.UNSIGNED_SHORT, 0);
-                    }
+                }
+                else if (s_gl.indexes[q].length == 0) {
+                    gl.drawArrays(s_gl.primType, 0, s_gl.positions[q].length / 3);
+                }
+                else {
+                    gl.drawElements(s_gl.primType, s_gl.indexes[q].length, s_gl.indexType, 0);
                 }
 
-                //Clean Texture units for IG
-                if (s_gl.imageGeometry != 0 && !x3dom.caps.MOBILE) {
-                    gl.activeTexture(gl.TEXTURE0);
-                    gl.bindTexture(gl.TEXTURE_2D, null);
-                    if (s_gl.imageGeometry == 1) {
-                        gl.activeTexture(gl.TEXTURE1);
-                        gl.bindTexture(gl.TEXTURE_2D, null);
-                    }
-                }
+                gl.disableVertexAttribArray(sp.position);
 
-                if (sp.position !== undefined) {
-                    gl.disableVertexAttribArray(sp.position);
-                }
                 if (sp.normal !== undefined) {
                     gl.disableVertexAttribArray(sp.normal);
                 }
@@ -16745,7 +17040,6 @@ x3dom.gfx_flash = (function () {
             //Set Texture
             if (shape._dirty.texture === true) {
                 if (appearance) {
-
                     var texTrafo = null;
                     if (appearance._cf.textureTransform.node) {
                         texTrafo = appearance.texTransformMatrix().toGL();
@@ -16773,7 +17067,6 @@ x3dom.gfx_flash = (function () {
                         } else if (x3dom.isa(texture, x3dom.nodeTypes.MovieTexture)) {
                             x3dom.debug.logError("Flash backend doesn't support MovieTextures yet");
                         } else {
-                            console.log(texture._vf.url[0]);
                             this.object.setMeshTexture({ id: shape._objectID,
                                 origChannelCount: texture._vf.origChannelCount,
                                 repeatS: texture._vf.repeatS,
@@ -16781,6 +17074,8 @@ x3dom.gfx_flash = (function () {
                                 url: texture._vf.url[0],
                                 transform: texTrafo });
                         }
+                    } else {
+                        this.object.removeTexture({ id: shape._objectID });
                     }
                 }
                 shape._dirty.texture = false;
@@ -16931,26 +17226,29 @@ x3dom.gfx_flash = (function () {
  * Philip Taylor: http://philip.html5.org
  */
 
+
 // ### X3DDocument ###
 x3dom.X3DDocument = function(canvas, ctx, settings) {
-    this.canvas = canvas;
-    this.ctx = ctx;
-    this.properties = settings;
-    this.needRender = true;
-    this._x3dElem = null;   // backref to <X3D> root element (set on parsing)
-    this._scene = null;
-    this._viewarea = null;
-    // bag for pro-active elements
+    this.canvas = canvas;       // The <canvas> elem
+    this.ctx = ctx;             // WebGL context object, AKA gl
+    this.properties = settings; // showStat, showLog, etc.
+    this.needRender = true;     // Trigger redraw if true
+    this._x3dElem = null;       // Backref to <X3D> root element (set on parsing)
+    this._scene = null;         // Scene root element
+    this._viewarea = null;      // Viewport, handles rendering and interaction
+    this.downloadCount = 0;     // Counter for objects to be loaded
+
+    // bag for pro-active (or multi-core-like) elements
     this._nodeBag = {
-        timer: [],
-        lights: [],
-        clipPlanes: [],
-        followers: [],
-        trans: [],
-        renderTextures: [],
-        viewarea: []
+        timer: [],          // TimeSensor (tick)
+        lights: [],         // Light
+        clipPlanes: [],     // ClipPlane
+        followers: [],      // X3DFollowerNode
+        trans: [],          // X3DTransformNode (for listening to CSS changes)
+        renderTextures: [], // RenderedTexture
+        viewarea: []        // Viewport (for updating camera navigation)
     };
-    this.downloadCount = 0;
+
     this.onload = function () {};
     this.onerror = function () {};
 };
@@ -16975,7 +17273,6 @@ x3dom.X3DDocument.prototype.load = function (uri, sceneElemPos) {
         }
         var next_uri = queued_uris.shift();
 
-        //x3dom.debug.logInfo("loading... next_uri=" + next_uri + ", " + x3dom.isX3DElement(next_uri) + ", " + next_uri.namespaceURI);
         if ( x3dom.isX3DElement(next_uri) &&
             (next_uri.localName.toLowerCase() === 'x3d' || next_uri.localName.toLowerCase() === 'websg') )
         {
@@ -17238,7 +17535,8 @@ x3dom.X3DDocument.prototype.onMouseRelease = function (ctx, x, y, buttonState, p
         return;
     }
 
-    ctx.pickValue(this._viewarea, x, y, buttonState);
+    var button = (prevButton << 8) | buttonState;   // for shadowObjectIdChanged
+    ctx.pickValue(this._viewarea, x, y, button);
     this._viewarea.onMouseRelease(x, y, buttonState, prevButton);
 };
 
@@ -17348,8 +17646,8 @@ x3dom.X3DDocument.prototype.onKeyPress = function(charCode)
 			}
             x3dom.debug.logInfo("a: show all | d: show helper buffers | s: small feature culling | t: light view | " +
                                 "m: toggle render mode | c: frustum culling | p: intersect type | r: reset view | " +
-                                "e: examine mode | f: fly mode | w: walk mode | h: helicopter mode | o: lookaround | " +
-                                "l: lookAt mode | g: game mode | u: upright position | v: print viewpoint info | " +
+                                "e: examine mode | f: fly mode | y: freefly mode | w: walk mode | h: helicopter mode | " +
+                                "l: lookAt mode | o: lookaround | g: game mode | u: upright position | v: print viewpoint info | " +
                                 "pageUp: next view | pageDown: prev. view | +: increase speed | -: decrease speed ");
             break;
         case  43: /* + (incr. speed) */
@@ -17420,6 +17718,9 @@ x3dom.X3DDocument.prototype.onKeyPress = function(charCode)
         case 109: /* m, toggle "points" attribute */
             this._viewarea._points = ++this._viewarea._points % 3;
             break;
+        case 110: /* n, turntable */
+            nav.setType("turntable", this._viewarea);
+            break;
         case 111: /* o, look around like in fly, but don't move */
             nav.setType("lookaround", this._viewarea);
             break;
@@ -17479,6 +17780,9 @@ x3dom.X3DDocument.prototype.onKeyPress = function(charCode)
             break;
         case 119: /* w, walk mode */
             nav.setType("walk", this._viewarea);
+            break;
+        case 121: /* y, freefly mode */
+            nav.setType("freefly", this._viewarea);
             break;
         default:
     }
@@ -17582,9 +17886,10 @@ x3dom.Viewarea = function (document, scene) {
         pickPos: new x3dom.fields.SFVec3f(0, 0, 0),
         pickNorm: new x3dom.fields.SFVec3f(0, 0, 1),
         pickObj: null,
+        firstObj: null,
         lastObj: null,
         lastClickObj: null,
-        shadowObjectId: 0
+        shadowObjectId: -1
     };
 
     this._rotMat = x3dom.fields.SFMatrix4f.identity();
@@ -17608,7 +17913,6 @@ x3dom.Viewarea = function (document, scene) {
     this._pressX = -1;
     this._pressY = -1;
     this._lastButton = 0;
-    this._hasTouches = false;
 
     this._points = 0;   // old render mode flag (but think of better name!)
     this._numRenderedNodes = 0;
@@ -17617,6 +17921,7 @@ x3dom.Viewarea = function (document, scene) {
     this._pickNorm = new x3dom.fields.SFVec3f(0, 0, 1);
     
     this._isAnimating = false;
+    this._isMoving = false;
     this._lastTS = 0;
     this._mixer = new x3dom.MatrixMixer();
 
@@ -17676,7 +17981,7 @@ x3dom.Viewarea.prototype.tick = function(timeStamp)
 
 x3dom.Viewarea.prototype.isMoving = function()
 {
-    return (this._lastButton > 0 || this._hasTouches || this._isAnimating);
+    return (this._isMoving || this._isAnimating);
 };
 
 x3dom.Viewarea.prototype.navigateTo = function(timeStamp)
@@ -17686,7 +17991,7 @@ x3dom.Viewarea.prototype.navigateTo = function(timeStamp)
     
     var needNavAnim = ( navType === "game" ||
                         (this._lastButton > 0 &&
-                        (navType === "fly" ||
+                        (navType.indexOf("fly") >= 0 ||
                          navType === "walk" ||
                          navType === "helicopter" ||
                          navType.substr(0, 5) === "looka")) );
@@ -17908,25 +18213,27 @@ x3dom.Viewarea.prototype.navigateTo = function(timeStamp)
         {
             var currProjMat = this.getProjectionMatrix();
 
-            if (step < 0) {
-                // backwards: negate viewing direction
-                tmpMat = new x3dom.fields.SFMatrix4f();
-                tmpMat.setValue(this._last_mat_view.e0(), this._last_mat_view.e1(), 
-                                this._last_mat_view.e2().negate(), this._last_mat_view.e3());
-                
-                this._scene._nameSpace.doc.ctx.pickValue(this, this._width/2, this._height/2,
-                            this._lastButton, tmpMat, currProjMat.mult(tmpMat));
-            }
-            else {
-                this._scene._nameSpace.doc.ctx.pickValue(this, this._width/2, this._height/2, this._lastButton);
-            }
+            if (navType !== "freefly") {
+                if (step < 0) {
+                    // backwards: negate viewing direction
+                    tmpMat = new x3dom.fields.SFMatrix4f();
+                    tmpMat.setValue(this._last_mat_view.e0(), this._last_mat_view.e1(),
+                                    this._last_mat_view.e2().negate(), this._last_mat_view.e3());
 
-            if (this._pickingInfo.pickObj)
-            {
-                dist = this._pickingInfo.pickPos.subtract(this._from).length();
+                    this._scene._nameSpace.doc.ctx.pickValue(this, this._width/2, this._height/2,
+                                this._lastButton, tmpMat, currProjMat.mult(tmpMat));
+                }
+                else {
+                    this._scene._nameSpace.doc.ctx.pickValue(this, this._width/2, this._height/2, this._lastButton);
+                }
 
-                if (dist <= avatarRadius) {
-                    step = 0;
+                if (this._pickingInfo.pickObj)
+                {
+                    dist = this._pickingInfo.pickPos.subtract(this._from).length();
+
+                    if (dist <= avatarRadius) {
+                        step = 0;
+                    }
                 }
             }
 
@@ -18055,19 +18362,19 @@ x3dom.Viewarea.prototype.animateTo = function(target, prev, dur)
     var navi = this._scene.getNavigationInfo();
 
     if (x3dom.isa(target, x3dom.nodeTypes.X3DViewpointNode)) {
-        target = target.getCurrentTransform().mult(target.getViewMatrix());
+        target = target.getViewMatrix().mult(target.getCurrentTransform().inverse());
     }
 
     if (navi._vf.transitionType[0].toLowerCase() !== "teleport" && navi.getType() !== "game")
     {
         if (prev && x3dom.isa(prev, x3dom.nodeTypes.X3DViewpointNode)) {
-            prev = prev.getCurrentTransform().mult(prev.getViewMatrix()).
+            prev = prev.getViewMatrix().mult(prev.getCurrentTransform().inverse()).
                          mult(this._transMat).mult(this._rotMat);
 
             this._mixer._beginTime = this._lastTS;
 
             if (arguments.length >= 3) {
-                 // for lookAt to assure travel speed of 1 m/s
+                // for lookAt to assure travel speed of 1 m/s
                 this._mixer._endTime = this._lastTS + dur;
             }
             else {
@@ -18095,7 +18402,15 @@ x3dom.Viewarea.prototype.animateTo = function(target, prev, dur)
 };
 
 x3dom.Viewarea.prototype.getLights = function () {
-    return this._doc._nodeBag.lights;
+    var enabledLights = [];
+    for (var i=0; i<this._doc._nodeBag.lights.length; i++)
+    {
+        if (this._doc._nodeBag.lights[i]._vf.on == true)
+        {
+            enabledLights.push(this._doc._nodeBag.lights[i]);
+        }
+    }
+    return enabledLights;
 };
 
 x3dom.Viewarea.prototype.getLightsShadow = function () {
@@ -18409,10 +18724,14 @@ x3dom.Viewarea.prototype.calcViewRay = function(x, y)
 
 x3dom.Viewarea.prototype.showAll = function(axis)
 {
-    this._scene.updateVolume();
+    if (axis === undefined)
+        axis = "negZ";
 
-    var min = x3dom.fields.SFVec3f.copy(this._scene._lastMin);
-    var max = x3dom.fields.SFVec3f.copy(this._scene._lastMax);
+    var scene = this._scene;
+    scene.updateVolume();
+
+    var min = x3dom.fields.SFVec3f.copy(scene._lastMin);
+    var max = x3dom.fields.SFVec3f.copy(scene._lastMax);
 
     var x = "x", y = "y", z = "z";
     var sign = 1;
@@ -18439,17 +18758,18 @@ x3dom.Viewarea.prototype.showAll = function(axis)
         break;
     }
 
-    var viewpoint = this._scene.getViewpoint();
+    var viewpoint = scene.getViewpoint();
     var fov = viewpoint.getFieldOfView();
 
     var dia = max.subtract(min);
-    var diaz2 = sign * (dia[z] / 2.0);
-    var tanfov2 = Math.tan(fov / 2.0);
 
-    var dist1 = (dia[y] / 2.0) / tanfov2 - diaz2;
-    var dist2 = (dia[x] / 2.0) / tanfov2 - diaz2;
+    var diaz2 = dia[z] / 2.0, tanfov2 = Math.tan(fov / 2.0);
+
+    var dist1 = (dia[y] / 2.0) / tanfov2 + diaz2;
+    var dist2 = (dia[x] / 2.0) / tanfov2 + diaz2;
 
     dia = min.add(dia.multiply(0.5));
+
     dia[z] += sign * (dist1 > dist2 ? dist1 : dist2) * 1.01;
 
     var quat = x3dom.fields.Quaternion.rotateFromTo(from, to);
@@ -18466,13 +18786,17 @@ x3dom.Viewarea.prototype.resetView = function()
 
     if (navi._vf.transitionType[0].toLowerCase() !== "teleport" && navi.getType() !== "game")
     {
-        // EXPERIMENTAL (TODO: parent trafo of vp)
         this._mixer._beginTime = this._lastTS;
         this._mixer._endTime = this._lastTS + navi._vf.transitionTime;
 
         this._mixer.setBeginMatrix(this.getViewMatrix());
-        this._scene.getViewpoint().resetView();
-        this._mixer.setEndMatrix(this._scene.getViewpoint().getViewMatrix());
+
+        var target = this._scene.getViewpoint();
+        target.resetView();
+
+        target = target.getViewMatrix().mult(target.getCurrentTransform().inverse());
+
+        this._mixer.setEndMatrix(target);
     }
     else
     {
@@ -18616,6 +18940,7 @@ x3dom.Viewarea.prototype.initMouseState = function()
     this._pressX = -1;
     this._pressY = -1;
     this._lastButton = 0;
+    this._isMoving = false;
     this._needNavigationMatrixUpdate = true;
 };
 
@@ -18625,6 +18950,7 @@ x3dom.Viewarea.prototype.onMousePress = function (x, y, buttonState)
 
     this.prepareEvents(x, y, buttonState, "onmousedown");
     this._pickingInfo.lastClickObj = this._pickingInfo.pickObj;
+    this._pickingInfo.firstObj = this._pickingInfo.pickObj;
 
     this._dx = 0;
     this._dy = 0;
@@ -18633,6 +18959,30 @@ x3dom.Viewarea.prototype.onMousePress = function (x, y, buttonState)
     this._pressX = x;
     this._pressY = y;
     this._lastButton = buttonState;
+    this._isMoving = false;
+
+    var navi = this._scene.getNavigationInfo();
+    var navType = navi.getType();
+
+    if (navType === "turntable")
+    {
+        var currViewMat = this.getViewMatrix();
+
+        var viewpoint = this._scene.getViewpoint();
+        var center = x3dom.fields.SFVec3f.copy(viewpoint.getCenterOfRotation());
+
+        this._flyMat = currViewMat.inverse();
+
+        this._from = this._flyMat.e3();
+        //this._at = this._from.subtract(this._flyMat.e2());
+        this._at = center;
+        this._up = this._flyMat.e1();
+
+        this._flyMat = x3dom.fields.SFMatrix4f.lookAt(this._from, this._at, this._up);
+
+        var dur = 0.2 / navi._vf.speed;   // fly to pivot point
+        this.animateTo(this._flyMat.inverse(), viewpoint, dur);
+    }
 };
 
 x3dom.Viewarea.prototype.onMouseRelease = function (x, y, buttonState, prevButton)
@@ -18651,7 +19001,8 @@ x3dom.Viewarea.prototype.onMouseRelease = function (x, y, buttonState, prevButto
         {
             this.prepareEvents(x, y, prevButton, "onclick");
         }
-        else if (!this._pickingInfo.pickObj && !this._pickingInfo.lastClickObj)
+        else if (!this._pickingInfo.pickObj && !this._pickingInfo.lastClickObj &&
+                 !this._pickingInfo.firstObj)   // press and release outside object
         {
             var eventType = "backgroundClicked";
             try {
@@ -18699,9 +19050,10 @@ x3dom.Viewarea.prototype.onMouseRelease = function (x, y, buttonState, prevButto
             //x3dom.debug.logInfo("No hit at position " + this._pick);
         }
     }
+    this._pickingInfo.firstObj = null;
 
-    if (this._pickingInfo.pickObj && navType === "lookat" &&
-        this._pressX === x && this._pressY === y)
+    if ((this._pickingInfo.pickObj || this._pickingInfo.shadowObjectId >= 0) &&
+        navType === "lookat" && this._pressX === x && this._pressY === y)
     {
         var step = (this._lastButton & 2) ? -1 : 1;
         var dist = this._pickingInfo.pickPos.subtract(this._from).length() / tDist;
@@ -18743,6 +19095,7 @@ x3dom.Viewarea.prototype.onMouseRelease = function (x, y, buttonState, prevButto
     this._lastX = x;
     this._lastY = y;
     this._lastButton = buttonState;
+    this._isMoving = false;
 };
 
 x3dom.Viewarea.prototype.onMouseOver = function (x, y, buttonState)
@@ -18750,6 +19103,7 @@ x3dom.Viewarea.prototype.onMouseOver = function (x, y, buttonState)
     this._dx = 0;
     this._dy = 0;
     this._lastButton = 0;
+    this._isMoving = false;
     this._lastX = x;
     this._lastY = y;
     this._deltaT = 0;
@@ -18760,6 +19114,7 @@ x3dom.Viewarea.prototype.onMouseOut = function (x, y, buttonState)
     this._dx = 0;
     this._dy = 0;
     this._lastButton = 0;
+    this._isMoving = false;
     this._lastX = x;
     this._lastY = y;
     this._deltaT = 0;
@@ -18785,7 +19140,12 @@ x3dom.Viewarea.prototype.onDoubleClick = function (x, y)
 
     var viewpoint = this._scene.getViewpoint();
 
-    viewpoint._vf.centerOfRotation.setValues(this._pick);
+    if (viewpoint._vf.centerOfRotation) {
+        viewpoint._vf.centerOfRotation.setValues(this._pick);
+    }
+    else {
+        viewpoint._centerOfRotation.setValues(this._pick);  // Viewfrustum
+    }
     x3dom.debug.logInfo("New center of Rotation:  " + this._pick);
 
     var mat = this.getViewMatrix().inverse();
@@ -18843,6 +19203,7 @@ x3dom.Viewarea.prototype.onMove = function (x, y, buttonState)
     this._lastY = y;
 };
 
+// multi-touch version of examine mode, called from X3DCanvas.js
 x3dom.Viewarea.prototype.onMoveView = function (translation, rotation)
 {
 	var navi = this._scene.getNavigationInfo();
@@ -18874,6 +19235,8 @@ x3dom.Viewarea.prototype.onMoveView = function (translation, rotation)
                            mult(mat.inverse()).mult(rotation).mult(mat).
                            mult(x3dom.fields.SFMatrix4f.translation(center.negate()));
 		}
+
+        this._isMoving = true;
 	}
 };
 
@@ -18889,22 +19252,24 @@ x3dom.Viewarea.prototype.onDrag = function (x, y, buttonState)
         return;
     }
 
+    var viewpoint = this._scene.getViewpoint();
+
     var dx = x - this._lastX;
     var dy = y - this._lastY;
     var d, vec, mat = null;
+    var alpha, beta;
 
     if (navType === "examine")
     {
         if (buttonState & 1) //left
         {
-            var alpha = (dy * 2 * Math.PI) / this._width;
-            var beta = (dx * 2 * Math.PI) / this._height;
+            alpha = (dy * 2 * Math.PI) / this._width;
+            beta = (dx * 2 * Math.PI) / this._height;
             mat = this.getViewMatrix();
 
             var mx = x3dom.fields.SFMatrix4f.rotationX(alpha);
             var my = x3dom.fields.SFMatrix4f.rotationY(beta);
 
-            var viewpoint = this._scene.getViewpoint();
             var center = viewpoint.getCenterOfRotation();
             mat.setTranslate(new x3dom.fields.SFVec3f(0,0,0));
 
@@ -18919,7 +19284,6 @@ x3dom.Viewarea.prototype.onDrag = function (x, y, buttonState)
 			d = ((d < x3dom.fields.Eps) ? 1 : d) * navi._vf.speed;
 
             vec = new x3dom.fields.SFVec3f(d*dx/this._width, d*(-dy)/this._height, 0);
-            //this.pan(vec);
             this._movement = this._movement.add(vec);
 
             mat = this.getViewpointMatrix().mult(this._transMat);
@@ -18934,7 +19298,6 @@ x3dom.Viewarea.prototype.onDrag = function (x, y, buttonState)
 			d = ((d < x3dom.fields.Eps) ? 1 : d) * navi._vf.speed;
 
             vec = new x3dom.fields.SFVec3f(0, 0, d*(dx+dy)/this._height);
-            //this.zoom(vec);
             this._movement = this._movement.add(vec);
 
             mat = this.getViewpointMatrix().mult(this._transMat);
@@ -18943,6 +19306,75 @@ x3dom.Viewarea.prototype.onDrag = function (x, y, buttonState)
                              mult(x3dom.fields.SFMatrix4f.translation(this._movement)).
                              mult(mat);
         }
+
+        this._isMoving = true;
+    }
+    else if (navType === "turntable")   // requires that y is up vector in world coords
+    {
+        if (buttonState & 1) //left
+        {
+            alpha = (dy * 2 * Math.PI) / this._height;
+            beta = (dx * 2 * Math.PI) / this._width;
+
+            this._up = this._flyMat.e1();
+            this._from = this._flyMat.e3();
+
+            var offset = this._from.subtract(this._at);
+
+            // angle in xz-plane
+            var phi = Math.atan2(offset.x, offset.z);
+
+            // angle from y-axis
+            var theta = Math.atan2(Math.sqrt(offset.x * offset.x + offset.z * offset.z), offset.y);
+
+            phi -= Math.min(beta, 0.1);
+            theta -= Math.min(alpha, 0.1);
+
+            // clamp theta
+            var typeParams = navi.getTypeParams();
+            theta = Math.max(typeParams[2], Math.min(typeParams[3], theta));
+
+            var radius = offset.length();
+
+            // calc new cam position
+            var rSinPhi = radius * Math.sin(theta);
+
+            offset.x = rSinPhi * Math.sin(phi);
+            offset.y = radius  * Math.cos(theta);
+            offset.z = rSinPhi * Math.cos(phi);
+
+            offset = this._at.add(offset);
+
+            // calc new up vector
+            theta -= Math.PI / 2;
+
+            var sinPhi = Math.sin(theta);
+            var cosPhi = Math.cos(theta);
+            var up = new x3dom.fields.SFVec3f(sinPhi * Math.sin(phi), cosPhi, sinPhi * Math.cos(phi));
+
+            if (up.y < 0)
+                up = up.negate();
+
+            this._flyMat = x3dom.fields.SFMatrix4f.lookAt(offset, this._at, up);
+            viewpoint.setView(this._flyMat.inverse());
+        }
+        else if (buttonState & 2) //right
+        {
+            d = (this._scene._lastMax.subtract(this._scene._lastMin)).length();
+            d = ((d < x3dom.fields.Eps) ? 1 : d) * navi._vf.speed;
+
+            this._up = this._flyMat.e1();
+            this._from = this._flyMat.e3();
+
+            // zoom in/out
+            var dir = this._from.subtract(this._at).normalize();
+            this._from = this._from.addScaled(dir, -d*(dx+dy) / this._height);
+
+            this._flyMat = x3dom.fields.SFMatrix4f.lookAt(this._from, this._at, this._up);
+            viewpoint.setView(this._flyMat.inverse());
+        }
+
+        this._isMoving = true;
     }
 
     this._dx = dx;
@@ -19334,21 +19766,19 @@ x3dom.Mesh.prototype.doIntersect = function(line)
 x3dom.Mesh.prototype.calcNormals = function(creaseAngle, ccw)
 {
     if (ccw === undefined)
-      ccw = true;
-      
-    var i = 0, j = 0, num = 0;
-    var multInd = (this._multiIndIndices !== undefined && this._multiIndIndices.length);
-    var coords = this._positions[0];
+        ccw = true;
+
+    var multInd = this._multiIndIndices && this._multiIndIndices.length;
     var idxs = multInd ? this._multiIndIndices : this._indices[0];
-    
+    var coords = this._positions[0];
+
     var vertNormals = [];
     var vertFaceNormals = [];
 
+    var i, j, m = coords.length;
     var a, b, n = null;
-    
-    //num = coords.length / 3;
-    num = (this._posSize !== undefined && this._posSize > coords.length) ? 
-           this._posSize / 3 : coords.length / 3;
+
+    var num = (this._posSize !== undefined && this._posSize > m) ? this._posSize / 3 : m / 3;
     num = 3 * ((num - Math.floor(num) > 0) ? Math.floor(num + 1) : num);
     
     for (i = 0; i < num; ++i) {
@@ -19358,36 +19788,41 @@ x3dom.Mesh.prototype.calcNormals = function(creaseAngle, ccw)
     num = idxs.length;
         
     for (i = 0; i < num; i += 3) {
+        var ind_i0, ind_i1, ind_i2;
+        var t;
 
-        if (!multInd) {        
-            a = new x3dom.fields.SFVec3f(
-                    coords[idxs[i  ]*3], coords[idxs[i  ]*3+1], coords[idxs[i  ]*3+2]).
-                subtract(new x3dom.fields.SFVec3f(
-                    coords[idxs[i+1]*3], coords[idxs[i+1]*3+1], coords[idxs[i+1]*3+2]));
-            b = new x3dom.fields.SFVec3f(
-                    coords[idxs[i+1]*3], coords[idxs[i+1]*3+1], coords[idxs[i+1]*3+2]).
-                subtract(new x3dom.fields.SFVec3f(
-                    coords[idxs[i+2]*3], coords[idxs[i+2]*3+1], coords[idxs[i+2]*3+2]));
+        if (!multInd) {
+            ind_i0 = idxs[i  ] * 3;
+            ind_i1 = idxs[i+1] * 3;
+            ind_i2 = idxs[i+2] * 3;
+
+            t = new x3dom.fields.SFVec3f(coords[ind_i1], coords[ind_i1+1], coords[ind_i1+2]);
+            a = new x3dom.fields.SFVec3f(coords[ind_i0], coords[ind_i0+1], coords[ind_i0+2]).subtract(t);
+            b = t.subtract(new x3dom.fields.SFVec3f(coords[ind_i2], coords[ind_i2+1], coords[ind_i2+2]));
+
+            // this is needed a few lines below
+            ind_i0 =  i    * 3;
+            ind_i1 = (i+1) * 3;
+            ind_i2 = (i+2) * 3;
         }
         else {
-            a = new x3dom.fields.SFVec3f(
-                        coords[i*3], coords[i*3+1], coords[i*3+2]).
-                    subtract(new x3dom.fields.SFVec3f(
-                        coords[(i+1)*3], coords[(i+1)*3+1], coords[(i+1)*3+2]));
-            b = new x3dom.fields.SFVec3f(
-                        coords[(i+1)*3], coords[(i+1)*3+1], coords[(i+1)*3+2]).
-                    subtract(new x3dom.fields.SFVec3f(
-                        coords[(i+2)*3], coords[(i+2)*3+1], coords[(i+2)*3+2]));
+            ind_i0 =  i    * 3;
+            ind_i1 = (i+1) * 3;
+            ind_i2 = (i+2) * 3;
+
+            t = new x3dom.fields.SFVec3f(coords[ind_i1], coords[ind_i1+1], coords[ind_i1+2]);
+            a = new x3dom.fields.SFVec3f(coords[ind_i0], coords[ind_i0+1], coords[ind_i0+2]).subtract(t);
+            b = t.subtract(new x3dom.fields.SFVec3f(coords[ind_i2], coords[ind_i2+1], coords[ind_i2+2]));
         }
         
         n = a.cross(b).normalize();
         if (!ccw)
-          n = n.negate();
-        
+            n = n.negate();
+
         if (creaseAngle <= x3dom.fields.Eps) {
-            vertNormals[i*3  ] = vertNormals[(i+1)*3  ] = vertNormals[(i+2)*3  ] = n.x;
-            vertNormals[i*3+1] = vertNormals[(i+1)*3+1] = vertNormals[(i+2)*3+1] = n.y;
-            vertNormals[i*3+2] = vertNormals[(i+1)*3+2] = vertNormals[(i+2)*3+2] = n.z;
+            vertNormals[ind_i0  ] = vertNormals[ind_i1  ] = vertNormals[ind_i2  ] = n.x;
+            vertNormals[ind_i0+1] = vertNormals[ind_i1+1] = vertNormals[ind_i2+1] = n.y;
+            vertNormals[ind_i0+2] = vertNormals[ind_i1+2] = vertNormals[ind_i2+2] = n.z;
         }
         else {
             vertFaceNormals[idxs[i  ]].push(n);
@@ -19395,35 +19830,33 @@ x3dom.Mesh.prototype.calcNormals = function(creaseAngle, ccw)
             vertFaceNormals[idxs[i+2]].push(n);
         }
     }
-    
+
+    // TODO: allow generic creaseAngle
     if (creaseAngle > x3dom.fields.Eps) 
     {
-        for (i = 0; i < coords.length; i += 3) {
-            //TODO: generic creaseAngle
-            n = new x3dom.fields.SFVec3f(0, 0, 0);
-            
+        for (i = 0; i < m; i += 3) {
+            var iThird = i / 3;
+            var arr;
+
             if (!multInd) {
-                num = vertFaceNormals[i/3].length;
-                for (j = 0; j < num; ++j) {
-                    n = n.add(vertFaceNormals[i/3][j]);
-                }
+                arr = vertFaceNormals[iThird];
             }
             else {
-                num = vertFaceNormals[idxs[i/3]].length;
-                for (j = 0; j < num; ++j) {
-                    n = n.add(vertFaceNormals[idxs[i/3]][j]);
-                }
+                arr = vertFaceNormals[idxs[iThird]];
             }
+            num = arr.length;
 
+            n = new x3dom.fields.SFVec3f(0, 0, 0);
+
+            for (j = 0; j < num; ++j) {
+                n = n.add(arr[j]);
+            }
             n = n.normalize();
+
             vertNormals[i  ] = n.x;
             vertNormals[i+1] = n.y;
             vertNormals[i+2] = n.z;
         }
-    }
-    
-    if (multInd) {
-        this._multiIndIndices = [];
     }
     
     this._normals[0] = vertNormals;
@@ -19440,7 +19873,7 @@ x3dom.Mesh.prototype.splitMesh = function(primStride)
     else
         pStride = primStride;
 
-    var MAX = 65535;
+    var MAX = x3dom.Utils.maxIndexableCoords;
 
     //adapt MAX to match the primitive stride
     MAX = Math.floor(MAX / pStride) * pStride;
@@ -19600,6 +20033,40 @@ x3dom.Mesh.prototype.calcTexCoords = function(mode)
  */
 
 
+/** If used as standalone lib, define some basics first. */
+if (typeof x3dom === "undefined")
+{
+    x3dom = {
+        extend: function(f) {
+            function g() {}
+            g.prototype = f.prototype || f;
+            return new g();
+        },
+
+        debug: {
+            logInfo:    function(msg) { console.log(msg); },
+            logWarning: function(msg) { console.warn(msg); },
+            logError:   function(msg) { console.error(msg); }
+        }
+    };
+
+    if (!Array.map) {
+        Array.map = function(array, fun, thisp) {
+            var len = array.length;
+            var res = [];
+            for (var i = 0; i < len; i++) {
+                if (i in array) {
+                    res[i] = fun.call(thisp, array[i], i, array);
+                }
+            }
+            return res;
+        };
+    }
+
+    console.log("Using x3dom fields.js as standalone math and/or base types library.");
+}
+
+
 /** @namespace The x3dom.fields namespace. */
 x3dom.fields = {};
 
@@ -19613,7 +20080,7 @@ x3dom.fields.Eps = 0.000001;
 ///////////////////////////////////////////////////////////////////////////////
 /** SFMatrix4f constructor. 
     @class Represents a SFMatrix4f
-    @TODO: use 2-dim array instead of _xx
+    THINKABOUTME: use 2-dim array instead of _xx?
   */
 x3dom.fields.SFMatrix4f = function(	_00, _01, _02, _03, 
 									_10, _11, _12, _13, 
@@ -19758,6 +20225,50 @@ x3dom.fields.SFMatrix4f.lookAt = function (from, at, up)
     return tmp;
 };
 
+//! Calculates perspective projection matrix
+x3dom.fields.SFMatrix4f.perspective = function(fov, aspect, near, far)
+{
+    var f = 1 / Math.tan(fov / 2);
+
+    return new x3dom.fields.SFMatrix4f(
+        f/aspect, 0, 0, 0,
+        0, f, 0, 0,
+        0, 0, (near+far)/(near-far), 2*near*far/(near-far),
+        0, 0, -1, 0
+    );
+};
+
+//! Calculates orthogonal projection matrix
+x3dom.fields.SFMatrix4f.ortho = function(left, right, bottom, top, near, far, aspect)
+{
+    var rl = (right - left) / 2;    // hs
+    var tb = (top - bottom) / 2;    // vs
+    var fn = far - near;
+
+    if (aspect === undefined)
+        aspect = 1.0;
+
+    if (aspect < (rl / tb))
+        tb = rl / aspect;
+    else
+        rl = tb * aspect;
+
+    left = -rl;
+    right = rl;
+    bottom = -tb;
+    top = tb;
+
+    rl *= 2;
+    tb *= 2;
+
+    return new x3dom.fields.SFMatrix4f(
+        2 / rl, 0, 0,  -(right+left) / rl,
+        0, 2 / tb, 0,  -(top+bottom) / tb,
+        0, 0, -2 / fn, -(far+near) / fn,
+        0, 0, 0, 1
+    );
+};
+
 x3dom.fields.SFMatrix4f.prototype.setTranslate = function (vec) {
     this._03 = vec.x;
     this._13 = vec.y;
@@ -19768,6 +20279,22 @@ x3dom.fields.SFMatrix4f.prototype.setScale = function (vec) {
     this._00 = vec.x;
     this._11 = vec.y;
     this._22 = vec.z;
+};
+
+x3dom.fields.SFMatrix4f.prototype.setRotate = function (quat) {
+    var xx = quat.x * quat.x;
+    var xy = quat.x * quat.y;
+    var xz = quat.x * quat.z;
+    var yy = quat.y * quat.y;
+    var yz = quat.y * quat.z;
+    var zz = quat.z * quat.z;
+    var wx = quat.w * quat.x;
+    var wy = quat.w * quat.y;
+    var wz = quat.w * quat.z;
+
+    this._00 = 1 - 2 * (yy + zz); this._01 = 2 * (xy - wz); this._02 = 2 * (xz + wy);
+    this._10 = 2 * (xy + wz); this._11 = 1 - 2 * (xx + zz); this._12 = 2 * (yz - wx);
+    this._20 = 2 * (xz - wy); this._21 = 2 * (yz + wx); this._22 = 1 - 2 * (xx + yy);
 };
 
 x3dom.fields.SFMatrix4f.parseRotation = function (str) {
@@ -19947,6 +20474,13 @@ x3dom.fields.SFMatrix4f.prototype.setValue = function (v1, v2, v3, v4) {
         this._23 = v4.z;
         this._33 = 1;
     }
+};
+
+x3dom.fields.SFMatrix4f.prototype.setFromArray = function (a) {
+    this._00 = a[0]; this._01 = a[4]; this._02 = a[ 8]; this._03 = a[12];
+    this._10 = a[1]; this._11 = a[5]; this._12 = a[ 9]; this._13 = a[13];
+    this._20 = a[2]; this._21 = a[6]; this._22 = a[10]; this._23 = a[14];
+    this._30 = a[3]; this._31 = a[7]; this._32 = a[11]; this._33 = a[15];
 };
 
 x3dom.fields.SFMatrix4f.prototype.toGL = function () {
@@ -20434,7 +20968,7 @@ x3dom.fields.SFMatrix4f.prototype.det3 = function (a1, a2, a3, b1, b2, b3, c1, c
             (a1 * b3 * c2) - (a2 * b1 * c3) - (a3 * b2 * c1));
 };
 
-//! Returns the determinat of the whole 4x4 matrix
+//! Returns the determinant of the whole 4x4 matrix
 x3dom.fields.SFMatrix4f.prototype.det = function () {
     var a1 = this._00;
     var b1 = this._10;
@@ -20462,7 +20996,7 @@ x3dom.fields.SFMatrix4f.prototype.det = function () {
             d1 * this.det3(a2, a3, a4, b2, b3, b4, c2, c3, c4));
 };
 
-/** Method to inverts the matrix, given that matrix is not singular */
+/** Method to invert the matrix, given that matrix is not singular */
 x3dom.fields.SFMatrix4f.prototype.inverse = function () {
     var a1 = this._00;
     var b1 = this._10;
@@ -20486,7 +21020,8 @@ x3dom.fields.SFMatrix4f.prototype.inverse = function () {
 
     var rDet = this.det();
 
-    if (Math.abs(rDet) < 1e-30)
+    //if (Math.abs(rDet) < 1e-30)
+    if (rDet == 0)
     {
         x3dom.debug.logWarning("Invert matrix: singular matrix, no inverse!");
         return x3dom.fields.SFMatrix4f.identity();
@@ -20610,7 +21145,8 @@ x3dom.fields.SFMatrix4f.prototype.setValueByStr = function(str) {
   */
 x3dom.fields.SFVec2f = function(x, y) {
     if (arguments.length === 0) {
-        this.x = this.y = 0;
+        this.x = 0;
+        this.y = 0;
     }
     else {
         this.x = x;
@@ -20661,7 +21197,7 @@ x3dom.fields.SFVec2f.prototype.reflect = function (n) {
     return new x3dom.fields.SFVec2f(this.x-d2*n.x, this.y-d2*n.y);
 };
 
-x3dom.fields.SFVec2f.prototype.normalize = function (that) {
+x3dom.fields.SFVec2f.prototype.normalize = function() {
     var n = this.length();
     if (n) { n = 1.0 / n; }
     return new x3dom.fields.SFVec2f(this.x*n, this.y*n);
@@ -20711,7 +21247,9 @@ x3dom.fields.SFVec2f.prototype.setValueByStr = function(str) {
   */
 x3dom.fields.SFVec3f = function(x, y, z) {
     if (arguments.length === 0) {
-        this.x = this.y = this.z = 0;
+        this.x = 0;
+        this.y = 0;
+        this.z = 0;
     }
     else {
         this.x = x;
@@ -20784,8 +21322,8 @@ x3dom.fields.SFVec3f.prototype.dot = function (that) {
 
 x3dom.fields.SFVec3f.prototype.cross = function (that) {
     return new x3dom.fields.SFVec3f( this.y*that.z - this.z*that.y, 
-                                    this.z*that.x - this.x*that.z, 
-                                    this.x*that.y - this.y*that.x );
+                                     this.z*that.x - this.x*that.z,
+                                     this.x*that.y - this.y*that.x );
 };
 
 x3dom.fields.SFVec3f.prototype.reflect = function (n) {
@@ -20797,7 +21335,7 @@ x3dom.fields.SFVec3f.prototype.length = function() {
     return Math.sqrt((this.x*this.x) + (this.y*this.y) + (this.z*this.z));
 };
 
-x3dom.fields.SFVec3f.prototype.normalize = function (that) {
+x3dom.fields.SFVec3f.prototype.normalize = function() {
     var n = this.length();
     if (n) { n = 1.0 / n; }
     return new x3dom.fields.SFVec3f(this.x*n, this.y*n, this.z*n);
@@ -20854,7 +21392,10 @@ x3dom.fields.SFVec3f.prototype.setValueByStr = function(str) {
   */
 x3dom.fields.SFVec4f = function(x, y, z, w) {
     if (arguments.length === 0) {
-        this.x = this.y = this.z = this.w = 0;
+        this.x = 0;
+        this.y = 0;
+        this.z = 0;
+        this.w = 0;
     }
     else {
         this.x = x;
@@ -20896,10 +21437,22 @@ x3dom.fields.SFVec4f.prototype.toString = function () {
     @class Represents a Quaternion
   */
 x3dom.fields.Quaternion = function(x, y, z, w) {
-    this.x = x;
-    this.y = y;
-    this.z = z;
-    this.w = w;
+    if (arguments.length === 0) {
+        this.x = 0;
+        this.y = 0;
+        this.z = 1;
+        this.w = 0;
+    }
+    else {
+        this.x = x;
+        this.y = y;
+        this.z = z;
+        this.w = w;
+    }
+};
+
+x3dom.fields.Quaternion.copy = function(v) {
+    return new x3dom.fields.Quaternion(v.x, v.y, v.z, v.w);
 };
 
 x3dom.fields.Quaternion.prototype.multiply = function (that) {
@@ -21077,10 +21630,7 @@ x3dom.fields.Quaternion.prototype.setValues = function (that) {
 };
 
 x3dom.fields.Quaternion.prototype.equals = function (that, eps) {
-    return Math.abs(this.x - that.x) < eps && 
-           Math.abs(this.y - that.y) < eps &&
-           Math.abs(this.z - that.z) < eps && 
-           Math.abs(this.w - that.w) < eps;
+    return (this.dot(that) >= 1.0 - eps);
 };
 
 x3dom.fields.Quaternion.prototype.multScalar = function (s) {
@@ -21218,7 +21768,9 @@ x3dom.fields.Quaternion.prototype.setValueByStr = function(str) {
   */
 x3dom.fields.SFColor = function(r, g, b) {
     if (arguments.length === 0) {
-        this.r = this.g = this.b = 0;
+        this.r = 0;
+        this.g = 0;
+        this.b = 0;
     }
     else {
         this.r = r;
@@ -21381,7 +21933,10 @@ x3dom.fields.SFColor.colorParse = function(color) {
   */
 x3dom.fields.SFColorRGBA = function(r, g, b, a) {
     if (arguments.length === 0) {
-        this.r = this.g = this.b = this.a = 0;
+        this.r = 0;
+        this.g = 0;
+        this.b = 0;
+        this.a = 1;
     }
     else {
         this.r = r;
@@ -21448,14 +22003,17 @@ x3dom.fields.SFColorRGBA.prototype.setValueByStr = function(str) {
   */
 x3dom.fields.SFImage = function(w, h, c, arr) {
     if (arguments.length === 0 || !(arr && arr.map)) {
-        this.width = this.height = this.comp = 0;
+        this.width = 0;
+        this.height = 0;
+        this.comp = 0;
         this.array = [];
     }
     else {
         this.width = w;
         this.height = h;
         this.comp = c;
-        arr.map( function(v) { this.array.push(v); }, this.array );
+        var that = this.array;
+        arr.map( function(v) { that.push(v); }, this.array );
     }
 };
 
@@ -21492,7 +22050,7 @@ x3dom.fields.SFImage.prototype.setValueByStr = function(str) {
         }
         
         if (mc[i].substr(1,1).toLowerCase() !== "x") {
-            // TODO; optimize by directly parsing value!
+            // Maybe optimize by directly parsing value!
             var out = "";
             var inp = parseInt(mc[i], 10);
             
@@ -21563,7 +22121,8 @@ x3dom.fields.SFImage.prototype.toGL = function() {
 x3dom.fields.MFColor = function(colorArray) {
 
     if (arguments.length === 0) {
-    } else {
+    }
+    else {
         var that = this;
         colorArray.map( function(c) { that.push(c); }, this );
     }
@@ -21912,7 +22471,7 @@ x3dom.fields.MFString = function(strArray) {
 
 x3dom.fields.MFString.parse = function(str) {
     var arr = [];
-    // TODO: ignore leading whitespace?
+    // ignore leading whitespace?
     if (str.length && str[0] == '"') {
         var m, re = /"((?:[^\\"]|\\\\|\\")*)"/g;
         while ((m = re.exec(str))) {
@@ -21935,7 +22494,7 @@ x3dom.fields.MFString.prototype.setValueByStr = function(str) {
     while (arr.length) {
         arr.pop();
     }
-    // TODO: ignore leading whitespace?
+    // ignore leading whitespace?
     if (str.length && str[0] == '"') {
         var m, re = /"((?:[^\\"]|\\\\|\\")*)"/g;
         while ((m = re.exec(str))) {
@@ -22888,6 +23447,9 @@ x3dom.NodeNameSpace.prototype.setupTree = function (domNode) {
                     }
                 }
             }
+            if (n) {
+                domNode._x3domNode = n;
+            }
             return n;
         }
         else {
@@ -22914,7 +23476,11 @@ x3dom.NodeNameSpace.prototype.setupTree = function (domNode) {
                 x3dom.debug.logWarning("Unrecognised X3D element &lt;" + domNode.localName + "&gt;.");
             }
             else {
-                var ctx = { doc: this.doc, xmlNode: domNode, nameSpace: this };
+                var ctx = {
+                    doc: this.doc,
+                    xmlNode: domNode,
+                    nameSpace: this
+                };
                 n = new nodeType(ctx);
                 
                 //active workaround for missing DOMAttrModified support
@@ -22952,23 +23518,6 @@ x3dom.NodeNameSpace.prototype.setupTree = function (domNode) {
                     domNode.highlight = function(enable, colorStr) {
                         var color = x3dom.fields.SFColor.parse(colorStr);
                         this._x3domNode.highlight(enable, color);
-                        this._x3domNode._nameSpace.doc.needRender = true;
-                    };
-                }
-
-                // add very experimental visibility-switch functionality
-                // (might be removed again in later versions from x3dom)
-                if (domNode.setVisibility === undefined &&
-                    domNode.resetVisibility === undefined &&
-                    x3dom.isa(n, x3dom.nodeTypes.X3DBoundedNode))
-                {
-                    domNode.setVisibility = function(on) {
-                        this._x3domNode.setVisibility(on);
-                        this._x3domNode._nameSpace.doc.needRender = true;
-                    };
-
-                    domNode.resetVisibility = function() {
-                        this._x3domNode.resetVisibility();
                         this._x3domNode._nameSpace.doc.needRender = true;
                     };
                 }
@@ -23016,6 +23565,8 @@ x3dom.registerNodeType(
     "X3DNode",
     "Core",
     defineClass(null, function (ctx) {
+        // reference to DOM element
+        this._xmlNode = null;
 
         // holds a link to the node name
         this._DEF = null;
@@ -23403,7 +23954,11 @@ x3dom.registerNodeType(
         
 		callEvtHandler: function(eventType, event) {
 			var node = this;
-			
+
+            if (!node._xmlNode) {
+                return event.cancelBubble;
+            }
+
 			try {
 				var attrib = node._xmlNode[eventType];
 				event.target = node._xmlNode;
@@ -23439,10 +23994,11 @@ x3dom.registerNodeType(
 			}
 			else {
 			    //IE has no __defineSetter__ !!!
-				Object.defineProperty(xmlNode, name, { 
-					set: function(value) { 
+				Object.defineProperty(xmlNode, name, {
+					set: function(value) {
 						xmlNode.setAttribute(name, value); 
-					} 
+					},
+                    configurable: true
 				});	
       		}
       		
@@ -24012,36 +24568,6 @@ x3dom.registerNodeType(
             forceUpdateCoverage: function()
             {
                 return false;
-            },
-
-            setVisibility: function(on)
-            {
-                if (on != this._vf.render) {
-                    this._actRender = this._vf.render;
-                    this._vf.render = on;
-                }
-
-                for (var i=0, n=this._childNodes.length; i<n; i++)
-                {
-                    var child = this._childNodes[i];
-                    if (child && child.setVisibility)
-                        child.setVisibility(on);
-                }
-            },
-
-            resetVisibility: function()
-            {
-                if (this._actRender !== undefined &&
-                    this._actRender != this._vf.render) {
-                    this._vf.render = this._actRender;
-                }
-
-                for (var i=0, n=this._childNodes.length; i<n; i++)
-                {
-                    var child = this._childNodes[i];
-                    if (child && child.resetVisibility)
-                        child.resetVisibility();
-                }
             }
         }
     )
@@ -25246,6 +25772,7 @@ x3dom.BindableBag.prototype.addBindable = function(node) {
  * Philip Taylor: http://philip.html5.org
  */
 
+
 /* ### X3DGeometryNode ### */
 x3dom.registerNodeType(
     "X3DGeometryNode",
@@ -25302,11 +25829,13 @@ x3dom.registerNodeType(
             },
 
             parentAdded: function(parent) {
-                if (parent._cleanupGLObjects) {
-                    parent._cleanupGLObjects(true);
+                if (x3dom.isa(parent, x3dom.nodeTypes.X3DShapeNode)) {
+                    if (parent._cleanupGLObjects) {
+                        parent._cleanupGLObjects(true);
+                    }
+                    parent.setAllDirty();
+                    parent.invalidateVolume();
                 }
-                parent.setAllDirty();
-                parent.invalidateVolume();
             }
         }
     )
@@ -25384,6 +25913,8 @@ x3dom.registerNodeType(
 
             this.addField_SFNode('coord', x3dom.nodeTypes.Coordinate);
             this.addField_SFNode('color', x3dom.nodeTypes.X3DColorNode);
+
+            this._mesh._primType = 'POINTS';
         },
         {
             nodeChanged: function()
@@ -25464,6 +25995,7 @@ x3dom.registerNodeType(
 
             this.addField_SFBool(ctx, 'colorPerVertex', true);
             this.addField_SFBool(ctx, 'normalPerVertex', true);
+            this.addField_SFString(ctx, 'normalUpdateMode', 'fast');  // none; fast; nice
 
             this.addField_MFNode('attrib', x3dom.nodeTypes.X3DVertexAttributeNode);
 
@@ -25531,6 +26063,8 @@ x3dom.registerNodeType(
 
             this.addField_MFInt32(ctx, 'coordIndex', []);
             this.addField_MFInt32(ctx, 'colorIndex', []);
+
+            this._mesh._primType = 'LINES';
         },
         {
             nodeChanged: function()
@@ -25582,7 +26116,7 @@ x3dom.registerNodeType(
                 var p0, p1, c0, c1;
 
                 // Found MultiIndex Mesh OR LineSet with too many vertices for 16 bit
-                if ( (hasColor && hasColorInd) || positions.length > 65535 )
+                if ( (hasColor && hasColorInd) || positions.length > x3dom.Utils.maxIndexableCoords )
                 {
                     t = 0;
                     cnt = 0;
@@ -25673,7 +26207,7 @@ x3dom.registerNodeType(
                     }
 
                     //if the LineSet is too large for 16 bit indices, split it!
-                    if (positions.length > 65535)
+                    if (positions.length > x3dom.Utils.maxIndexableCoords)
                         this._mesh.splitMesh(2);
                 } // if isMulti
                 else
@@ -25716,7 +26250,6 @@ x3dom.registerNodeType(
 
             fieldChanged: function(fieldName)
             {
-                //@todo: handle field updates for over-sized LineSets
                 var pnts = null;
                 
                 if (fieldName == "coord")
@@ -25864,7 +26397,7 @@ x3dom.registerNodeType(
                 }
                 posMax = positions.length;
 
-                if (!normPerVert || posMax > 65535)
+                if (!normPerVert || posMax > x3dom.Utils.maxIndexableCoords)
                 {
                     t = 0;
                     cnt = 0;
@@ -26080,7 +26613,7 @@ x3dom.registerNodeType(
             {
                 var pnts = this._cf.coord.node._vf.point;
                 
-                if ( pnts.length > 65535 )  // are there other problematic cases?
+                if ( pnts.length > x3dom.Utils.maxIndexableCoords )  // are there other problematic cases?
                 {
 					// TODO; implement
                     x3dom.debug.logWarning("IndexedTriangleSet: fieldChanged with " + 
@@ -26182,6 +26715,7 @@ x3dom.registerNodeType(
                         node._dirty.texcoords = true;
                     });
                 }
+                // TODO: index
             }
         }
     )
@@ -26282,7 +26816,7 @@ x3dom.registerNodeType(
 				
 				var faceCnt = 0, cnt = 0;
 				
-				if (hasNormal && positions.length <= 65535)
+				if (hasNormal && positions.length <= x3dom.Utils.maxIndexableCoords)
 				{
                     this._hasIndexOffset = true;
                     this._indexOffset = [];
@@ -26491,7 +27025,7 @@ x3dom.registerNodeType(
         		
                 var pnts = this._cf.coord.node._vf.point;
                 
-				if ((this._cf.normal.node === null) || (pnts.length > 65535))
+				if ((this._cf.normal.node === null) || (pnts.length > x3dom.Utils.maxIndexableCoords))
                 {
 					if (fieldName == "coord") {
 						this._mesh._positions[0] = [];
@@ -27194,6 +27728,8 @@ x3dom.registerNodeType(
             this.addField_SFNode('material', x3dom.nodeTypes.X3DMaterialNode);
             this.addField_SFNode('texture',  x3dom.nodeTypes.X3DTextureNode);
             this.addField_SFNode('textureTransform', x3dom.nodeTypes.X3DTextureTransformNode);
+            this.addField_SFNode('lineProperties', x3dom.nodeTypes.LineProperties);
+            this.addField_SFNode('colorMaskMode', x3dom.nodeTypes.ColorMaskMode);
             this.addField_SFNode('blendMode', x3dom.nodeTypes.BlendMode);
             this.addField_SFNode('depthMode', x3dom.nodeTypes.DepthMode);
             this.addField_MFNode('shaders', x3dom.nodeTypes.X3DShaderNode);
@@ -27310,6 +27846,40 @@ x3dom.registerNodeType(
     )
 );
 
+/* ### ColorMaskMode ### */
+x3dom.registerNodeType(
+    "ColorMaskMode",
+    "Shape",
+    defineClass(x3dom.nodeTypes.X3DAppearanceChildNode,
+        function (ctx) {
+            x3dom.nodeTypes.ColorMaskMode.superClass.call(this, ctx);
+
+            this.addField_SFBool(ctx, 'maskR', true);
+            this.addField_SFBool(ctx, 'maskG', true);
+            this.addField_SFBool(ctx, 'maskB', true);
+            this.addField_SFBool(ctx, 'maskA', true);
+        }
+    )
+);
+
+/* ### LineProperties ### */
+x3dom.registerNodeType(
+    "LineProperties",
+    "Shape",
+    defineClass(x3dom.nodeTypes.X3DAppearanceChildNode,
+        function (ctx) {
+            x3dom.nodeTypes.LineProperties.superClass.call(this, ctx);
+
+            // http://www.web3d.org/files/specifications/19775-1/V3.2/Part01/components/shape.html#LineProperties
+            // THINKABOUTME: to my mind, the only useful, but missing, field is linewidth (scaleFactor is overhead)
+            this.addField_SFBool(ctx, 'applied', true);
+            this.addField_SFInt32(ctx, 'linetype', 1);
+            this.addField_SFFloat(ctx, 'linewidthScaleFactor', 0);
+        }
+    )
+);
+
+
 /* ### X3DMaterialNode ### */
 x3dom.registerNodeType(
     "X3DMaterialNode",
@@ -27317,6 +27887,13 @@ x3dom.registerNodeType(
     defineClass(x3dom.nodeTypes.X3DAppearanceChildNode,
         function (ctx) {
             x3dom.nodeTypes.X3DMaterialNode.superClass.call(this, ctx);
+
+            this.addField_SFFloat(ctx, 'ambientIntensity', 0.2);
+            this.addField_SFColor(ctx, 'diffuseColor', 0.8, 0.8, 0.8);
+            this.addField_SFColor(ctx, 'emissiveColor', 0, 0, 0);
+            this.addField_SFFloat(ctx, 'shininess', 0.2);
+            this.addField_SFColor(ctx, 'specularColor', 0, 0, 0);
+            this.addField_SFFloat(ctx, 'transparency', 0);
         }
     )
 );
@@ -27328,13 +27905,6 @@ x3dom.registerNodeType(
     defineClass(x3dom.nodeTypes.X3DMaterialNode,
         function (ctx) {
             x3dom.nodeTypes.Material.superClass.call(this, ctx);
-
-            this.addField_SFFloat(ctx, 'ambientIntensity', 0.2);
-            this.addField_SFColor(ctx, 'diffuseColor', 0.8, 0.8, 0.8);
-            this.addField_SFColor(ctx, 'emissiveColor', 0, 0, 0);
-            this.addField_SFFloat(ctx, 'shininess', 0.2);
-            this.addField_SFColor(ctx, 'specularColor', 0, 0, 0);
-            this.addField_SFFloat(ctx, 'transparency', 0);
         },
 		{
 			fieldChanged: function(fieldName) {
@@ -27360,6 +27930,44 @@ x3dom.nodeTypes.Material.defaultNode = function() {
     }
     return x3dom.nodeTypes.Material._defaultNode;
 };
+
+/* ### TwoSidedMaterial ### */
+x3dom.registerNodeType(
+    "TwoSidedMaterial",
+    "Shape",
+    defineClass(x3dom.nodeTypes.X3DMaterialNode,
+        function (ctx) {
+            x3dom.nodeTypes.TwoSidedMaterial.superClass.call(this, ctx);
+
+            this.addField_SFFloat(ctx, 'backAmbientIntensity', 0.2);
+            this.addField_SFColor(ctx, 'backDiffuseColor', 0.8, 0.8, 0.8);
+            this.addField_SFColor(ctx, 'backEmissiveColor', 0, 0, 0);
+            this.addField_SFFloat(ctx, 'backShininess', 0.2);
+            this.addField_SFColor(ctx, 'backSpecularColor', 0, 0, 0);
+            this.addField_SFFloat(ctx, 'backTransparency', 0);
+            this.addField_SFBool(ctx, 'separateBackColor', false);
+        },
+        {
+            fieldChanged: function(fieldName) {
+                if (fieldName == "ambientIntensity" || fieldName == "diffuseColor" ||
+                    fieldName == "emissiveColor" || fieldName == "shininess" ||
+                    fieldName == "specularColor" || fieldName == "transparency" ||
+                    fieldName == "backAmbientIntensity" || fieldName == "backDiffuseColor" ||
+                    fieldName == "backEmissiveColor" || fieldName == "backShininess" ||
+                    fieldName == "backSpecularColor" || fieldName == "backTransparency" ||
+                    fieldName == "separateBackColor")
+                {
+                    Array.forEach(this._parentNodes, function (app) {
+                        Array.forEach(app._parentNodes, function (shape) {
+                            shape._dirty.material = true;
+                        });
+                    });
+                }
+            }
+        }
+    )
+);
+
 
 /* ### X3DShapeNode ### */
 x3dom.registerNodeType(
@@ -27397,7 +28005,7 @@ x3dom.registerNodeType(
             this._texCoordStrideOffset = [0, 0];
             this._colorStrideOffset = [0, 0];
 
-            this._tessellationProperties = null;
+            this._tessellationProperties = [];
         },
         {
             collectDrawableObjects: function (transform, drawableCollection, singlePath, invalidateCache, planeMask)
@@ -27715,7 +28323,9 @@ x3dom.registerNodeType(
 			
 			fieldChanged: function(fieldName)
             {
-				this._dirty = true;
+                if (this._vf.hasOwnProperty(fieldName)) {
+				    this._dirty = true;
+                }
 			},
 
             parentRemoved: function(parent)
@@ -27833,6 +28443,7 @@ x3dom.registerNodeType(
  * Philip Taylor: http://philip.html5.org
  */
 
+
 /* ### X3DFollowerNode ### */
 x3dom.registerNodeType(
     "X3DFollowerNode",
@@ -27847,13 +28458,16 @@ x3dom.registerNodeType(
                 x3dom.debug.logWarning("X3DFollowerNode: No runtime context found!");
             
             this.addField_SFBool(ctx, 'isActive', false);
-            
+
+            // http://www.web3d.org/files/specifications/19775-1/V3.3/Part01/components/followers.html
             // [S|M]F<type> [in]     set_destination
             // [S|M]F<type> [in]     set_value
+            // [S|M]F<type> [out]    value
             // SFBool       [out]    isActive
-            // [S|M]F<type> [out]    value_changed
             // [S|M]F<type> []       initialDestination
             // [S|M]F<type> []       initialValue
+
+            this._eps = 0.001;
         },
         {
             parentRemoved: function(parent)
@@ -27884,7 +28498,7 @@ x3dom.registerNodeType(
                 }
 
                 // When optimizing for speed, the above two if(.) cases can be omitted,
-                // as this funciton will not be called for values outside of 0..duration.
+                // as this function will not be called for values outside of 0..duration.
                 return this.stepResponseCore(t / this._vf.duration);
             },
             
@@ -27911,15 +28525,13 @@ x3dom.registerNodeType(
         function (ctx) {
             x3dom.nodeTypes.X3DChaserNode.superClass.call(this, ctx);
 
-            this.addField_SFTime(ctx, 'duration', 0);
+            this.addField_SFTime(ctx, 'duration', 1);
             
             this._initDone = false;
             this._stepTime = 0;
             this._currTime = 0;
             this._bufferEndTime = 0;
             this._numSupports = 60;
-        },
-        {
         }
     )
 );
@@ -27932,21 +28544,12 @@ x3dom.registerNodeType(
         function (ctx) {
             x3dom.nodeTypes.X3DDamperNode.superClass.call(this, ctx);
 
-            this.addField_SFTime(ctx, 'tau', 0);
+            this.addField_SFTime(ctx, 'tau', 0.3);
             this.addField_SFFloat(ctx, 'tolerance', -1);
-            this.addField_SFInt32(ctx, 'order', 0);
+            this.addField_SFInt32(ctx, 'order', 3);
             
-            this._eps = this._vf.tolerance < 0 ? 0.001 : this._vf.tolerance;
+            this._eps = this._vf.tolerance < 0 ? this._eps : this._vf.tolerance;
             this._lastTick = 0;
-        },
-        {
-            fieldChanged: function(fieldName)
-            {
-                if (fieldName === "tolerance")
-                {
-                    this._eps = this._vf.tolerance < 0 ? 0.001 : this._vf.tolerance;
-                }
-            }
         }
     )
 );
@@ -27961,24 +28564,20 @@ x3dom.registerNodeType(
 
             this.addField_SFColor(ctx, 'initialDestination', 0.8, 0.8, 0.8);
             this.addField_SFColor(ctx, 'initialValue', 0.8, 0.8, 0.8);
-            
-            // How to treat eventIn nicely such that external scripting is handled for set_XXX?
-            this.addField_SFColor(ctx, 'set_value', 0, 0, 0);
-            this.addField_SFColor(ctx, 'set_destination', 0, 0, 0);
+
+            this.addField_SFColor(ctx, 'value', 0, 0, 0);
+            this.addField_SFColor(ctx, 'destination', 0, 0, 0);
             
             this._buffer = new x3dom.fields.MFColor();
             this._previousValue = new x3dom.fields.SFColor(0, 0, 0);
             this._value = new x3dom.fields.SFColor(0, 0, 0);
+
+            this.initialize();
         },
         {
-            nodeChanged: function() 
-            {
-                this.initialize();
-            },
-            
             fieldChanged: function(fieldName)
             {
-                if (fieldName.indexOf("set_destination") >= 0)
+                if (fieldName.indexOf("destination") >= 0)
                 {
                     this.initialize();
                     this.updateBuffer(this._currTime);
@@ -27987,16 +28586,16 @@ x3dom.registerNodeType(
                         this.postMessage('isActive', true);
                     }
                 }
-                else if (fieldName.indexOf("set_value") >= 0)
+                else if (fieldName.indexOf("value") >= 0)
                 {
                     this.initialize();
                     
-                    this._previousValue.setValues(this._vf.set_value);
+                    this._previousValue.setValues(this._vf.value);
                     for (var C=1; C<this._buffer.length; C++) {
-                        this._buffer[C].setValues(this._vf.set_value);
+                        this._buffer[C].setValues(this._vf.value);
                     }
                     
-                    this.postMessage('value_changed', this._vf.set_value);
+                    this.postMessage('value', this._vf.value);
                     
                     if (!this._vf.isActive) {
                         this.postMessage('isActive', true);
@@ -28012,7 +28611,7 @@ x3dom.registerNodeType(
                 {
                     this._initDone = true;
                     
-                    this._vf.set_destination = this._vf.initialDestination;
+                    this._vf.destination = this._vf.initialDestination;
 
                     this._buffer.length = this._numSupports;
 
@@ -28025,7 +28624,7 @@ x3dom.registerNodeType(
 
                     this._stepTime = this._vf.duration / this._numSupports;
                     
-                    var active = !this._buffer[0].equals(this._buffer[1], x3dom.fields.Eps);
+                    var active = !this._buffer[0].equals(this._buffer[1], this._eps);
                     if (this._vf.isActive !== active) {
                         this.postMessage('isActive', active);
                     }
@@ -28046,7 +28645,7 @@ x3dom.registerNodeType(
 
                     this._value = this._vf.initialValue;
                     
-                    this.postMessage('value_changed', this._value);
+                    this.postMessage('value', this._value);
                     
                     return true;
                 }
@@ -28070,10 +28669,10 @@ x3dom.registerNodeType(
                     Output = Output.add(DeltaOut);
                 }
                 
-                if ( !Output.equals(this._value, x3dom.fields.Eps) ) {
+                if ( !Output.equals(this._value, this._eps) ) {
                     this._value.setValues(Output);
                     
-                    this.postMessage('value_changed', this._value);
+                    this.postMessage('value', this._value);
                 }
                 else {
                     this.postMessage('isActive', false);
@@ -28106,15 +28705,15 @@ x3dom.registerNodeType(
                         {
                             Alpha = C / NumToShift;
 
-                            this._buffer[C] = this._buffer[NumToShift].multiply(Alpha).add(this._vf.set_destination.multiply((1 - Alpha)));
+                            this._buffer[C] = this._buffer[NumToShift].multiply(Alpha).add(this._vf.destination.multiply((1 - Alpha)));
                         }
                     }
                     else
                     {
-                        this._previousValue = (NumToShift == this._buffer.length) ? this._buffer[0] : this._vf.set_destination;
+                        this._previousValue = (NumToShift == this._buffer.length) ? this._buffer[0] : this._vf.destination;
 
                         for (C= 0; C<this._buffer.length; C++) {
-                            this._buffer[C] = this._vf.set_destination;
+                            this._buffer[C] = this._vf.destination;
                         }
                     }
                     this._bufferEndTime += NumToShift * this._stepTime;
@@ -28135,10 +28734,9 @@ x3dom.registerNodeType(
 
             this.addField_SFColor(ctx, 'initialDestination', 0.8, 0.8, 0.8);
             this.addField_SFColor(ctx, 'initialValue', 0.8, 0.8, 0.8);
-            
-            // How to treat eventIn nicely such that external scripting is handled for set_XXX?
-            this.addField_SFColor(ctx, 'set_value', 0, 0, 0);
-            this.addField_SFColor(ctx, 'set_destination', 0, 0, 0);
+
+            this.addField_SFColor(ctx, 'value', 0, 0, 0);
+            this.addField_SFColor(ctx, 'destination', 0, 0, 0);
             
             this._value0 = new x3dom.fields.SFColor(0, 0, 0);
             this._value1 = new x3dom.fields.SFColor(0, 0, 0);
@@ -28152,10 +28750,14 @@ x3dom.registerNodeType(
         {
             fieldChanged: function(fieldName)
             {
-                if (fieldName.indexOf("set_destination") >= 0)
+                if (fieldName === "tolerance")
                 {
-                    if ( !this._value0.equals(this._vf.set_destination, this._eps) ) {
-                        this._value0 = this._vf.set_destination;
+                    this._eps = this._vf.tolerance < 0 ? 0.001 : this._vf.tolerance;
+                }
+                else if (fieldName.indexOf("destination") >= 0)
+                {
+                    if ( !this._value0.equals(this._vf.destination, this._eps) ) {
+                        this._value0 = this._vf.destination;
                         
                         if (!this._vf.isActive) {
                             //this._lastTick = 0;
@@ -28163,16 +28765,16 @@ x3dom.registerNodeType(
                         }
                     }
                 }
-                else if (fieldName.indexOf("set_value") >= 0)
+                else if (fieldName.indexOf("value") >= 0)
                 {
-                    this._value1.setValues(this._vf.set_value);
-                    this._value2.setValues(this._vf.set_value);
-                    this._value3.setValues(this._vf.set_value);
-                    this._value4.setValues(this._vf.set_value);
-                    this._value5.setValues(this._vf.set_value);
+                    this._value1.setValues(this._vf.value);
+                    this._value2.setValues(this._vf.value);
+                    this._value3.setValues(this._vf.value);
+                    this._value4.setValues(this._vf.value);
+                    this._value5.setValues(this._vf.value);
                     this._lastTick = 0;
                     
-                    this.postMessage('value_changed', this._value5);
+                    this.postMessage('value', this._value5);
                     
                     if (!this._vf.isActive) {
                         this._lastTick = 0;
@@ -28271,7 +28873,7 @@ x3dom.registerNodeType(
                     this._value4.setValues(this._value0);
                     this._value5.setValues(this._value0);
                     
-                    this.postMessage('value_changed', this._value0);
+                    this.postMessage('value', this._value0);
                     this.postMessage('isActive', false);
                     
                     this._lastTick = 0;
@@ -28279,7 +28881,7 @@ x3dom.registerNodeType(
                     return false;
                 }
                 
-                this.postMessage('value_changed', this._value5);
+                this.postMessage('value', this._value5);
 
                 this._lastTick = now;
 
@@ -28299,25 +28901,21 @@ x3dom.registerNodeType(
 
             this.addField_SFRotation(ctx, 'initialDestination', 0, 1, 0, 0);
             this.addField_SFRotation(ctx, 'initialValue', 0, 1, 0, 0);
-            
-            // How to treat eventIn nicely such that external scripting is handled for set_XXX?
-            this.addField_SFRotation(ctx, 'set_value', 0, 1, 0, 0);
-            this.addField_SFRotation(ctx, 'set_destination', 0, 1, 0, 0);
+
+            this.addField_SFRotation(ctx, 'value', 0, 1, 0, 0);
+            this.addField_SFRotation(ctx, 'destination', 0, 1, 0, 0);
             
             this._numSupports = 30;
             this._buffer = new x3dom.fields.MFRotation();
             this._previousValue = new x3dom.fields.Quaternion(0, 1, 0, 0);
             this._value = new x3dom.fields.Quaternion(0, 1, 0, 0);
+
+            this.initialize();
         },
         {
-            nodeChanged: function() 
-            {
-                this.initialize();
-            },
-            
             fieldChanged: function(fieldName)
             {
-                if (fieldName.indexOf("set_destination") >= 0)
+                if (fieldName.indexOf("destination") >= 0)
                 {
                     this.initialize();
                     this.updateBuffer(this._currTime);
@@ -28326,16 +28924,16 @@ x3dom.registerNodeType(
                         this.postMessage('isActive', true);
                     }
                 }
-                else if (fieldName.indexOf("set_value") >= 0)
+                else if (fieldName.indexOf("value") >= 0)
                 {
                     this.initialize();
                     
-                    this._previousValue.setValues(this._vf.set_value);
+                    this._previousValue.setValues(this._vf.value);
                     for (var C=1; C<this._buffer.length; C++) {
-                        this._buffer[C].setValues(this._vf.set_value);
+                        this._buffer[C].setValues(this._vf.value);
                     }
                     
-                    this.postMessage('value_changed', this._vf.set_value);
+                    this.postMessage('value', this._vf.value);
                     
                     if (!this._vf.isActive) {
                         this.postMessage('isActive', true);
@@ -28352,20 +28950,20 @@ x3dom.registerNodeType(
                 {
                     this._initDone = true;
                     
-                    this._vf.set_destination = this._vf.initialDestination;
+                    this._vf.destination = x3dom.fields.Quaternion.copy(this._vf.initialDestination);
 
                     this._buffer.length = this._numSupports;
 
-                    this._buffer[0] = this._vf.initialDestination;
+                    this._buffer[0] = x3dom.fields.Quaternion.copy(this._vf.initialDestination);
                     for (var C=1; C<this._buffer.length; C++) {
-                        this._buffer[C] = this._vf.initialValue;
+                        this._buffer[C] = x3dom.fields.Quaternion.copy(this._vf.initialValue);
                     }
 
-                    this._previousValue = this._vf.initialValue;
+                    this._previousValue = x3dom.fields.Quaternion.copy(this._vf.initialValue);
 
                     this._stepTime = this._vf.duration / this._numSupports;
                     
-                    var active = !this._buffer[0].equals(this._buffer[1], x3dom.fields.Eps);
+                    var active = !this._buffer[0].equals(this._buffer[1], this._eps);
                     if (this._vf.isActive !== active) {
                         this.postMessage('isActive', active);
                     }
@@ -28384,9 +28982,9 @@ x3dom.registerNodeType(
                 {
                     this._bufferEndTime = now; // first event we received, so we are in the initialization phase.
 
-                    this._value = this._vf.initialValue;
+                    this._value = x3dom.fields.Quaternion.copy(this._vf.initialValue);
                     
-                    this.postMessage('value_changed', this._value);
+                    this.postMessage('value', this._value);
                     
                     return true;
                 }
@@ -28398,14 +28996,14 @@ x3dom.registerNodeType(
                 // This means we calculate the delta between each entry in _buffer and its previous
                 // entries, calculate the step response of each such step and add it to form the output.
 
-                // The oldest vaule _buffer[_buffer.length - 1] needs some extra thought, because it has
+                // The oldest value _buffer[_buffer.length - 1] needs some extra thought, because it has
                 // no previous value. More exactly, we haven't stored a previous value anymore.
                 // However, the step response of that missing previous value has already reached its
                 // destination, so we can - would we have that previous value - use this as a start point
                 // for adding the step responses.
                 // Actually updateBuffer(.) maintains this value in
 
-                var Output = this._previousValue;
+                var Output = x3dom.fields.Quaternion.copy(this._previousValue);
 
                 var DeltaIn = this._previousValue.inverse().multiply(this._buffer[this._buffer.length - 1]);
                 
@@ -28417,12 +29015,12 @@ x3dom.registerNodeType(
                     
                     Output = Output.slerp(Output.multiply(DeltaIn), this.stepResponse((C + Frac) * this._stepTime));
                 }
-                
-                if ( !Output.equals(this._value, x3dom.fields.Eps) ) {
+
+                if ( !Output.equals(this._value, this._eps) ) {
                     Output = Output.normalize(Output);
                     this._value.setValues(Output);
-                    
-                    this.postMessage('value_changed', this._value);
+
+                    this.postMessage('value', this._value);
                 }
                 else {
                     this.postMessage('isActive', false);
@@ -28439,7 +29037,6 @@ x3dom.registerNodeType(
                 var Alpha;
                 // is normally < 1. When it has grown to be larger than 1, we have to shift the array because the step response
                 // of the oldest entry has already reached its destination, and it's time for a newer entry.
-                // has already reached it
                 // In the case of a very low frame rate, or a very short _stepTime we may need to shift by more than one entry.
 
                 if (Frac >= 1)
@@ -28450,10 +29047,10 @@ x3dom.registerNodeType(
                     if( NumToShift < this._buffer.length)
                     {   
                         // normal case
-                        this._previousValue = this._buffer[this._buffer.length - NumToShift];
+                        this._previousValue = x3dom.fields.Quaternion.copy(this._buffer[this._buffer.length - NumToShift]);
 
                         for (C=this._buffer.length - 1; C>=NumToShift; C--) {
-                            this._buffer[C] = this._buffer[C - NumToShift];
+                            this._buffer[C] = x3dom.fields.Quaternion.copy(this._buffer[C - NumToShift]);
                         }
 
                         for (C=0; C<NumToShift; C++)
@@ -28463,7 +29060,7 @@ x3dom.registerNodeType(
                             // Therefore we do a linear interpolation from the latest value in the buffer to destination.
                             Alpha = C / NumToShift;
 
-                            this._buffer[C] = this._vf.set_destination.slerp(this._buffer[NumToShift], Alpha);
+                            this._buffer[C] = this._vf.destination.slerp(this._buffer[NumToShift], Alpha);
                         }
                     }
                     else
@@ -28475,13 +29072,14 @@ x3dom.registerNodeType(
                         // Maybe we could write part of a linear interpolation
                         // from this._buffer[0] to destination, that goes from this._bufferEndTime to now
                         // (possibly only the end of the interpolation is to be written),
-                        // but if we rech here we are in a very degenerate case...
+                        // but if we reach here we are in a very degenerate case...
                         // Thus we just write destination to the buffer.
 
-                        this._previousValue = (NumToShift == this._buffer.length) ? this._buffer[0] : this._vf.set_destination;
+                        this._previousValue = x3dom.fields.Quaternion.copy((NumToShift == this._buffer.length) ?
+                                                                           this._buffer[0] : this._vf.destination);
 
                         for (C= 0; C<this._buffer.length; C++) {
-                            this._buffer[C] = this._vf.set_destination;
+                            this._buffer[C] = x3dom.fields.Quaternion.copy(this._vf.destination);
                         }
                     }
 
@@ -28504,10 +29102,9 @@ x3dom.registerNodeType(
 
             this.addField_SFRotation(ctx, 'initialDestination', 0, 1, 0, 0);
             this.addField_SFRotation(ctx, 'initialValue', 0, 1, 0, 0);
-            
-            // How to treat eventIn nicely such that external scripting is handled for set_XXX?
-            this.addField_SFRotation(ctx, 'set_value', 0, 1, 0, 0);
-            this.addField_SFRotation(ctx, 'set_destination', 0, 1, 0, 0);
+
+            this.addField_SFRotation(ctx, 'value', 0, 1, 0, 0);
+            this.addField_SFRotation(ctx, 'destination', 0, 1, 0, 0);
             
             this._value0 = new x3dom.fields.Quaternion(0, 1, 0, 0);
             this._value1 = new x3dom.fields.Quaternion(0, 1, 0, 0);
@@ -28521,10 +29118,14 @@ x3dom.registerNodeType(
         {
             fieldChanged: function(fieldName)
             {
-                if (fieldName.indexOf("set_destination") >= 0)
+                if (fieldName === "tolerance")
                 {
-                    if ( !this._value0.equals(this._vf.set_destination, this._eps) ) {
-                        this._value0 = this._vf.set_destination;
+                    this._eps = this._vf.tolerance < 0 ? 0.001 : this._vf.tolerance;
+                }
+                else if (fieldName.indexOf("destination") >= 0)
+                {
+                    if ( !this._value0.equals(this._vf.destination, this._eps) ) {
+                        this._value0 = this._vf.destination;
                         
                         if (!this._vf.isActive) {
                             //this._lastTick = 0;
@@ -28532,16 +29133,16 @@ x3dom.registerNodeType(
                         }
                     }
                 }
-                else if (fieldName.indexOf("set_value") >= 0)
+                else if (fieldName.indexOf("value") >= 0)
                 {
-                    this._value1.setValues(this._vf.set_value);
-                    this._value2.setValues(this._vf.set_value);
-                    this._value3.setValues(this._vf.set_value);
-                    this._value4.setValues(this._vf.set_value);
-                    this._value5.setValues(this._vf.set_value);
+                    this._value1.setValues(this._vf.value);
+                    this._value2.setValues(this._vf.value);
+                    this._value3.setValues(this._vf.value);
+                    this._value4.setValues(this._vf.value);
+                    this._value5.setValues(this._vf.value);
                     this._lastTick = 0;
                     
-                    this.postMessage('value_changed', this._value5);
+                    this.postMessage('value', this._value5);
                     
                     if (!this._vf.isActive) {
                         this._lastTick = 0;
@@ -28632,7 +29233,7 @@ x3dom.registerNodeType(
                     this._value4.setValues(this._value0);
                     this._value5.setValues(this._value0);
                     
-                    this.postMessage('value_changed', this._value0);
+                    this.postMessage('value', this._value0);
                     this.postMessage('isActive', false);
                     
                     this._lastTick = 0;
@@ -28640,7 +29241,7 @@ x3dom.registerNodeType(
                     return false;
                 }
                 
-                this.postMessage('value_changed', this._value5);
+                this.postMessage('value', this._value5);
 
                 this._lastTick = now;
 
@@ -28660,28 +29261,20 @@ x3dom.registerNodeType(
             
             this.addField_SFVec3f(ctx, 'initialDestination', 0, 0, 0);
             this.addField_SFVec3f(ctx, 'initialValue', 0, 0, 0);
-            
-            // How to treat eventIn nicely such that external scripting is handled for set_XXX?
-            this.addField_SFVec3f(ctx, 'set_value', 0, 0, 0);
-            this.addField_SFVec3f(ctx, 'set_destination', 0, 0, 0);
+
+            this.addField_SFVec3f(ctx, 'value', 0, 0, 0);
+            this.addField_SFVec3f(ctx, 'destination', 0, 0, 0);
             
             this._buffer = new x3dom.fields.MFVec3f();
             this._previousValue = new x3dom.fields.SFVec3f(0, 0, 0);
             this._value = new x3dom.fields.SFVec3f(0, 0, 0);
-            
-            //this._fieldWatchers.destination = this._fieldWatchers.set_destination = [ function (msg) {
-            //    this.set_destination(this._currTime);
-            //} ];
+
+            this.initialize();
         },
         {
-            nodeChanged: function() 
-            {
-                this.initialize();
-            },
-            
             fieldChanged: function(fieldName)
             {
-                if (fieldName.indexOf("set_destination") >= 0)
+                if (fieldName.indexOf("destination") >= 0)
                 {
                     this.initialize();
                     this.updateBuffer(this._currTime);
@@ -28690,16 +29283,16 @@ x3dom.registerNodeType(
                         this.postMessage('isActive', true);
                     }
                 }
-                else if (fieldName.indexOf("set_value") >= 0)
+                else if (fieldName.indexOf("value") >= 0)
                 {
                     this.initialize();
                     
-                    this._previousValue.setValues(this._vf.set_value);
+                    this._previousValue.setValues(this._vf.value);
                     for (var C=1; C<this._buffer.length; C++) {
-                        this._buffer[C].setValues(this._vf.set_value);
+                        this._buffer[C].setValues(this._vf.value);
                     }
                     
-                    this.postMessage('value_changed', this._vf.set_value);
+                    this.postMessage('value', this._vf.value);
                     
                     if (!this._vf.isActive) {
                         this.postMessage('isActive', true);
@@ -28716,20 +29309,20 @@ x3dom.registerNodeType(
                 {
                     this._initDone = true;
                     
-                    this._vf.set_destination = this._vf.initialDestination;
+                    this._vf.destination = x3dom.fields.SFVec3f.copy(this._vf.initialDestination);
 
                     this._buffer.length = this._numSupports;
 
-                    this._buffer[0] = this._vf.initialDestination;
+                    this._buffer[0] = x3dom.fields.SFVec3f.copy(this._vf.initialDestination);
                     for (var C=1; C<this._buffer.length; C++) {
-                        this._buffer[C] = this._vf.initialValue;
+                        this._buffer[C] = x3dom.fields.SFVec3f.copy(this._vf.initialValue);
                     }
 
-                    this._previousValue = this._vf.initialValue;
+                    this._previousValue = x3dom.fields.SFVec3f.copy(this._vf.initialValue);
 
                     this._stepTime = this._vf.duration / this._numSupports;
                     
-                    var active = !this._buffer[0].equals(this._buffer[1], x3dom.fields.Eps);
+                    var active = !this._buffer[0].equals(this._buffer[1], this._eps);
                     if (this._vf.isActive !== active) {
                         this.postMessage('isActive', active);
                     }
@@ -28748,9 +29341,9 @@ x3dom.registerNodeType(
                 {
                     this._bufferEndTime = now; // first event we received, so we are in the initialization phase.
 
-                    this._value = this._vf.initialValue;
+                    this._value = x3dom.fields.SFVec3f.copy(this._vf.initialValue);
                     
-                    this.postMessage('value_changed', this._value);
+                    this.postMessage('value', this._value);
                     
                     return true;
                 }
@@ -28762,14 +29355,14 @@ x3dom.registerNodeType(
                 // This means we calculate the delta between each entry in _buffer and its previous
                 // entries, calculate the step response of each such step and add it to form the output.
 
-                // The oldest vaule _buffer[_buffer.length - 1] needs some extra thought, because it has
+                // The oldest value _buffer[_buffer.length - 1] needs some extra thought, because it has
                 // no previous value. More exactly, we haven't stored a previous value anymore.
                 // However, the step response of that missing previous value has already reached its
                 // destination, so we can - would we have that previous value - use this as a start point
                 // for adding the step responses.
                 // Actually updateBuffer(.) maintains this value in
 
-                var Output = this._previousValue;
+                var Output = x3dom.fields.SFVec3f.copy(this._previousValue);
 
                 var DeltaIn = this._buffer[this._buffer.length - 1].subtract(this._previousValue);
 
@@ -28786,10 +29379,10 @@ x3dom.registerNodeType(
                     Output = Output.add(DeltaOut);
                 }
                 
-                if ( !Output.equals(this._value, x3dom.fields.Eps) ) {
+                if ( !Output.equals(this._value, this._eps) ) {
                     this._value.setValues(Output);
                     
-                    this.postMessage('value_changed', this._value);
+                    this.postMessage('value', this._value);
                 }
                 else {
                     this.postMessage('isActive', false);
@@ -28806,7 +29399,6 @@ x3dom.registerNodeType(
                 var Alpha;
                 // is normally < 1. When it has grown to be larger than 1, we have to shift the array because the step response
                 // of the oldest entry has already reached its destination, and it's time for a newer entry.
-                // has already reached it
                 // In the case of a very low frame rate, or a very short _stepTime we may need to shift by more than one entry.
 
                 if (Frac >= 1)
@@ -28817,10 +29409,10 @@ x3dom.registerNodeType(
                     if( NumToShift < this._buffer.length)
                     {   
                         // normal case
-                        this._previousValue = this._buffer[this._buffer.length - NumToShift];
+                        this._previousValue = x3dom.fields.SFVec3f.copy(this._buffer[this._buffer.length - NumToShift]);
 
                         for (C=this._buffer.length - 1; C>=NumToShift; C--) {
-                            this._buffer[C] = this._buffer[C - NumToShift];
+                            this._buffer[C] = x3dom.fields.SFVec3f.copy(this._buffer[C - NumToShift]);
                         }
 
                         for (C=0; C<NumToShift; C++)
@@ -28830,7 +29422,7 @@ x3dom.registerNodeType(
                             // Therefore we do a linear interpolation from the latest value in the buffer to destination.
                             Alpha = C / NumToShift;
 
-                            this._buffer[C] = this._buffer[NumToShift].multiply(Alpha).add(this._vf.set_destination.multiply((1 - Alpha)));
+                            this._buffer[C] = this._buffer[NumToShift].multiply(Alpha).add(this._vf.destination.multiply((1 - Alpha)));
                         }
                     }
                     else
@@ -28842,13 +29434,14 @@ x3dom.registerNodeType(
                         // Maybe we could write part of a linear interpolation
                         // from this._buffer[0] to destination, that goes from this._bufferEndTime to now
                         // (possibly only the end of the interpolation is to be written),
-                        // but if we rech here we are in a very degenerate case...
+                        // but if we reach here we are in a very degenerate case...
                         // Thus we just write destination to the buffer.
 
-                        this._previousValue = (NumToShift == this._buffer.length) ? this._buffer[0] : this._vf.set_destination;
+                        this._previousValue = x3dom.fields.SFVec3f.copy((NumToShift == this._buffer.length) ?
+                                                                        this._buffer[0] : this._vf.destination);
 
                         for (C= 0; C<this._buffer.length; C++) {
-                            this._buffer[C] = this._vf.set_destination;
+                            this._buffer[C] = x3dom.fields.SFVec3f.copy(this._vf.destination);
                         }
                     }
 
@@ -28871,24 +29464,20 @@ x3dom.registerNodeType(
 
             this.addField_SFVec2f(ctx, 'initialDestination', 0, 0);
             this.addField_SFVec2f(ctx, 'initialValue', 0, 0);
-            
-            // How to treat eventIn nicely such that external scripting is handled for set_XXX?
-            this.addField_SFVec2f(ctx, 'set_value', 0, 0);
-            this.addField_SFVec2f(ctx, 'set_destination', 0, 0);
+
+            this.addField_SFVec2f(ctx, 'value', 0, 0);
+            this.addField_SFVec2f(ctx, 'destination', 0, 0);
             
             this._buffer = new x3dom.fields.MFVec2f();
             this._previousValue = new x3dom.fields.SFVec2f(0, 0);
             this._value = new x3dom.fields.SFVec2f(0, 0);
+
+            this.initialize();
         },
         {
-            nodeChanged: function() 
-            {
-                this.initialize();
-            },
-            
             fieldChanged: function(fieldName)
             {
-                if (fieldName.indexOf("set_destination") >= 0)
+                if (fieldName.indexOf("destination") >= 0)
                 {
                     this.initialize();
                     this.updateBuffer(this._currTime);
@@ -28897,16 +29486,16 @@ x3dom.registerNodeType(
                         this.postMessage('isActive', true);
                     }
                 }
-                else if (fieldName.indexOf("set_value") >= 0)
+                else if (fieldName.indexOf("value") >= 0)
                 {
                     this.initialize();
                     
-                    this._previousValue.setValues(this._vf.set_value);
+                    this._previousValue.setValues(this._vf.value);
                     for (var C=1; C<this._buffer.length; C++) {
-                        this._buffer[C].setValues(this._vf.set_value);
+                        this._buffer[C].setValues(this._vf.value);
                     }
                     
-                    this.postMessage('value_changed', this._vf.set_value);
+                    this.postMessage('value', this._vf.value);
                     
                     if (!this._vf.isActive) {
                         this.postMessage('isActive', true);
@@ -28922,20 +29511,20 @@ x3dom.registerNodeType(
                 {
                     this._initDone = true;
                     
-                    this._vf.set_destination = this._vf.initialDestination;
+                    this._vf.destination = x3dom.fields.SFVec2f.copy(this._vf.initialDestination);
 
                     this._buffer.length = this._numSupports;
 
-                    this._buffer[0] = this._vf.initialDestination;
+                    this._buffer[0] = x3dom.fields.SFVec2f.copy(this._vf.initialDestination);
                     for (var C=1; C<this._buffer.length; C++) {
-                        this._buffer[C] = this._vf.initialValue;
+                        this._buffer[C] = x3dom.fields.SFVec2f.copy(this._vf.initialValue);
                     }
 
-                    this._previousValue = this._vf.initialValue;
+                    this._previousValue = x3dom.fields.SFVec2f.copy(this._vf.initialValue);
 
                     this._stepTime = this._vf.duration / this._numSupports;
                     
-                    var active = !this._buffer[0].equals(this._buffer[1], x3dom.fields.Eps);
+                    var active = !this._buffer[0].equals(this._buffer[1], this._eps);
                     if (this._vf.isActive !== active) {
                         this.postMessage('isActive', active);
                     }
@@ -28954,16 +29543,16 @@ x3dom.registerNodeType(
                 {
                     this._bufferEndTime = now;
 
-                    this._value = this._vf.initialValue;
+                    this._value = x3dom.fields.SFVec2f.copy(this._vf.initialValue);
                     
-                    this.postMessage('value_changed', this._value);
+                    this.postMessage('value', this._value);
                     
                     return true;
                 }
 
                 var Frac = this.updateBuffer(now);
                 
-                var Output = this._previousValue;
+                var Output = x3dom.fields.SFVec2f.copy(this._previousValue);
 
                 var DeltaIn = this._buffer[this._buffer.length - 1].subtract(this._previousValue);
 
@@ -28980,10 +29569,10 @@ x3dom.registerNodeType(
                     Output = Output.add(DeltaOut);
                 }
                 
-                if ( !Output.equals(this._value, x3dom.fields.Eps) ) {
+                if ( !Output.equals(this._value, this._eps) ) {
                     this._value.setValues(Output);
                     
-                    this.postMessage('value_changed', this._value);
+                    this.postMessage('value', this._value);
                 }
                 else {
                     this.postMessage('isActive', false);
@@ -29006,25 +29595,26 @@ x3dom.registerNodeType(
 
                     if( NumToShift < this._buffer.length)
                     {
-                        this._previousValue = this._buffer[this._buffer.length - NumToShift];
+                        this._previousValue = x3dom.fields.SFVec2f.copy(this._buffer[this._buffer.length - NumToShift]);
 
                         for (C=this._buffer.length - 1; C>=NumToShift; C--) {
-                            this._buffer[C]= this._buffer[C - NumToShift];
+                            this._buffer[C]= x3dom.fields.SFVec2f.copy(this._buffer[C - NumToShift]);
                         }
 
                         for (C=0; C<NumToShift; C++)
                         {
                             Alpha = C / NumToShift;
 
-                            this._buffer[C] = this._buffer[NumToShift].multiply(Alpha).add(this._vf.set_destination.multiply((1 - Alpha)));
+                            this._buffer[C] = this._buffer[NumToShift].multiply(Alpha).add(this._vf.destination.multiply((1 - Alpha)));
                         }
                     }
                     else
                     {
-                        this._previousValue = (NumToShift == this._buffer.length) ? this._buffer[0] : this._vf.set_destination;
+                        this._previousValue = x3dom.fields.SFVec2f.copy((NumToShift == this._buffer.length) ?
+                                                                        this._buffer[0] : this._vf.destination);
 
                         for (C= 0; C<this._buffer.length; C++) {
-                            this._buffer[C] = this._vf.set_destination;
+                            this._buffer[C] = x3dom.fields.SFVec2f.copy(this._vf.destination);
                         }
                     }
 
@@ -29047,10 +29637,9 @@ x3dom.registerNodeType(
 
             this.addField_SFVec3f(ctx, 'initialDestination', 0, 0, 0);
             this.addField_SFVec3f(ctx, 'initialValue', 0, 0, 0);
-            
-            // How to treat eventIn nicely such that external scripting is handled for set_XXX?
-            this.addField_SFVec3f(ctx, 'set_value', 0, 0, 0);
-            this.addField_SFVec3f(ctx, 'set_destination', 0, 0, 0);
+
+            this.addField_SFVec3f(ctx, 'value', 0, 0, 0);
+            this.addField_SFVec3f(ctx, 'destination', 0, 0, 0);
             
             this._value0 = new x3dom.fields.SFVec3f(0, 0, 0);
             this._value1 = new x3dom.fields.SFVec3f(0, 0, 0);
@@ -29064,10 +29653,14 @@ x3dom.registerNodeType(
         {
             fieldChanged: function(fieldName)
             {
-                if (fieldName.indexOf("set_destination") >= 0)
+                if (fieldName === "tolerance")
                 {
-                    if ( !this._value0.equals(this._vf.set_destination, this._eps) ) {
-                        this._value0 = this._vf.set_destination;
+                    this._eps = this._vf.tolerance < 0 ? 0.001 : this._vf.tolerance;
+                }
+                else if (fieldName.indexOf("destination") >= 0)
+                {
+                    if ( !this._value0.equals(this._vf.destination, this._eps) ) {
+                        this._value0 = this._vf.destination;
                         
                         if (!this._vf.isActive) {
                             //this._lastTick = 0;
@@ -29075,16 +29668,16 @@ x3dom.registerNodeType(
                         }
                     }
                 }
-                else if (fieldName.indexOf("set_value") >= 0)
+                else if (fieldName.indexOf("value") >= 0)
                 {
-                    this._value1.setValues(this._vf.set_value);
-                    this._value2.setValues(this._vf.set_value);
-                    this._value3.setValues(this._vf.set_value);
-                    this._value4.setValues(this._vf.set_value);
-                    this._value5.setValues(this._vf.set_value);
+                    this._value1.setValues(this._vf.value);
+                    this._value2.setValues(this._vf.value);
+                    this._value3.setValues(this._vf.value);
+                    this._value4.setValues(this._vf.value);
+                    this._value5.setValues(this._vf.value);
                     this._lastTick = 0;
                     
-                    this.postMessage('value_changed', this._value5);
+                    this.postMessage('value', this._value5);
                     
                     if (!this._vf.isActive) {
                         this._lastTick = 0;
@@ -29175,7 +29768,7 @@ x3dom.registerNodeType(
                     this._value4.setValues(this._value0);
                     this._value5.setValues(this._value0);
                     
-                    this.postMessage('value_changed', this._value0);
+                    this.postMessage('value', this._value0);
                     this.postMessage('isActive', false);
                     
                     this._lastTick = 0;
@@ -29183,7 +29776,7 @@ x3dom.registerNodeType(
                     return false;
                 }
                 
-                this.postMessage('value_changed', this._value5);
+                this.postMessage('value', this._value5);
 
                 this._lastTick = now;
 
@@ -29203,10 +29796,9 @@ x3dom.registerNodeType(
 
             this.addField_SFVec2f(ctx, 'initialDestination', 0, 0);
             this.addField_SFVec2f(ctx, 'initialValue', 0, 0);
-            
-            // How to treat eventIn nicely such that external scripting is handled for set_XXX?
-            this.addField_SFVec2f(ctx, 'set_value', 0, 0);
-            this.addField_SFVec2f(ctx, 'set_destination', 0, 0);
+
+            this.addField_SFVec2f(ctx, 'value', 0, 0);
+            this.addField_SFVec2f(ctx, 'destination', 0, 0);
             
             this._value0 = new x3dom.fields.SFVec2f(0, 0);
             this._value1 = new x3dom.fields.SFVec2f(0, 0);
@@ -29220,10 +29812,14 @@ x3dom.registerNodeType(
         {
             fieldChanged: function(fieldName)
             {
-                if (fieldName.indexOf("set_destination") >= 0)
+                if (fieldName === "tolerance")
                 {
-                    if ( !this._value0.equals(this._vf.set_destination, this._eps) ) {
-                        this._value0 = this._vf.set_destination;
+                    this._eps = this._vf.tolerance < 0 ? 0.001 : this._vf.tolerance;
+                }
+                else if (fieldName.indexOf("destination") >= 0)
+                {
+                    if ( !this._value0.equals(this._vf.destination, this._eps) ) {
+                        this._value0 = this._vf.destination;
                         
                         if (!this._vf.isActive) {
                             //this._lastTick = 0;
@@ -29231,16 +29827,16 @@ x3dom.registerNodeType(
                         }
                     }
                 }
-                else if (fieldName.indexOf("set_value") >= 0)
+                else if (fieldName.indexOf("value") >= 0)
                 {
-                    this._value1.setValues(this._vf.set_value);
-                    this._value2.setValues(this._vf.set_value);
-                    this._value3.setValues(this._vf.set_value);
-                    this._value4.setValues(this._vf.set_value);
-                    this._value5.setValues(this._vf.set_value);
+                    this._value1.setValues(this._vf.value);
+                    this._value2.setValues(this._vf.value);
+                    this._value3.setValues(this._vf.value);
+                    this._value4.setValues(this._vf.value);
+                    this._value5.setValues(this._vf.value);
                     this._lastTick = 0;
                     
-                    this.postMessage('value_changed', this._value5);
+                    this.postMessage('value', this._value5);
                     
                     if (!this._vf.isActive) {
                         this._lastTick = 0;
@@ -29331,7 +29927,7 @@ x3dom.registerNodeType(
                     this._value4.setValues(this._value0);
                     this._value5.setValues(this._value0);
                     
-                    this.postMessage('value_changed', this._value0);
+                    this.postMessage('value', this._value0);
                     this.postMessage('isActive', false);
                     
                     this._lastTick = 0;
@@ -29339,7 +29935,7 @@ x3dom.registerNodeType(
                     return false;
                 }
                 
-                this.postMessage('value_changed', this._value5);
+                this.postMessage('value', this._value5);
 
                 this._lastTick = now;
 
@@ -29359,24 +29955,20 @@ x3dom.registerNodeType(
 
             this.addField_SFFloat(ctx, 'initialDestination', 0);
             this.addField_SFFloat(ctx, 'initialValue', 0);
-            
-            // How to treat eventIn nicely such that external scripting is handled for set_XXX?
-            this.addField_SFFloat(ctx, 'set_value', 0);
-            this.addField_SFFloat(ctx, 'set_destination', 0);
+
+            this.addField_SFFloat(ctx, 'value', 0);
+            this.addField_SFFloat(ctx, 'destination', 0);
             
             this._buffer = [];
             this._previousValue = 0;
             this._value = 0;
+
+            this.initialize();
         },
         {
-            nodeChanged: function() 
-            {
-                this.initialize();
-            },
-            
             fieldChanged: function(fieldName)
             {
-                if (fieldName.indexOf("set_destination") >= 0)
+                if (fieldName.indexOf("destination") >= 0)
                 {
                     this.initialize();
                     this.updateBuffer(this._currTime);
@@ -29385,16 +29977,16 @@ x3dom.registerNodeType(
                         this.postMessage('isActive', true);
                     }
                 }
-                else if (fieldName.indexOf("set_value") >= 0)
+                else if (fieldName.indexOf("value") >= 0)
                 {
                     this.initialize();
                     
-                    this._previousValue = this._vf.set_value;
+                    this._previousValue = this._vf.value;
                     for (var C=1; C<this._buffer.length; C++) {
-                        this._buffer[C] = this._vf.set_value;
+                        this._buffer[C] = this._vf.value;
                     }
                     
-                    this.postMessage('value_changed', this._vf.set_value);
+                    this.postMessage('value', this._vf.value);
                     
                     if (!this._vf.isActive) {
                         this.postMessage('isActive', true);
@@ -29408,7 +30000,7 @@ x3dom.registerNodeType(
                 {
                     this._initDone = true;
                     
-                    this._vf.set_destination = this._vf.initialDestination;
+                    this._vf.destination = this._vf.initialDestination;
 
                     this._buffer.length = this._numSupports;
 
@@ -29421,7 +30013,7 @@ x3dom.registerNodeType(
 
                     this._stepTime = this._vf.duration / this._numSupports;
                     
-                    var active = (Math.abs(this._buffer[0] - this._buffer[1]) >= x3dom.fields.Eps);
+                    var active = (Math.abs(this._buffer[0] - this._buffer[1]) >= this._eps);
                     if (this._vf.isActive !== active) {
                         this.postMessage('isActive', active);
                     }
@@ -29442,7 +30034,7 @@ x3dom.registerNodeType(
 
                     this._value = this._vf.initialValue;
                     
-                    this.postMessage('value_changed', this._value);
+                    this.postMessage('value', this._value);
                     
                     return true;
                 }
@@ -29466,10 +30058,10 @@ x3dom.registerNodeType(
                     Output = Output + DeltaOut;
                 }
                 
-                if (Math.abs(Output - this._value) >= x3dom.fields.Eps) {
+                if (Math.abs(Output - this._value) >= this._eps) {
                     this._value = Output;
                     
-                    this.postMessage('value_changed', this._value);
+                    this.postMessage('value', this._value);
                 }
                 else {
                     this.postMessage('isActive', false);
@@ -29502,15 +30094,15 @@ x3dom.registerNodeType(
                         {
                             Alpha = C / NumToShift;
 
-                            this._buffer[C] = this._buffer[NumToShift] * Alpha + this._vf.set_destination * (1 - Alpha);
+                            this._buffer[C] = this._buffer[NumToShift] * Alpha + this._vf.destination * (1 - Alpha);
                         }
                     }
                     else
                     {
-                        this._previousValue = (NumToShift == this._buffer.length) ? this._buffer[0] : this._vf.set_destination;
+                        this._previousValue = (NumToShift == this._buffer.length) ? this._buffer[0] : this._vf.destination;
 
                         for (C = 0; C<this._buffer.length; C++) {
-                            this._buffer[C] = this._vf.set_destination;
+                            this._buffer[C] = this._vf.destination;
                         }
                     }
 
@@ -29533,10 +30125,9 @@ x3dom.registerNodeType(
 
             this.addField_SFFloat(ctx, 'initialDestination', 0);
             this.addField_SFFloat(ctx, 'initialValue', 0);
-            
-            // How to treat eventIn nicely such that external scripting is handled for set_XXX?
-            this.addField_SFFloat(ctx, 'set_value', 0);
-            this.addField_SFFloat(ctx, 'set_destination', 0);
+
+            this.addField_SFFloat(ctx, 'value', 0);
+            this.addField_SFFloat(ctx, 'destination', 0);
             
             this._value0 = 0;
             this._value1 = 0;
@@ -29550,10 +30141,14 @@ x3dom.registerNodeType(
         {
             fieldChanged: function(fieldName)
             {
-                if (fieldName.indexOf("set_destination") >= 0)
+                if (fieldName === "tolerance")
                 {
-                    if (Math.abs(this._value0 - this._vf.set_destination) >= this._eps) {
-                        this._value0 = this._vf.set_destination;
+                    this._eps = this._vf.tolerance < 0 ? 0.001 : this._vf.tolerance;
+                }
+                else if (fieldName.indexOf("destination") >= 0)
+                {
+                    if (Math.abs(this._value0 - this._vf.destination) >= this._eps) {
+                        this._value0 = this._vf.destination;
                         
                         if (!this._vf.isActive) {
                             //this._lastTick = 0;
@@ -29561,16 +30156,16 @@ x3dom.registerNodeType(
                         }
                     }
                 }
-                else if (fieldName.indexOf("set_value") >= 0)
+                else if (fieldName.indexOf("value") >= 0)
                 {
-                    this._value1 = this._vf.set_value;
-                    this._value2 = this._vf.set_value;
-                    this._value3 = this._vf.set_value;
-                    this._value4 = this._vf.set_value;
-                    this._value5 = this._vf.set_value;
+                    this._value1 = this._vf.value;
+                    this._value2 = this._vf.value;
+                    this._value3 = this._vf.value;
+                    this._value4 = this._vf.value;
+                    this._value5 = this._vf.value;
                     this._lastTick = 0;
                     
-                    this.postMessage('value_changed', this._value5);
+                    this.postMessage('value', this._value5);
                     
                     if (!this._vf.isActive) {
                         this._lastTick = 0;
@@ -29656,7 +30251,7 @@ x3dom.registerNodeType(
                     this._value4 = this._value0;
                     this._value5 = this._value0;
                     
-                    this.postMessage('value_changed', this._value0);
+                    this.postMessage('value', this._value0);
                     this.postMessage('isActive', false);
                     
                     this._lastTick = 0;
@@ -29664,7 +30259,7 @@ x3dom.registerNodeType(
                     return false;
                 }
                 
-                this.postMessage('value_changed', this._value5);
+                this.postMessage('value', this._value5);
 
                 this._lastTick = now;
 
@@ -29685,12 +30280,10 @@ x3dom.registerNodeType(
             this.addField_MFVec3f(ctx, 'initialDestination', []);
             this.addField_MFVec3f(ctx, 'initialValue', []);
             
-            this.addField_MFVec3f(ctx, 'set_value', []);
-            this.addField_MFVec3f(ctx, 'set_destination', []);
+            this.addField_MFVec3f(ctx, 'value', []);
+            this.addField_MFVec3f(ctx, 'destination', []);
             
             x3dom.debug.logWarning("CoordinateDamper NYI");
-        },
-        {
         }
     )
 );
@@ -29706,12 +30299,10 @@ x3dom.registerNodeType(
             this.addField_MFVec2f(ctx, 'initialDestination', []);
             this.addField_MFVec2f(ctx, 'initialValue', []);
             
-            this.addField_MFVec2f(ctx, 'set_value', []);
-            this.addField_MFVec2f(ctx, 'set_destination', []);
+            this.addField_MFVec2f(ctx, 'value', []);
+            this.addField_MFVec2f(ctx, 'destination', []);
             
             x3dom.debug.logWarning("TexCoordDamper2D NYI");
-        },
-        {
         }
     )
 );
@@ -30159,6 +30750,7 @@ x3dom.registerNodeType(
  * Philip Taylor: http://philip.html5.org
  */
 
+
 // ### Anchor ###
 x3dom.registerNodeType(
     "Anchor",
@@ -30223,6 +30815,7 @@ x3dom.registerNodeType(
 			this.addField_SFBool(ctx, 'mapDEFToID', false);
             
 			this.count = 0;
+            this.numRetries = 10;
         },
         {
             fieldChanged: function (fieldName)
@@ -30304,10 +30897,10 @@ x3dom.registerNodeType(
 						return xhr;
 					}
 					
-					if (xhr.status === 202 && that.count < 10) {
+					if (xhr.status === x3dom.nodeTypes.Inline.AwaitTranscoding && that.count < that.numRetries) {
 						that.count++;
-						x3dom.debug.logInfo('Statuscode 202 and send new Request in 5 sec');
-                        //TODO: check reload header field for better reload timout?
+						x3dom.debug.logInfo('Statuscode 202 and send new request in 5 sec');
+                        //TODO: check reload header field for better reload timeout?
 						window.setTimeout(function(){
                             that._nameSpace.doc.downloadCount -= 1;
                             that.nodeChanged();
@@ -30316,7 +30909,7 @@ x3dom.registerNodeType(
 					}
 					else if ((xhr.status !== 200) && (xhr.status !== 0)) {
 						that.fireEvents("error");
-                        x3dom.debug.logError('XMLHttpRequest requires a web server running!');
+                        x3dom.debug.logError('XHR status: ' + xhr.status + ' - XMLHttpRequest requires web server running!');
 
                         that._nameSpace.doc.downloadCount -= 1;
 						that.count = 0;
@@ -30430,7 +31023,19 @@ x3dom.registerNodeType(
 
                 if (this._vf.url.length && this._vf.url[0].length)
                 {
-                    xhr.open('GET', encodeURI(this._nameSpace.getURL(this._vf.url[0])), true);
+                    var xhrURI = this._nameSpace.getURL(this._vf.url[0]);
+
+                    //Unfortunately, there is currently an inconsistent behavior between
+                    //chrome and firefox, where the first one is "escaping" the "%" character in the
+                    //blob URI, which contains a ref to a "file" object. This can also not be fixed by
+                    //first using "decodeURI", because, in that case, "%3A" is not resolved to "%".
+                    if (!(xhrURI.substr(0, 5) === "blob:"))
+                    {
+                        xhrURI = encodeURI(xhrURI);
+                    }
+
+                    xhr.open('GET', xhrURI, true);
+
                     try {
                         xhr.send(null);
                     }
@@ -30443,6 +31048,8 @@ x3dom.registerNodeType(
         }
     )
 );
+
+x3dom.nodeTypes.Inline.AwaitTranscoding = 202;      // Parameterizable retry state for Transcoder
 
 
 function setNamespace(prefix, childDomNode, mapDEFToID)
@@ -30556,9 +31163,8 @@ x3dom.registerNodeType(
         {
             fieldChanged: function(fieldName)
             {
-                if (fieldName.indexOf("Url") > 0 ||
-                    fieldName.search("sky") >= 0 || 
-                    fieldName.search("ground") >= 0) {
+                if (fieldName.indexOf("Url") > 0 || fieldName == "transparency" ||
+                    fieldName.search("sky") >= 0 || fieldName.search("ground") >= 0) {
                     this._dirty = true;
                 }
                 else if (fieldName.indexOf("bind") >= 0) {
@@ -30613,6 +31219,9 @@ x3dom.registerNodeType(
 
             // If TRUE, transparent objects are sorted from back to front (allows explicitly disabling sorting)
             this.addField_SFBool(ctx, 'sortTrans', true);
+
+            // Transparent objects like glass do not throw much shadow, enable this IR convenience flag with TRUE
+            this.addField_SFBool(ctx, 'shadowExcludeTransparentObjects', false);
 
             // boolean flags for feature (de)activation
             // If TRUE, objects outside the viewing frustum are ignored
@@ -30688,6 +31297,7 @@ x3dom.registerNodeType(
  * Philip Taylor: http://philip.html5.org
  */
 
+
 /* ### X3DViewpointNode ### */
 x3dom.registerNodeType(
     "X3DViewpointNode",
@@ -30695,21 +31305,92 @@ x3dom.registerNodeType(
     defineClass(x3dom.nodeTypes.X3DBindableNode,
         function (ctx) {
             x3dom.nodeTypes.X3DViewpointNode.superClass.call(this, ctx);
-        },
-        {
-        }
-    )
-);
 
-/* ### X3DNavigationInfoNode ### */
-x3dom.registerNodeType(
-    "X3DNavigationInfoNode",
-    "Navigation",
-    defineClass(x3dom.nodeTypes.X3DBindableNode,
-        function (ctx) {
-            x3dom.nodeTypes.X3DNavigationInfoNode.superClass.call(this, ctx);
+            // attach some convenience accessor methods to dom/xml node
+            if (ctx && ctx.xmlNode) {
+                var domNode = ctx.xmlNode;
+
+                if (!domNode.resetView && !domNode.getFieldOfView &&
+                    !domNode.getNear && !domNode.getFar)
+                {
+                    domNode.resetView = function() {
+                        var that = this._x3domNode;
+
+                        that.resetView();
+                        that._nameSpace.doc.needRender = true;
+                    };
+
+                    domNode.getFieldOfView = function() {
+                        return this._x3domNode.getFieldOfView();
+                    };
+
+                    domNode.getNear = function() {
+                        return this._x3domNode.getNear();
+                    };
+
+                    domNode.getFar = function() {
+                        return this._x3domNode.getFar();
+                    };
+                }
+            }
         },
         {
+            activate: function (prev) {
+                var viewarea = this._nameSpace.doc._viewarea;
+                if (prev) {
+                    viewarea.animateTo(this, prev._autoGen ? null : prev);
+                }
+                viewarea._needNavigationMatrixUpdate = true;
+
+                x3dom.nodeTypes.X3DBindableNode.prototype.activate.call(this, prev);
+                //x3dom.debug.logInfo ('activate ViewBindable ' + this._DEF + '/' + this._vf.description);
+            },
+
+            deactivate: function (prev) {
+                x3dom.nodeTypes.X3DBindableNode.prototype.deactivate.call(this, prev);
+                //x3dom.debug.logInfo ('deactivate ViewBindable ' + this._DEF + '/' + this._vf.description);
+            },
+
+            getTransformation: function() {
+                return this.getCurrentTransform();
+            },
+
+            getCenterOfRotation: function() {
+                return new x3dom.fields.SFVec3f(0, 0, 0);
+            },
+
+            getFieldOfView: function() {
+                return 1.57079633;
+            },
+
+            setView: function(newView) {
+                var mat = this.getCurrentTransform();
+                this._viewMatrix = newView.mult(mat);
+            },
+
+            resetView: function() {
+                // see derived class
+            },
+
+            getNear: function() {
+                return 0.1;
+            },
+
+            getFar: function() {
+                return 10000;
+            },
+
+            getImgPlaneHeightAtDistOne: function() {
+                return 2.0;
+            },
+
+            getViewMatrix: function() {
+                return null;
+            },
+
+            getProjectionMatrix: function(aspect) {
+                return null;
+            }
         }
     )
 );
@@ -30736,22 +31417,22 @@ x3dom.registerNodeType(
 
             this._projMatrix = null;
             this._lastAspect = 1.0;
+
             // z-ratio: a value around 5000 would be better...
             this._zRatio = 10000;
             this._zNear = this._vf.zNear;
             this._zFar = this._vf.zFar;
+            
             // special stuff...
             this._imgPlaneHeightAtDistOne = 2.0 * Math.tan(this._vf.fieldOfView / 2.0);
         },
         {
             fieldChanged: function (fieldName) {
-                if (fieldName == "position" ||
-                    fieldName == "orientation") {
+                if (fieldName == "position" || fieldName == "orientation") {
                     this.resetView();
                 }
                 else if (fieldName == "fieldOfView" ||
-                         fieldName == "zNear" ||
-                         fieldName == "zFar") {
+                         fieldName == "zNear" || fieldName == "zFar") {
                     this._projMatrix = null;   // only trigger refresh
                     this._zNear = this._vf.zNear;
                     this._zFar = this._vf.zFar;
@@ -30761,20 +31442,6 @@ x3dom.registerNodeType(
                     // FIXME; call parent.fieldChanged();
                     this.bind(this._vf.bind);
                 }
-            },
-
-            activate: function (prev) {
-                if (prev) {
-                    this._nameSpace.doc._viewarea.animateTo(this, prev._autoGen ? null : prev);
-                }
-                x3dom.nodeTypes.X3DViewpointNode.prototype.activate.call(this, prev);
-                this._nameSpace.doc._viewarea._needNavigationMatrixUpdate = true;
-                //x3dom.debug.logInfo ('activate ViewBindable ' + this._DEF + '/' + this._vf.description);
-            },
-
-            deactivate: function (prev) {
-                x3dom.nodeTypes.X3DViewpointNode.prototype.deactivate.call(this, prev);
-                //x3dom.debug.logInfo ('deactivate ViewBindable ' + this._DEF + '/' + this._vf.description);
             },
 
             getCenterOfRotation: function() {
@@ -30789,21 +31456,9 @@ x3dom.registerNodeType(
                 return this._vf.fieldOfView;
             },
 
-            setView: function(newView) {
-                var mat = this.getCurrentTransform();
-                mat = mat.inverse();
-                this._viewMatrix = mat.mult(newView);
-            },
-            
             resetView: function() {
-                //this._viewMatrix = this._vf.orientation.toMatrix().transpose().
-                //    mult(x3dom.fields.SFMatrix4f.translation(this._vf.position.negate()));
                 this._viewMatrix = x3dom.fields.SFMatrix4f.translation(this._vf.position).
                     mult(this._vf.orientation.toMatrix()).inverse();
-            },
-
-            getTransformation: function() {
-                return this.getCurrentTransform();
             },
             
             getNear: function() {
@@ -30829,8 +31484,8 @@ x3dom.registerNodeType(
                     var nearScale = 0.8, farScale = 1.2;
                     var viewarea = this._nameSpace.doc._viewarea;
                     var scene = viewarea._scene;
+
                     //scene.updateVolume();
-                    
                     var min = x3dom.fields.SFVec3f.copy(scene._lastMin);
                     var max = x3dom.fields.SFVec3f.copy(scene._lastMax);
                     
@@ -30839,6 +31494,28 @@ x3dom.registerNodeType(
                     
                     var mat = viewarea.getViewMatrix().inverse();
                     var vp = mat.e3();
+
+                    // account for scales around the viewpoint
+                    var translation = new x3dom.fields.SFVec3f(0,0,0),
+                        scaleFactor = new x3dom.fields.SFVec3f(1,1,1);
+                    var rotation = new x3dom.fields.Quaternion(0,0,1,0),
+                        scaleOrientation = new x3dom.fields.Quaternion(0,0,1,0);
+
+                    // unfortunately, decompose is a rather expensive operation
+                    mat.getTransform(translation, rotation, scaleFactor, scaleOrientation);
+
+                    var minScal = scaleFactor.x, maxScal = scaleFactor.x;
+
+                    if (maxScal < scaleFactor.y) maxScal = scaleFactor.y;
+                    if (minScal > scaleFactor.y) minScal = scaleFactor.y;
+                    if (maxScal < scaleFactor.z) maxScal = scaleFactor.z;
+                    if (minScal > scaleFactor.z) minScal = scaleFactor.z;
+
+                    if (maxScal > 1)
+                        nearScale /= maxScal;
+                    else if (minScal > x3dom.fields.Eps && minScal < 1)
+                        farScale /= minScal;
+                    // near/far scale adaption done
 
                     var sCenter = min.add(dia.multiply(0.5));
                     var vDist = (vp.subtract(sCenter)).length();
@@ -30858,44 +31535,36 @@ x3dom.registerNodeType(
                     
                     var zNearLimit = zfar / this._zRatio;
                     znear = Math.max(znear, Math.max(x3dom.fields.Eps, zNearLimit));
-                    //x3dom.debug.logInfo("near: " + znear + " -> far:" + zfar);
-                    
-                    if (this._vf.zFar > 0)
-                        zfar = this._vf.zFar;
-                    if (this._vf.zNear > 0)
+
+                    if (zfar > this._vf.zNear && this._vf.zNear > 0)
                         znear = this._vf.zNear;
-                    
-                    var div = znear - zfar;
-                    
-                    if (this._projMatrix != null && div != 0)
-                    {
-                        this._projMatrix._22 = (znear + zfar) / div;
-                        this._projMatrix._23 = 2 * znear * zfar / div;
-                    }
+                    if (this._vf.zFar > znear)
+                        zfar = this._vf.zFar;
+
+                    if (zfar <= znear)
+                        zfar = znear + 1;
+                    //x3dom.debug.logInfo("near: " + znear + " -> far:" + zfar);
                 }
-                
-                // needed for being able to ask for near and far
-                this._zNear = znear;
-                this._zFar = zfar;
 
                 if (this._projMatrix == null)
                 {
-                    var f = 1 / Math.tan(fovy / 2);
-                    
-                    this._projMatrix = new x3dom.fields.SFMatrix4f(
-                        f/aspect, 0, 0, 0,
-                        0, f, 0, 0,
-                        0, 0, (znear+zfar)/(znear-zfar), 2*znear*zfar/(znear-zfar),
-                        0, 0, -1, 0
-                    );
-                    
-                    this._lastAspect = aspect;
+                    this._projMatrix = x3dom.fields.SFMatrix4f.perspective(fovy, aspect, znear, zfar);
                 }
-                else if (this._lastAspect !== aspect)
+                else if (this._zNear != znear || this._zFar != zfar)
+                {
+                    var div = znear - zfar;
+                    this._projMatrix._22 = (znear + zfar) / div;
+                    this._projMatrix._23 = 2 * znear * zfar / div;
+                }
+                else if (this._lastAspect != aspect)
                 {
                     this._projMatrix._00 = (1 / Math.tan(fovy / 2)) / aspect;
-                    this._lastAspect = aspect;
                 }
+
+                // also needed for being able to ask for near and far
+                this._zNear = znear;
+                this._zFar = zfar;
+                this._lastAspect = aspect;
 
                 return this._projMatrix;
             }
@@ -30926,13 +31595,11 @@ x3dom.registerNodeType(
         },
         {
             fieldChanged: function (fieldName) {
-                if (fieldName == "position" || 
-                    fieldName == "orientation") {
+                if (fieldName == "position" || fieldName == "orientation") {
                     this.resetView();
                 }
                 else if (fieldName == "fieldOfView" ||
-                         fieldName == "zNear" || 
-                         fieldName == "zFar") {
+                         fieldName == "zNear" || fieldName == "zFar") {
                     this._projMatrix = null;   // trigger refresh
                     this.resetView();
                 }
@@ -30941,34 +31608,12 @@ x3dom.registerNodeType(
                 }
             },
 
-            activate: function (prev) {
-                if (prev) {
-                    this._nameSpace.doc._viewarea.animateTo(this, prev);
-                }
-                x3dom.nodeTypes.X3DViewpointNode.prototype.activate.call(this, prev);
-                this._nameSpace.doc._viewarea._needNavigationMatrixUpdate = true;
-            },
-
-            deactivate: function (prev) {
-                x3dom.nodeTypes.X3DViewpointNode.prototype.deactivate.call(this, prev);
-            },
-
             getCenterOfRotation: function() {
                 return this._vf.centerOfRotation;
             },
             
             getViewMatrix: function() {
                 return this._viewMatrix;
-            },
-            
-            getFieldOfView: function() {
-                return 1.57079633;
-            },
-
-            setView: function(newView) {
-                var mat = this.getCurrentTransform();
-                mat = mat.inverse();
-                this._viewMatrix = mat.mult(newView);
             },
             
             resetView: function() {
@@ -30980,10 +31625,6 @@ x3dom.registerNodeType(
                                                     mult(this._vf.orientation.toMatrix());
                 this._viewMatrix = this._viewMatrix.mult(offset).inverse();
             },
-
-            getTransformation: function() {
-                return this.getCurrentTransform();
-            },
             
             getNear: function() {
                 return this._vf.zNear;
@@ -30992,14 +31633,10 @@ x3dom.registerNodeType(
             getFar: function() {
                 return this._vf.zFar;
             },
-
-            getImgPlaneHeightAtDistOne: function() {
-                return 2.0;
-            },
             
             getProjectionMatrix: function(aspect)
             {
-                if (this._projMatrix == null)
+                if (this._projMatrix == null || this._lastAspect != aspect)
                 {
                     var near = this.getNear();
                     var far = this.getFar();
@@ -31009,28 +31646,7 @@ x3dom.registerNodeType(
                     var right = this._vf.fieldOfView[2];
                     var top = this._vf.fieldOfView[3];
                     
-                    var rl = (right - left) / 2;    // hs
-                    var tb = (top - bottom) / 2;    // vs
-                    var fn = far - near;
-                    
-                    if (aspect < (rl / tb))
-                        tb = rl / aspect;
-                    else
-                        rl = tb * aspect;
-                    
-                    left = -rl;
-                    right = rl;
-                    bottom = -tb;
-                    top = tb;
-                    
-                    rl *= 2;
-                    tb *= 2;
-                    
-                    this._projMatrix = new x3dom.fields.SFMatrix4f(
-                                        2 / rl, 0, 0,  -(right+left) / rl,
-                                        0, 2 / tb, 0,  -(top+bottom) / tb,
-                                        0, 0, -2 / fn, -(far+near) / fn,
-                                        0, 0, 0, 1);
+                    this._projMatrix = x3dom.fields.SFMatrix4f.ortho(left, right, bottom, top, near, far, aspect);
                 }
                 this._lastAspect = aspect;
                 
@@ -31056,37 +31672,28 @@ x3dom.registerNodeType(
                                                         0, 1, 0, 0,
                                                         0, 0, 1, 0,
                                                         0, 0, 0, 1);
-            
-            this._viewMatrix = this._vf.modelview.inverse();
-            this._projMatrix = this._vf.projection;
+
+            this._viewMatrix = this._vf.modelview.transpose().inverse();
+            this._projMatrix = this._vf.projection.transpose();
+
+            this._centerOfRotation = new x3dom.fields.SFVec3f(0, 0, 0);
+            // FIXME; derive near/far from current matrix, if requested!
         },
         {
             fieldChanged: function (fieldName) {
                 if (fieldName == "modelview") {
-                    this._viewMatrix = this._vf.modelview.inverse();
+                    this.resetView();
                 }
                 else if (fieldName == "projection") {
-                    this._projMatrix = this._vf.projection;
+                    this._projMatrix = this._vf.projection.transpose();
                 }
                 else if (fieldName.indexOf("bind") >= 0) {
                     this.bind(this._vf.bind);
                 }
             },
 
-            activate: function (prev) {
-                if (prev) {
-                    this._nameSpace.doc._viewarea.animateTo(this, prev);
-                }
-                x3dom.nodeTypes.X3DViewpointNode.prototype.activate.call(this,prev);
-                this._nameSpace.doc._viewarea._needNavigationMatrixUpdate = true;
-            },
-
-            deactivate: function (prev) {
-                x3dom.nodeTypes.X3DViewpointNode.prototype.deactivate.call(this,prev);
-            },
-
             getCenterOfRotation: function() {
-                return new x3dom.fields.SFVec3f(0, 0, 0);
+                return this._centerOfRotation;  // this field is only a little helper for examine mode
             },
             
             getViewMatrix: function() {
@@ -31097,35 +31704,29 @@ x3dom.registerNodeType(
                 return (2.0 * Math.atan(1.0 / this._projMatrix._11));
             },
 
-            getNear: function() {
-                return 0.1;     // FIXME; derive from matrix!
-            },
-
-            getFar: function() {
-                return 10000;   // FIXME; derive from matrix!
-            },
-
             getImgPlaneHeightAtDistOne: function() {
                 return 2.0 / this._projMatrix._11;
             },
-
-            setView: function(newView) {
-                var mat = this.getCurrentTransform();
-                mat = mat.inverse();
-                this._viewMatrix = mat.mult(newView);
-            },
             
             resetView: function() {
-                this._viewMatrix = this._vf.modelview.inverse();
-            },
-
-            getTransformation: function() {
-                return this.getCurrentTransform();
+                this._viewMatrix = this._vf.modelview.transpose().inverse();
+                this._centerOfRotation = new x3dom.fields.SFVec3f(0, 0, 0);       // reset helper, too
             },
 
             getProjectionMatrix: function(aspect) {
                 return this._projMatrix;
             }
+        }
+    )
+);
+
+/* ### X3DNavigationInfoNode ### */
+x3dom.registerNodeType(
+    "X3DNavigationInfoNode",
+    "Navigation",
+    defineClass(x3dom.nodeTypes.X3DBindableNode,
+        function (ctx) {
+            x3dom.nodeTypes.X3DNavigationInfoNode.superClass.call(this, ctx);
         }
     )
 );
@@ -31140,17 +31741,26 @@ x3dom.registerNodeType(
 
             this.addField_SFBool(ctx, 'headlight', true);
             this.addField_MFString(ctx, 'type', ["EXAMINE","ANY"]);
-            this.addField_MFFloat(ctx, 'typeParams', [-0.4, 60]);   // view angle and height for helicopter mode
-            this.addField_MFFloat(ctx, 'avatarSize', [0.25,1.6,0.75]);
-            this.addField_SFFloat(ctx, 'speed', 1.0);
+            // view angle and height for helicopter mode and
+            // min/max rotation angle for turntable in ]0, PI[, starting from +y (0) down to -y (PI)
+            this.addField_MFFloat(ctx, 'typeParams', [-0.4, 60, 0.05, 2.8]);
+            // TODO; use avatarSize + visibilityLimit for projection matrix (near/far)
+            this.addField_MFFloat(ctx, 'avatarSize', [0.25, 1.6, 0.75]);
             this.addField_SFFloat(ctx, 'visibilityLimit', 0.0);
+            this.addField_SFFloat(ctx, 'speed', 1.0);
+            // for 'jumping' between viewpoints (bind transition time)
             this.addField_SFTime(ctx, 'transitionTime', 1.0);
             this.addField_MFString(ctx, 'transitionType', ["LINEAR"]);
 
-            //TODO; use avatarSize + visibilityLimit for projection matrix
-            x3dom.debug.logInfo("NavType: " + this._vf.type[0].toLowerCase());
-
+            this._validTypes = [
+                "none", "examine", "turntable",
+                "fly", "freefly", "lookat", "lookaround",
+                "walk", "game", "helicopter", "any"
+            ];
             this._heliUpdated = false;
+
+            var type = this.checkType(this.getType());
+            x3dom.debug.logInfo("NavType: " + type);
         },
         {
             fieldChanged: function(fieldName) {
@@ -31158,7 +31768,8 @@ x3dom.registerNodeType(
                     this._heliUpdated = false;
                 }
                 else if (fieldName == "type") {
-                    var type = this._vf.type[0].toLowerCase();
+                    var type = this.checkType(this.getType());
+
                     switch (type) {
                         case 'game':
                             this._nameSpace.doc._viewarea.initMouseState();
@@ -31169,8 +31780,36 @@ x3dom.registerNodeType(
                         default:
                             break;
                     }
+
+                    this._vf.type[0] = type;
                     x3dom.debug.logInfo("Switch to " + type + " mode.");
                 }
+            },
+
+            setType: function(type, viewarea) {
+                var navType = this.checkType(type.toLowerCase());
+                var oldType = this.checkType(this.getType());
+
+                switch (navType) {
+                    case 'game':
+                        if (oldType !== navType) {
+                            if (viewarea)
+                                viewarea.initMouseState();
+                            else
+                                this._nameSpace.doc._viewarea.initMouseState();
+                        }
+                        break;
+                    case 'helicopter':
+                        if (oldType !== navType) {
+                            this._heliUpdated = false;
+                        }
+                        break;
+                    default:
+                        break;
+                }
+
+                this._vf.type[0] = navType;
+                x3dom.debug.logInfo("Switch to " + navType + " mode.");
             },
 
             getType: function() {
@@ -31184,10 +31823,14 @@ x3dom.registerNodeType(
             },
 
             getTypeParams: function() {
-                var theta  = (this._vf.typeParams.length >= 1) ? this._vf.typeParams[0] : 0;
-                var height = (this._vf.typeParams.length >= 2) ? this._vf.typeParams[1] : 0;
+                var length = this._vf.typeParams.length;
 
-                return [theta, height];
+                var theta  = (length >= 1) ? this._vf.typeParams[0] : -0.4;
+                var height = (length >= 2) ? this._vf.typeParams[1] : 60.0;
+                var minAngle = (length >= 3) ? this._vf.typeParams[2] : x3dom.fields.Eps;
+                var maxAngle = (length >= 4) ? this._vf.typeParams[3] : Math.PI - x3dom.fields.Eps;
+
+                return [theta, height, minAngle, maxAngle];
             },
 
             setTypeParams: function(params) {
@@ -31196,31 +31839,20 @@ x3dom.registerNodeType(
                 }
             },
 
-            setType: function(type, viewarea) {
-                var navType = type.toLowerCase();
-                switch (navType) {
-                    case 'game':
-                        if (this._vf.type[0].toLowerCase() !== navType) {
-                            if (viewarea)
-                                viewarea.initMouseState();
-                            else
-                                this._nameSpace.doc._viewarea.initMouseState();
-                        }
-                        break;
-                    case 'helicopter':
-                        if (this._vf.type[0].toLowerCase() !== navType) {
-                            this._heliUpdated = false;
-                        }
-                        break;
-                    default:
-                        break;
+            checkType: function(type) {
+                if (this._validTypes.indexOf(type) > -1) {
+                    return type;
                 }
-                this._vf.type[0] = navType;
-                x3dom.debug.logInfo("Switch to " + navType + " mode.");
+                else {
+                    x3dom.debug.logWarning(type + " is no valid navigation type, use one of " +
+                                           this._validTypes.toString());
+                    return "examine";
+                }
             }
         }
     )
 );
+
 
 /* ### Billboard ### */
 x3dom.registerNodeType(
@@ -31771,11 +32403,7 @@ x3dom.registerNodeType(
             },
 
             fieldChanged: function(fieldName) {
-                if (fieldName == 'string' || fieldName == 'family' ||
-                    fieldName == 'horizontal' || fieldName == 'justify' ||
-                    fieldName == 'language' || fieldName == 'leftToRight' ||
-                    fieldName == 'size' || fieldName == 'spacing' ||
-                    fieldName == 'style' || fieldName == 'topToBottom') {
+                if (fieldName == 'string' || fieldName == 'length' || fieldName == 'maxExtent') {
                     this.invalidateVolume();
                     Array.forEach(this._parentNodes, function (node) {
                         node.setAllDirty();
@@ -32003,6 +32631,7 @@ x3dom.registerNodeType(
  * Philip Taylor: http://philip.html5.org
  */
 
+
 /* ### X3DTextureTransformNode ### */
 x3dom.registerNodeType(
     "X3DTextureTransformNode",
@@ -32041,10 +32670,8 @@ x3dom.registerNodeType(
         {
             fieldChanged: function (fieldName) {
                 //Tc' = -C * S * R * C * T * Tc
-                if (fieldName == 'center'
-                    || fieldName == 'rotation'
-                    || fieldName == 'scale'
-                    || fieldName == 'translation') {
+                if (fieldName == 'center' || fieldName == 'rotation' ||
+                    fieldName == 'scale' || fieldName == 'translation') {
 
                 var negCenter = new x3dom.fields.SFVec3f(-this._vf.center.x, -this._vf.center.y, 1);
                 var posCenter = new x3dom.fields.SFVec3f(this._vf.center.x, this._vf.center.y, 0);
@@ -32088,15 +32715,17 @@ x3dom.registerNodeType(
 		{
 			fieldChanged: function(fieldName)
 			{
-				Array.forEach(this._parentNodes, function (texture) {
-					Array.forEach(texture._parentNodes, function (app) {
-						Array.forEach(app._parentNodes, function (shape) {
-							shape._dirty.texture = true;
-						});
-					});
-				});
+                if (this._vf.hasOwnProperty(fieldName)) {
+                    Array.forEach(this._parentNodes, function (texture) {
+                        Array.forEach(texture._parentNodes, function (app) {
+                            Array.forEach(app._parentNodes, function (shape) {
+                                shape._dirty.texture = true;
+                            });
+                        });
+                    });
 
-				this._nameSpace.doc.needRender = true;
+                    this._nameSpace.doc.needRender = true;
+                }
 			}
 		}
     )
@@ -32114,9 +32743,9 @@ x3dom.registerNodeType(
             this.addField_MFString(ctx, 'url', []);
             this.addField_SFBool(ctx, 'repeatS', true);
             this.addField_SFBool(ctx, 'repeatT', true);
-            this.addField_SFNode('textureProperties', x3dom.nodeTypes.TextureProperties);
             this.addField_SFBool(ctx, 'scale', true);
             this.addField_SFBool(ctx, 'withCredentials', false);
+            this.addField_SFNode('textureProperties', x3dom.nodeTypes.TextureProperties);
 
             this._needPerFrameUpdate = false;
             this._isCanvas = false;
@@ -32153,7 +32782,8 @@ x3dom.registerNodeType(
             fieldChanged: function(fieldName)
             {
                 if (fieldName == "url" || fieldName ==  "origChannelCount" ||
-				    fieldName == "repeatS" || fieldName == "repeatT")
+				    fieldName == "repeatS" || fieldName == "repeatT" ||
+                    fieldName == "scale" || fieldName == "withCredentials")
                 {
                     var that = this;
 
@@ -32268,7 +32898,7 @@ x3dom.registerNodeType(
                                 that._canvas = childDomNode;
                             }
 
-                            if (that._vf.hideChildren) {
+                            if (childDomNode.style && that._vf.hideChildren) {
                                 childDomNode.style.display = "none";
                                 childDomNode.style.visibility = "hidden";
                             }
@@ -32674,6 +33304,7 @@ x3dom.registerNodeType(
  * Philip Taylor: http://philip.html5.org
  */
 
+
 /* ### Uniform ### */
 x3dom.registerNodeType(
     "Uniform",
@@ -32698,10 +33329,6 @@ x3dom.registerNodeType(
             this.addField_SFBool(ctx, 'isSRGB', false);
             this.addField_SFNode('texture', x3dom.nodeTypes.X3DTextureNode);
             this.addField_SFNode('textureTransform', x3dom.nodeTypes.X3DTextureTransformNode);
-        },
-        {
-            nodeChanged: function() {},
-            fieldChanged: function(fieldName) {}
         }
     )
 );
@@ -33158,11 +33785,6 @@ x3dom.registerNodeType(
 
             this.addField_SFInt32(ctx, 'numComponents', 4);
             this.addField_MFFloat(ctx, 'value', []);
-        },
-        {
-            fieldChanged: function (fieldName) {
-                //TODO
-            }
         }
     )
 );
@@ -33203,6 +33825,10 @@ x3dom.registerNodeType(
             this.addField_SFVec2f(ctx, 'subdivision', 1, 1);
             this.addField_SFVec3f(ctx, 'center', 0, 0, 0);
             this.addField_MFString(ctx, 'primType', ['TRIANGLES']);
+
+            // this way currently an initialize only field
+            if (this._vf.primType.length)
+                this._mesh._primType = this._vf.primType[0];
 
             var sx = this._vf.size.x, sy = this._vf.size.y;
             var subx = this._vf.subdivision.x, suby = this._vf.subdivision.y;
@@ -34782,7 +35408,7 @@ x3dom.registerNodeType(
                     //x3dom.debug.logInfo("color stride: " + stride);
                 }
                 
-                if (this._vf.indexType != "Uint16")
+                if (this._vf.indexType != "Uint16" && !x3dom.caps.INDEX_UINT)
     		        x3dom.debug.logWarning("Index type " + this._vf.indexType + " problematic");
             },
 			
@@ -35507,12 +36133,14 @@ x3dom.registerNodeType(
 
             fieldChanged: function(fieldName)
             {
-                if (fieldName == "coord" || fieldName == "normal" ||
-                    fieldName == "texCoord" || fieldName == "color" ||
-                    fieldName == "index") {
+                if (fieldName == "index" ||fieldName == "coord" || fieldName == "normal" ||
+                    fieldName == "texCoord" || fieldName == "color") {
                     this._dirty[fieldName] = true;
+                    this._vol.invalidate();
                 }
-                this._vol.invalidate();
+                else if (fieldName == "implicitMeshSize") {
+                    this._vol.invalidate();
+                }
             },
 
             getMin: function() {
@@ -35692,12 +36320,12 @@ x3dom.registerNodeType(
             x3dom.nodeTypes.IndexedFaceSet.superClass.call(this, ctx);
 
             this.addField_SFFloat(ctx, 'creaseAngle', 0);   // TODO
+            this.addField_SFBool(ctx, 'convex', true);
 
             this.addField_MFInt32(ctx, 'coordIndex', []);
             this.addField_MFInt32(ctx, 'normalIndex', []);
             this.addField_MFInt32(ctx, 'colorIndex', []);
             this.addField_MFInt32(ctx, 'texCoordIndex', []);
-			this.addField_SFBool(ctx, 'convex', true);
         },
         {
             nodeChanged: function()
@@ -35805,7 +36433,7 @@ x3dom.registerNodeType(
                 var p0, p1, p2, n0, n1, n2, t0, t1, t2, c0, c1, c2;
 
                 if ( (this._vf.creaseAngle <= x3dom.fields.Eps) ||  // FIXME; what to do for ipols?
-                     (positions.length > 65535) ||
+                     (positions.length > x3dom.Utils.maxIndexableCoords) ||
                      (hasNormal && hasNormalInd) ||
                      (hasTexCoord && hasTexCoordInd) ||
                      (hasColor && hasColorInd) )
@@ -35888,8 +36516,8 @@ x3dom.registerNodeType(
 									else if (colPerVert) { c2 = p2; }
 									else { c2 = faceCnt; }
 									t = 3;
-	
-									this._mesh._indices[0].push(cnt++, cnt++, cnt++);
+
+									//this._mesh._indices[0].push(cnt++, cnt++, cnt++);
 	
 									this._mesh._positions[0].push(positions[p0].x);
 									this._mesh._positions[0].push(positions[p0].y);
@@ -35912,10 +36540,10 @@ x3dom.registerNodeType(
 										this._mesh._normals[0].push(normals[n2].y);
 										this._mesh._normals[0].push(normals[n2].z);
 									}
-									else {
+									//else {
 										this._mesh._multiIndIndices.push(p0, p1, p2);
 										//this._mesh._multiIndIndices.push(cnt-3, cnt-2, cnt-1);
-									}
+									//}
 	
 									if (hasColor) {
 										this._mesh._colors[0].push(colors[c0].r);
@@ -35994,8 +36622,8 @@ x3dom.registerNodeType(
 									} else {
 										c2 = faceCnt;
 									}
-	
-									this._mesh._indices[0].push(cnt++, cnt++, cnt++);
+
+									//this._mesh._indices[0].push(cnt++, cnt++, cnt++);
 	
 									this._mesh._positions[0].push(positions[p0].x);
 									this._mesh._positions[0].push(positions[p0].y);
@@ -36018,10 +36646,10 @@ x3dom.registerNodeType(
 										this._mesh._normals[0].push(normals[n2].y);
 										this._mesh._normals[0].push(normals[n2].z);
 									}
-									else {
+									//else {
 										this._mesh._multiIndIndices.push(p0, p1, p2);
 										//this._mesh._multiIndIndices.push(cnt-3, cnt-2, cnt-1);
-									}
+									//}
 	
 									if (hasColor) {
 										this._mesh._colors[0].push(colors[c0].r);
@@ -36067,7 +36695,7 @@ x3dom.registerNodeType(
 								default:
 							}
 						}
-					} 
+					}
 					else {
 						var linklist = new x3dom.DoublyLinkedList();
 						var data = {};
@@ -36079,7 +36707,7 @@ x3dom.registerNodeType(
 								var multi_index_data = x3dom.EarClipping.getMultiIndexes(linklist);
 								
 								for (j = 0; j < multi_index_data.indices.length; j++)
-								{	
+								{
 									this._mesh._indices[0].push(cnt);
 									cnt++;
 									
@@ -36144,7 +36772,9 @@ x3dom.registerNodeType(
 							
 							linklist.appendNode(new x3dom.DoublyLinkedList.ListNode(
 							    positions[indexes[i]], indexes[i], data.normals, data.colors, data.texCoords));						
-						}		
+						}
+
+                        this._mesh.splitMesh();
 					}
 					
 					if (!hasNormal) {
@@ -36153,13 +36783,11 @@ x3dom.registerNodeType(
 					if (!hasTexCoord) {
 						this._mesh.calcTexCoords(texMode);
 					}
-	
-					this._mesh.splitMesh();
                 } // if isMulti
                 else
                 {
                     t = 0;
-                    if(this._vf.convex) {
+                    if (this._vf.convex) {
 						for (i = 0; i < indexes.length; ++i)
 						{
 							// Convert non-triangular polygons to a triangle fan
@@ -36176,7 +36804,8 @@ x3dom.registerNodeType(
 							}
 
 						}
-					} else {
+					}
+                    else {
 						//  Convert non-triangular convex polygons to a triangle fan					
 						linklist = new x3dom.DoublyLinkedList();
 						for (i = 0; i < indexes.length; ++i)
@@ -36217,21 +36846,29 @@ x3dom.registerNodeType(
                 }
 
                 this.invalidateVolume();
+
                 this._mesh._numFaces = 0;
                 this._mesh._numCoords = 0;
-                for (i=0; i<this._mesh._indices.length; i++) {
-                    this._mesh._numFaces += this._mesh._indices[i].length / 3;
-                    this._mesh._numCoords += this._mesh._positions[i].length / 3;
+
+                for (i=0; i<this._mesh._positions.length; i++) {
+                    var indexLength = this._mesh._indices[i].length;
+                    var numCoords = this._mesh._positions[i].length / 3;
+                    this._mesh._numCoords += numCoords;
+                    if (indexLength > 0)
+                        this._mesh._numFaces += indexLength / 3;
+                    else
+                        this._mesh._numFaces += numCoords / 3;
                 }
 
-                var time1 = new Date().getTime() - time0;
+                //var time1 = new Date().getTime() - time0;
                 //x3dom.debug.logInfo("Mesh load time: " + time1 + " ms");
             },
 
             fieldChanged: function(fieldName)
             {
                 if (fieldName != "coord" && fieldName != "normal" &&
-    				fieldName != "texCoord" && fieldName != "color")
+    				fieldName != "texCoord" && fieldName != "color" &&
+                    fieldName != "coordIndex")
     			{
     			    x3dom.debug.logWarning("IndexedFaceSet: fieldChanged for " +
     			                           fieldName + " not yet implemented!");
@@ -36246,17 +36883,68 @@ x3dom.registerNodeType(
                     if (texCoordNode._cf.texCoord.nodes.length)
                         texCoordNode = texCoordNode._cf.texCoord.nodes[0];
                 }
-                
-                if ((this._vf.creaseAngle <= x3dom.fields.Eps) || (n > 65535) ||
+
+                // TODO; optimize this very slow and brute force code, at least for creaseAngle=0 case!
+                if ((this._vf.creaseAngle <= x3dom.fields.Eps) || (n > x3dom.Utils.maxIndexableCoords) ||
                     (this._vf.normalIndex.length > 0 && this._cf.normal.node) ||
                     (this._vf.texCoordIndex.length > 0 && texCoordNode) ||
                     (this._vf.colorIndex.length > 0 && this._cf.color.node))
                 {
-					this._mesh._positions[0] = [];
-					this._mesh._indices[0] =[];
-					this._mesh._normals[0] = [];
-					this._mesh._texCoords[0] =[];
-					this._mesh._colors[0] = [];
+                    var needNormals = !this._cf.normal.node && this._vf.normalUpdateMode.toLowerCase() != 'none';
+
+                    n = this._mesh._multiIndIndices.length;
+
+                    this._mesh._positions[0] = [];
+                    this._mesh._indices[0] =[];
+
+                    // special coordinate interpolator handler
+                    if (fieldName == "coord" && n)
+                    {
+                        if (needNormals) {
+                            this._mesh._normals[0] = [];
+                        }
+
+                        for (i=0; i<n; i+=3) {
+                            var ind0 = this._mesh._multiIndIndices[i  ];
+                            var ind1 = this._mesh._multiIndIndices[i+1];
+                            var ind2 = this._mesh._multiIndIndices[i+2];
+
+                            var pos0 = pnts[ind0];
+                            var pos1 = pnts[ind1];
+                            var pos2 = pnts[ind2];
+
+                            this._mesh._positions[0].push(pos0.x, pos0.y, pos0.z);
+                            this._mesh._positions[0].push(pos1.x, pos1.y, pos1.z);
+                            this._mesh._positions[0].push(pos2.x, pos2.y, pos2.z);
+
+                            if (needNormals) {
+                                var a = pos0.subtract(pos1);
+                                var b = pos1.subtract(pos2);
+
+                                var norm = a.cross(b).normalize();
+                                if (!this._vf.ccw)
+                                    norm = norm.negate();
+
+                                this._mesh._normals[0].push(norm.x, norm.y, norm.z);
+                                this._mesh._normals[0].push(norm.x, norm.y, norm.z);
+                                this._mesh._normals[0].push(norm.x, norm.y, norm.z);
+                            }
+                        }
+
+                        this.invalidateVolume();
+
+                        Array.forEach(this._parentNodes, function (node) {
+                            node._dirty.positions = true;
+                            if (needNormals)
+                                node._dirty.normals = true;
+                        });
+
+                        return;
+                    }
+
+                    this._mesh._normals[0] = [];
+                    this._mesh._texCoords[0] =[];
+                    this._mesh._colors[0] = [];
 					
 					var indexes = this._vf.coordIndex;
 					var normalInd = this._vf.normalIndex;
@@ -36339,7 +37027,6 @@ x3dom.registerNodeType(
 					}
 					this._mesh._numColComponents = numColComponents;
 
-
 					var i, j, t, cnt, faceCnt;
 					var p0, p1, p2, n0, n1, n2, t0, t1, t2, c0, c1, c2;
 					
@@ -36415,7 +37102,7 @@ x3dom.registerNodeType(
 									else { c2 = faceCnt; }
 									t = 3;
 
-									this._mesh._indices[0].push(cnt++, cnt++, cnt++);
+									//this._mesh._indices[0].push(cnt++, cnt++, cnt++);
 
 									this._mesh._positions[0].push(positions[p0].x);
 									this._mesh._positions[0].push(positions[p0].y);
@@ -36438,9 +37125,9 @@ x3dom.registerNodeType(
 										this._mesh._normals[0].push(normals[n2].y);
 										this._mesh._normals[0].push(normals[n2].z);
 									}
-									else {
+									//else {
 										this._mesh._multiIndIndices.push(p0, p1, p2);
-									}
+									//}
 
 									if (hasColor) {
 										this._mesh._colors[0].push(colors[c0].r);
@@ -36520,7 +37207,7 @@ x3dom.registerNodeType(
 										c2 = faceCnt;
 									}
 
-									this._mesh._indices[0].push(cnt++, cnt++, cnt++);
+									//this._mesh._indices[0].push(cnt++, cnt++, cnt++);
 
 									this._mesh._positions[0].push(positions[p0].x);
 									this._mesh._positions[0].push(positions[p0].y);
@@ -36543,10 +37230,9 @@ x3dom.registerNodeType(
 										this._mesh._normals[0].push(normals[n2].y);
 										this._mesh._normals[0].push(normals[n2].z);
 									}
-									else {
+									//else {
 										this._mesh._multiIndIndices.push(p0, p1, p2);
-										//this._mesh._multiIndIndices.push(cnt-3, cnt-2, cnt-1);
-									}
+									//}
 
 									if (hasColor) {
 										this._mesh._colors[0].push(colors[c0].r);
@@ -36592,7 +37278,7 @@ x3dom.registerNodeType(
 								default:
 							}
 						}
-					} 
+					}
 					else {
 						var linklist = new x3dom.DoublyLinkedList();
 						var data = {};
@@ -36667,7 +37353,9 @@ x3dom.registerNodeType(
 							
 							linklist.appendNode(new x3dom.DoublyLinkedList.ListNode(
 								positions[indexes[i]], indexes[i], data.normals, data.colors, data.texCoords));						
-						}		
+						}
+
+                        this._mesh.splitMesh();
 					}
 
 					if (!hasNormal) {
@@ -36677,31 +37365,44 @@ x3dom.registerNodeType(
 						this._mesh.calcTexCoords(texMode);
 					}
 
-					this._mesh.splitMesh();
-
                     this.invalidateVolume();
+
 					this._mesh._numFaces = 0;
 					this._mesh._numCoords = 0;
 					
-					for (i=0; i<this._mesh._indices.length; i++) {
-						this._mesh._numFaces += this._mesh._indices[i].length / 3;
-						this._mesh._numCoords += this._mesh._positions[i].length / 3;
+					for (i=0; i<this._mesh._positions.length; i++) {
+                        var indexLength = this._mesh._indices[i].length;
+                        var numCoords = this._mesh._positions[i].length / 3;
+                        this._mesh._numCoords += numCoords;
+                        if (indexLength > 0)
+						    this._mesh._numFaces += indexLength / 3;
+                        else
+                            this._mesh._numFaces += numCoords / 3;
 					}
 	
 					Array.forEach(this._parentNodes, function (node) {
 						node.setGeoDirty();
-					});	 
+					});
                 }
 				else {
 					if (fieldName == "coord")
 					{
+                        var needNormals = !this._cf.normal.node && this._vf.normalUpdateMode.toLowerCase() != 'none';
+
 						this._mesh._positions[0] = pnts.toGL();
-						
+
+                        if (needNormals) {
+                            // position update usually also requires update of vertex normals
+                            this._mesh.calcNormals(this._vf.creaseAngle, this._vf.ccw);
+                        }
+
 						// tells the mesh that its bbox requires update
                         this.invalidateVolume();
 
 						Array.forEach(this._parentNodes, function (node) {					
 							node._dirty.positions = true;
+                            if (needNormals)
+                                node._dirty.normals = true;
                             node.invalidateVolume();
 						});
 					}
@@ -36740,6 +37441,41 @@ x3dom.registerNodeType(
 							node._dirty.texcoords = true;
 						});
 					}
+                    else if (fieldName == "coordIndex")
+                    {
+                        needNormals = !this._cf.normal.node && this._vf.normalUpdateMode.toLowerCase() != 'none';
+
+                        indexes = this._vf.coordIndex;
+                        t = 0;
+                        n = indexes.length;
+
+                        this._mesh._indices[0] = [];
+
+                        for (i = 0; i < n; ++i) {
+                            if (indexes[i] == -1) {
+                                t = 0;
+                            }
+                            else {
+                                switch (t) {
+                                    case 0: p0 = +indexes[i]; t = 1; break;
+                                    case 1: p1 = +indexes[i]; t = 2; break;
+                                    case 2: p2 = +indexes[i]; t = 3; this._mesh._indices[0].push(p0, p1, p2); break;
+                                    case 3: p1 = p2; p2 = +indexes[i]; this._mesh._indices[0].push(p0, p1, p2); break;
+                                }
+                            }
+                        }
+
+                        if (needNormals) {
+                            // index update usually also requires update of vertex normals
+                            this._mesh.calcNormals(this._vf.creaseAngle, this._vf.ccw);
+                        }
+
+                        Array.forEach(this._parentNodes, function (node) {
+                            node._dirty.indexes = true;
+                            if (needNormals)
+                                node._dirty.normals = true;
+                        });
+                    }
 				}
             }
         }
@@ -36867,8 +37603,8 @@ x3dom.registerNodeType(
 
 
 x3dom.versionInfo = {
-    version:  '1.5.0',
-    revision: 'bd0c4fe7954094877b20444b729f04aaf3a466a5',
-    date:     'Thu Sep 12 15:22:34 2013 +0200'
+    version:  '1.5.1',
+    revision: 'c0f47cbb994175bc43240b8de110f51628c95b6a',
+    date:     'Wed Oct 23 16:23:43 2013 +0200'
 };
 

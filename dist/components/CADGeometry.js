@@ -1,4 +1,4 @@
-/** X3DOM Runtime, http://www.x3dom.org/ 1.5.0 - bd0c4fe7954094877b20444b729f04aaf3a466a5 - Thu Sep 12 15:22:34 2013 +0200 */
+/** X3DOM Runtime, http://www.x3dom.org/ 1.5.1 - c0f47cbb994175bc43240b8de110f51628c95b6a - Wed Oct 23 16:23:43 2013 +0200 */
 x3dom.registerNodeType("IndexedQuadSet","CADGeometry",defineClass(x3dom.nodeTypes.X3DComposedGeometryNode,function(ctx){x3dom.nodeTypes.IndexedQuadSet.superClass.call(this,ctx);this.addField_MFInt32(ctx,'index',[]);},{nodeChanged:function()
 {var time0=new Date().getTime();this.handleAttribs();var colPerVert=this._vf.colorPerVertex;var normPerVert=this._vf.normalPerVertex;var indexes=this._vf.index;var hasNormal=false,hasTexCoord=false,hasColor=false;var positions,normals,texCoords,colors;var coordNode=this._cf.coord.node;x3dom.debug.assert(coordNode);positions=coordNode._vf.point;var normalNode=this._cf.normal.node;if(normalNode){hasNormal=true;normals=normalNode._vf.vector;}
 else{hasNormal=false;}
@@ -22,7 +22,7 @@ else{this._mesh.calcTexCoords(texMode);}
 if(hasColor&&colPerVert){this._mesh._colors[0]=colors.toGL();this._mesh._numColComponents=numColComponents;}}
 this.invalidateVolume();this._mesh._numFaces=0;this._mesh._numCoords=0;for(i=0;i<this._mesh._indices.length;i++){this._mesh._numFaces+=this._mesh._indices[i].length/3;this._mesh._numCoords+=this._mesh._positions[i].length/3;}
 var time1=new Date().getTime()-time0;},fieldChanged:function(fieldName)
-{var pnts=this._cf.coord.node._vf.point;if(pnts.length>65535)
+{var pnts=this._cf.coord.node._vf.point;if(pnts.length>x3dom.Utils.maxIndexableCoords)
 {x3dom.debug.logWarning("IndexedQuadSet: fieldChanged with "+"too many coordinates not yet implemented!");return;}
 if(fieldName=="coord")
 {this._mesh._positions[0]=pnts.toGL();this.invalidateVolume();Array.forEach(this._parentNodes,function(node){node._dirty.positions=true;node.invalidateVolume();});}
@@ -64,7 +64,7 @@ else{this._mesh.calcTexCoords(texMode);}
 if(hasColor&&colPerVert){this._mesh._colors[0]=colors.toGL();this._mesh._numColComponents=numColComponents;}}
 this.invalidateVolume();this._mesh._numFaces=0;this._mesh._numCoords=0;for(i=0;i<this._mesh._indices.length;i++){this._mesh._numFaces+=this._mesh._indices[i].length/3;this._mesh._numCoords+=this._mesh._positions[i].length/3;}
 var time1=new Date().getTime()-time0;},fieldChanged:function(fieldName)
-{var pnts=this._cf.coord.node._vf.point;if(pnts.length>65535)
+{var pnts=this._cf.coord.node._vf.point;if(pnts.length>x3dom.Utils.maxIndexableCoords)
 {x3dom.debug.logWarning("QuadSet: fieldChanged with "+"too many coordinates not yet implemented!");return;}
 if(fieldName=="coord")
 {this._mesh._positions[0]=pnts.toGL();this.invalidateVolume();Array.forEach(this._parentNodes,function(node){node._dirty.positions=true;node.invalidateVolume();});}
