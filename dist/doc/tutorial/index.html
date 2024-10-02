@@ -6,13 +6,13 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     
-    <title>Tutorial &mdash; X3DOM v1.3dev documentation</title>
+    <title>Tutorial &mdash; X3DOM v1.4.0 documentation</title>
     <link rel="stylesheet" href="../_static/flasky.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    '../',
-        VERSION:     '1.3dev',
+        VERSION:     '1.4.0',
         COLLAPSE_INDEX: false,
         FILE_SUFFIX: '.html',
         HAS_SOURCE:  true
@@ -21,16 +21,17 @@
     <script type="text/javascript" src="../_static/jquery.js"></script>
     <script type="text/javascript" src="../_static/underscore.js"></script>
     <script type="text/javascript" src="../_static/doctools.js"></script>
-    <link rel="top" title="X3DOM v1.3dev documentation" href="../index.html" />
+    <link rel="top" title="X3DOM v1.4.0 documentation" href="../index.html" />
     <link rel="next" title="First steps with X3DOM" href="firststeps.html" />
     <link rel="prev" title="Getting started" href="../gettingstarted.html" />
    
+    <script src="http://x3dom.org/download/dev/x3dom-full.js"></script>
   
   <link media="only screen and (max-device-width: 480px)" href="../_static/small_flask.css" type= "text/css" rel="stylesheet" />
 
   </head>
   <body>
-    <div id="beta_notice"><p><strong>Note: </strong>This documentation is under active development. If you are interested in helping out, <a href="http://sourceforge.net/mailarchive/forum.php?forum_name=x3dom-developers">get in touch</a>.</p></div>
+    <!--<div id="beta_notice"><p><strong>Note: </strong>This documentation is under active development. If you are interested in helping out, <a href="http://sourceforge.net/mailarchive/forum.php?forum_name=x3dom-developers">get in touch</a>.</p></div>-->
   
   
 
@@ -46,7 +47,7 @@
         <li class="right" >
           <a href="../gettingstarted.html" title="Getting started"
              accesskey="P">previous</a> |</li>
-        <li><a href="../index.html">X3DOM v1.3dev documentation</a> &raquo;</li> 
+        <li><a href="../index.html">X3DOM v1.4.0 documentation</a> &raquo;</li> 
       </ul>
     </div>  
 
@@ -72,6 +73,7 @@ of different kinds, but they still feature everything you need to get started.</
 <div class="toctree-wrapper compound">
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="dataconversion.html">Generic 3D data conversion</a></li>
+<li class="toctree-l1"><a class="reference internal" href="aopt.html">Analyzing and optimizing your model for the 3D Web</a></li>
 <li class="toctree-l1"><a class="reference internal" href="blender_export.html">Blender export</a></li>
 <li class="toctree-l1"><a class="reference internal" href="max_export.html">3ds Max Export</a></li>
 <li class="toctree-l1"><a class="reference internal" href="maya_export.html">Maya export</a></li>
@@ -86,7 +88,12 @@ of different kinds, but they still feature everything you need to get started.</
 </ul>
 </div>
 <p><strong>Elsewhere</strong></p>
-<p>If you can read german, there is also some german content available on our website:</p>
+<blockquote>
+<div><ul class="simple">
+<li><a class="reference external" href="http://www.x3dom.org/x3dom/doc/slides/x3domIntroTutorial.pdf">Slides with introduction and tutorial</a></li>
+</ul>
+</div></blockquote>
+<p>If you can read German, there is also some German content available on our website:</p>
 <blockquote>
 <div><ul class="simple">
 <li><a class="reference external" href="http://www.x3dom.org/iX/">Beispiele aus dem iX-Tutorial</a></li>
@@ -129,9 +136,16 @@ of different kinds, but they still feature everything you need to get started.</
       <div class="clearer"></div>
     </div>
   <div class="footer">
-    &copy; Copyright 2011, Fraunhofer IGD/VCST.
+    &copy; Copyright 2012, Fraunhofer IGD/VCST.
     Created using <a href="http://sphinx.pocoo.org/">Sphinx</a>.
   </div>
   
+<style>
+    .internal-node-list ul,
+    .internal-node-list, li {
+        margin:0;
+        padding:0;
+    }
+</style>
   </body>
 </html>

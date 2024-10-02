@@ -6,13 +6,13 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     
-    <title>Styling with CSS &mdash; X3DOM v1.3dev documentation</title>
+    <title>Styling with CSS &mdash; X3DOM v1.4.0 documentation</title>
     <link rel="stylesheet" href="../_static/flasky.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    '../',
-        VERSION:     '1.3dev',
+        VERSION:     '1.4.0',
         COLLAPSE_INDEX: false,
         FILE_SUFFIX: '.html',
         HAS_SOURCE:  true
@@ -21,17 +21,18 @@
     <script type="text/javascript" src="../_static/jquery.js"></script>
     <script type="text/javascript" src="../_static/underscore.js"></script>
     <script type="text/javascript" src="../_static/doctools.js"></script>
-    <link rel="top" title="X3DOM v1.3dev documentation" href="../index.html" />
+    <link rel="top" title="X3DOM v1.4.0 documentation" href="../index.html" />
     <link rel="up" title="Tutorial" href="index.html" />
     <link rel="next" title="Images, sound and movie formats" href="imagesoundmovie.html" />
     <link rel="prev" title="First steps with X3DOM" href="firststeps.html" />
    
+    <script src="http://x3dom.org/download/dev/x3dom-full.js"></script>
   
   <link media="only screen and (max-device-width: 480px)" href="../_static/small_flask.css" type= "text/css" rel="stylesheet" />
 
   </head>
   <body>
-    <div id="beta_notice"><p><strong>Note: </strong>This documentation is under active development. If you are interested in helping out, <a href="http://sourceforge.net/mailarchive/forum.php?forum_name=x3dom-developers">get in touch</a>.</p></div>
+    <!--<div id="beta_notice"><p><strong>Note: </strong>This documentation is under active development. If you are interested in helping out, <a href="http://sourceforge.net/mailarchive/forum.php?forum_name=x3dom-developers">get in touch</a>.</p></div>-->
   
   
 
@@ -47,7 +48,7 @@
         <li class="right" >
           <a href="firststeps.html" title="First steps with X3DOM"
              accesskey="P">previous</a> |</li>
-        <li><a href="../index.html">X3DOM v1.3dev documentation</a> &raquo;</li>
+        <li><a href="../index.html">X3DOM v1.4.0 documentation</a> &raquo;</li>
           <li><a href="index.html" accesskey="U">Tutorial</a> &raquo;</li> 
       </ul>
     </div>  
@@ -60,6 +61,7 @@
   <div class="section" id="styling-with-css">
 <span id="styling"></span><h1>Styling with CSS<a class="headerlink" href="#styling-with-css" title="Permalink to this headline">¶</a></h1>
 <p>This tutorial guides you through the process of using CSS with X3DOM. In order to demonstrate the functionality, we are going to create a HTML document with a X3DOM scene. That scene is then amended with a button that allows to resize the scene by setting CSS attributes using JavaScript.</p>
+<p>Important: you should always include the X3DOM default stylesheet <tt class="docutils literal"><span class="pre">x3dom.css</span></tt>, since it initializes some important settings necessary due to the fact that X3DOM&#8217;s new 3D elements are unknown to the Browser and so are their styles. For example, if the <tt class="docutils literal"><span class="pre">&lt;x3d&gt;</span></tt> element is not floating (e.g. using the <cite>float:left</cite> property), the relative mouse positions cannot be calculated correctly and picking does not work!</p>
 <div class="section" id="basic-scene-document">
 <h2>Basic scene document<a class="headerlink" href="#basic-scene-document" title="Permalink to this headline">¶</a></h2>
 <p>We are going to use the box example scene established in the <a class="reference internal" href="firststeps.html#firststeps"><em>First steps with X3DOM</em></a> tutorial:</p>
@@ -103,7 +105,7 @@
   <span class="nt">&lt;/style&gt;</span>
 <span class="nt">&lt;/head&gt;</span>
 ...
-<span class="nt">&lt;x3d</span> <span class="na">id=</span><span class="s">&quot;the_one&quot;</span><span class="nt">&gt;</span>
+<span class="nt">&lt;x3d</span> <span class="na">id=</span><span class="s">&quot;the_element&quot;</span><span class="nt">&gt;</span>
 ...
 </pre></div>
 </div>
@@ -135,7 +137,7 @@
 <span class="nt">&lt;/x3d&gt;</span>
 </pre></div>
 </div>
-<p>Semantically we are fine, but now we need to style the button so it floats over the scene. The following style rules will accomplish this. Please note the <cite>position: realtive</cite> property we are setting on the <tt class="docutils literal"><span class="pre">x3d</span></tt> element. We need this to allow absolute positioning of the button within the <tt class="docutils literal"><span class="pre">x3d</span></tt> element. Otherwise it would position absolute to the page. Additionally we need to remove the default 1 pixels border added by the X3DOM default stylesheet.</p>
+<p>Semantically we are fine, but now we need to style the button so it floats over the scene. The following style rules will accomplish this. Please note the <cite>position: relative</cite> property we are setting on the <tt class="docutils literal"><span class="pre">x3d</span></tt> element. We need this to allow absolute positioning of the button within the <tt class="docutils literal"><span class="pre">x3d</span></tt> element. Otherwise it would position absolute to the page. Additionally we need to remove the default 1 pixels border added by the X3DOM default stylesheet.</p>
 <div class="highlight-css"><div class="highlight"><pre><span class="nf">#the_element</span> <span class="p">{</span>
     <span class="o">...</span>
     <span class="k">border</span><span class="o">:</span> <span class="k">none</span><span class="p">;</span>  <span class="o">//</span> <span class="n">remove</span> <span class="n">the</span> <span class="k">default</span> <span class="m">1px</span> <span class="k">border</span>
@@ -270,9 +272,16 @@
       <div class="clearer"></div>
     </div>
   <div class="footer">
-    &copy; Copyright 2011, Fraunhofer IGD/VCST.
+    &copy; Copyright 2012, Fraunhofer IGD/VCST.
     Created using <a href="http://sphinx.pocoo.org/">Sphinx</a>.
   </div>
   
+<style>
+    .internal-node-list ul,
+    .internal-node-list, li {
+        margin:0;
+        padding:0;
+    }
+</style>
   </body>
 </html>

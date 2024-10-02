@@ -6,13 +6,13 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     
-    <title>Camera Navigation &mdash; X3DOM v1.3dev documentation</title>
+    <title>Camera Navigation &mdash; X3DOM v1.4.0 documentation</title>
     <link rel="stylesheet" href="_static/flasky.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    '',
-        VERSION:     '1.3dev',
+        VERSION:     '1.4.0',
         COLLAPSE_INDEX: false,
         FILE_SUFFIX: '.html',
         HAS_SOURCE:  true
@@ -21,16 +21,17 @@
     <script type="text/javascript" src="_static/jquery.js"></script>
     <script type="text/javascript" src="_static/underscore.js"></script>
     <script type="text/javascript" src="_static/doctools.js"></script>
-    <link rel="top" title="X3DOM v1.3dev documentation" href="index.html" />
+    <link rel="top" title="X3DOM v1.4.0 documentation" href="index.html" />
     <link rel="next" title="Configuration" href="configuration.html" />
     <link rel="prev" title="3D Lightbox Gallery of Historical Objects" href="tutorial/historical_objects.html" />
    
+    <script src="http://x3dom.org/download/dev/x3dom-full.js"></script>
   
   <link media="only screen and (max-device-width: 480px)" href="_static/small_flask.css" type= "text/css" rel="stylesheet" />
 
   </head>
   <body>
-    <div id="beta_notice"><p><strong>Note: </strong>This documentation is under active development. If you are interested in helping out, <a href="http://sourceforge.net/mailarchive/forum.php?forum_name=x3dom-developers">get in touch</a>.</p></div>
+    <!--<div id="beta_notice"><p><strong>Note: </strong>This documentation is under active development. If you are interested in helping out, <a href="http://sourceforge.net/mailarchive/forum.php?forum_name=x3dom-developers">get in touch</a>.</p></div>-->
   
   
 
@@ -46,7 +47,7 @@
         <li class="right" >
           <a href="tutorial/historical_objects.html" title="3D Lightbox Gallery of Historical Objects"
              accesskey="P">previous</a> |</li>
-        <li><a href="index.html">X3DOM v1.3dev documentation</a> &raquo;</li> 
+        <li><a href="index.html">X3DOM v1.4.0 documentation</a> &raquo;</li> 
       </ul>
     </div>  
 
@@ -57,17 +58,18 @@
             
   <div class="section" id="camera-navigation">
 <span id="navigation"></span><h1>Camera Navigation<a class="headerlink" href="#camera-navigation" title="Permalink to this headline">¶</a></h1>
-<p>The current WebGL/JS implementation of X3DOM provides some generic
-interaction and navigation methods. Interactive objects will be handled
-by HTML-like events. Navigation can be user-defined or controlled by
-specific predefined modes.</p>
+<p>X3DOM provides some generic interaction and navigation methods.
+Interactive objects will be handled by HTML-like events.
+Navigation can be user-defined or controlled by specific predefined modes.</p>
 <p>Currently X3DOM supports the following interactive navigation modes:</p>
 <ul class="simple">
 <li>Examine</li>
 <li>Walk</li>
 <li>Fly</li>
 <li>Look-at</li>
+<li>Look-around</li>
 <li>Game</li>
+<li>Helicopter</li>
 </ul>
 <p>Non-Interactive movement encompasses the functionality of:</p>
 <ul class="simple">
@@ -148,6 +150,27 @@ specific predefined modes.</p>
 </tr>
 <tr><td>Move backward</td>
 <td>Right</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="helicopter">
+<h3>Helicopter<a class="headerlink" href="#helicopter" title="Permalink to this headline">¶</a></h3>
+<p>Activate this mode by pressing the <tt class="docutils literal"><span class="pre">&quot;h&quot;</span></tt> key.</p>
+<p>To look downwards/upwards and to move higher/lower use the keys (8/9 and 6/7).</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="44%" />
+<col width="56%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head">Function</th>
+<th class="head">Mouse Button</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td>Move forward</td>
+<td>Left</td>
 </tr>
 </tbody>
 </table>
@@ -234,7 +257,7 @@ specific predefined modes.</p>
 <div class="section" id="mid-button-troubleshooting">
 <h2>Mid-Button troubleshooting<a class="headerlink" href="#mid-button-troubleshooting" title="Permalink to this headline">¶</a></h2>
 <p>If the web page has scroll bars and autoscrolling is enabled, Mid-Button
-currently does not work yet. As a workaround, you can disable autoscrolling
+currently does not work correctly. As a workaround, you can disable autoscrolling
 by unchecking the <strong>Use autoscrolling</strong> checkbox in the Firefox browser
 options, as is shown in the screenshot below (for the Firefox case).</p>
 <img alt="_images/UseAutoscrolling.png" src="_images/UseAutoscrolling.png" />
@@ -258,6 +281,7 @@ options, as is shown in the screenshot below (for the Firefox case).</p>
 <li><a class="reference internal" href="#examine">Examine</a></li>
 <li><a class="reference internal" href="#walk">Walk</a></li>
 <li><a class="reference internal" href="#fly">Fly</a></li>
+<li><a class="reference internal" href="#helicopter">Helicopter</a></li>
 <li><a class="reference internal" href="#look-at">Look at</a></li>
 <li><a class="reference internal" href="#game">Game</a></li>
 </ul>
@@ -292,9 +316,16 @@ options, as is shown in the screenshot below (for the Firefox case).</p>
       <div class="clearer"></div>
     </div>
   <div class="footer">
-    &copy; Copyright 2011, Fraunhofer IGD/VCST.
+    &copy; Copyright 2012, Fraunhofer IGD/VCST.
     Created using <a href="http://sphinx.pocoo.org/">Sphinx</a>.
   </div>
   
+<style>
+    .internal-node-list ul,
+    .internal-node-list, li {
+        margin:0;
+        padding:0;
+    }
+</style>
   </body>
 </html>

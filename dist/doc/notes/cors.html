@@ -6,13 +6,13 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     
-    <title>Loading resources from external servers &mdash; X3DOM v1.3dev documentation</title>
+    <title>Loading resources from external servers &mdash; X3DOM v1.4.0 documentation</title>
     <link rel="stylesheet" href="../_static/flasky.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    '../',
-        VERSION:     '1.3dev',
+        VERSION:     '1.4.0',
         COLLAPSE_INDEX: false,
         FILE_SUFFIX: '.html',
         HAS_SOURCE:  true
@@ -21,17 +21,18 @@
     <script type="text/javascript" src="../_static/jquery.js"></script>
     <script type="text/javascript" src="../_static/underscore.js"></script>
     <script type="text/javascript" src="../_static/doctools.js"></script>
-    <link rel="top" title="X3DOM v1.3dev documentation" href="../index.html" />
+    <link rel="top" title="X3DOM v1.4.0 documentation" href="../index.html" />
     <link rel="up" title="Notes" href="index.html" />
     <link rel="next" title="Complex models" href="complex_models.html" />
     <link rel="prev" title="Notes" href="index.html" />
    
+    <script src="http://x3dom.org/download/dev/x3dom-full.js"></script>
   
   <link media="only screen and (max-device-width: 480px)" href="../_static/small_flask.css" type= "text/css" rel="stylesheet" />
 
   </head>
   <body>
-    <div id="beta_notice"><p><strong>Note: </strong>This documentation is under active development. If you are interested in helping out, <a href="http://sourceforge.net/mailarchive/forum.php?forum_name=x3dom-developers">get in touch</a>.</p></div>
+    <!--<div id="beta_notice"><p><strong>Note: </strong>This documentation is under active development. If you are interested in helping out, <a href="http://sourceforge.net/mailarchive/forum.php?forum_name=x3dom-developers">get in touch</a>.</p></div>-->
   
   
 
@@ -47,7 +48,7 @@
         <li class="right" >
           <a href="index.html" title="Notes"
              accesskey="P">previous</a> |</li>
-        <li><a href="../index.html">X3DOM v1.3dev documentation</a> &raquo;</li>
+        <li><a href="../index.html">X3DOM v1.4.0 documentation</a> &raquo;</li>
           <li><a href="index.html" accesskey="U">Notes</a> &raquo;</li> 
       </ul>
     </div>  
@@ -76,6 +77,14 @@ needs to load resources from <tt class="docutils literal"><span class="pre">http
 safe for cross site requests. For example:</p>
 <div class="highlight-python"><pre>Access-Control-Allow-Origin: http://yoursite.org</pre>
 </div>
+<p>If you don&#8217;t care and want to allow access to all users, you can add e.g.
+the following to your httpd.conf (given you are using Apache2):</p>
+<div class="highlight-python"><pre>&lt;Directory /&gt;
+    Header set Access-Control-Allow-Origin "*"
+    Header set Access-Control-Allow-Headers "Content-Type"
+    Header set Access-Control-Allow-Methods "GET, PUT, OPTIONS, DELETE, POST"
+&lt;/Directory&gt;</pre>
+</div>
 <p>An alternative to adhering to the CORS protocol, is to setting
 up a proxy server forwarding requests to the foreign server in the background.
 If you can do away with the benefits CDN provides this technique may be
@@ -86,6 +95,7 @@ a viable alternative.</p>
 <li><a class="reference external" href="http://httpd.apache.org/docs/2.1/en/mod/mod_headers.html">Apache mod_headers</a></li>
 <li><a class="reference external" href="http://redmine.lighttpd.net/wiki/1/Docs:ModSetEnv">Lighttpd mod_setenv</a></li>
 <li><a class="reference external" href="http://wiki.nginx.org/HttpHeadersModule">NGINX headers module</a></li>
+<li><a class="reference external" href="http://enable-cors.org/">Others</a></li>
 </ul>
 <p><em>More information on proxy configuration:</em></p>
 <ul class="simple">
@@ -160,7 +170,8 @@ the CORS mechanisms. Please use with care.</p>
 <p>The Chrome browser allows you to disable a security precaution that prevents
 you loading resources from disk. Use the following startup parameters:</p>
 <div class="highlight-python"><pre>--allow-file-access-from-files
---allow-file-access</pre>
+--allow-file-access
+--disable-web-security</pre>
 </div>
 </div>
 <div class="section" id="firefox">
@@ -239,9 +250,16 @@ Available online at <a class="reference external" href="http://www.w3.org/TR/cor
       <div class="clearer"></div>
     </div>
   <div class="footer">
-    &copy; Copyright 2011, Fraunhofer IGD/VCST.
+    &copy; Copyright 2012, Fraunhofer IGD/VCST.
     Created using <a href="http://sphinx.pocoo.org/">Sphinx</a>.
   </div>
   
+<style>
+    .internal-node-list ul,
+    .internal-node-list, li {
+        margin:0;
+        padding:0;
+    }
+</style>
   </body>
 </html>
