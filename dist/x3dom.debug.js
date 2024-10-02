@@ -1,4 +1,4 @@
-/** X3DOM Runtime, http://www.x3dom.org/ 1.6.1 - 979902877438b38183164b102350130392ada7d5 - Thu Jul 24 17:38:21 2014 +0200 *//*
+/** X3DOM Runtime, http://www.x3dom.org/ 1.6.2 - 8f5655cec1951042e852ee9def292c9e0194186b - Sat Dec 20 00:03:52 2014 +0100 *//*
  * X3DOM JavaScript Library
  * http://www.x3dom.org
  *
@@ -113,7 +113,7 @@ x3dom.components = {};
 x3dom.geoCache = [];
 
 /** Stores information about Browser and hardware capabilities */
-x3dom.caps = { PLATFORM: navigator.platform, AGENT: navigator.userAgent };
+x3dom.caps = { PLATFORM: navigator.platform, AGENT: navigator.userAgent, RENDERMODE: "HARDWARE" };
 
 /** Registers the node defined by @p nodeDef.
 
@@ -1085,6 +1085,60 @@ get : function(urls, onloadCallbacks, priorities) {
 	
 };
 
+/**
+ * Created by tsturm on 30.10.2014.
+ */
+/**
+ *  Parts Object is return
+ */
+x3dom.MultiMaterial = function( params )
+{
+    this._origAmbientIntensity      = params.ambientIntensity;
+    this._origDiffuseColor          = params.diffuseColor;
+    this._origEmissiveColor         = params.emissiveColor;
+    this._origShininess             = params.shininess;
+    this._origSpeclarColor          = params.specularColor;
+    this._origTransparency          = params.transparency;
+
+    this._origBackAmbientIntensity  = params.backAmbientIntensity;
+    this._origBackDiffuseColor      = params.backDiffuseColor;
+    this._origBackEmissiveColor     = params.backEmissiveColor;
+    this._origBackShininess         = params.backShininess;
+    this._origBackSpecularColor     = params.backSpecularColor;
+    this._origBackTransparency      = params.backTransparency;
+
+    this._ambientIntensity          = params.ambientIntensity;
+    this._diffuseColor              = params.diffuseColor;
+    this._emissiveColor             = params.emissiveColor;
+    this._shininess                 = params.shininess;
+    this._specularColor             = params.specularColor;
+    this._transparency              = params.transparency;
+
+    this._backAmbientIntensity      = params.backAmbientIntensity;
+    this._backDiffuseColor          = params.backDiffuseColor;
+    this._backEmissiveColor         = params.backEmissiveColor;
+    this._backShininess             = params.backShininess;
+    this._backSpecularColor         = params.backSpecularColor;
+    this._backTransparency          = params.backTransparency;
+
+    this._highlighted               = false;
+
+    this.reset = function () {
+        this._ambientIntensity      = this._origAmbientIntensity;
+        this._diffuseColor          = this._origDiffuseColor;
+        this._emissiveColor         = this._origEmissiveColor;
+        this._shininess             = this._origShininess;
+        this._specularColor         = this._origSpeclarColor;
+        this._transparency          = this._origTransparency;
+        this._backAmbientIntensity  = this._origBackAmbientIntensity;
+        this._backDiffuseColor      = this._origBackDiffuseColor;
+        this._backEmissiveColor     = this._origBackEmissiveColor;
+        this._backShininess         = this._origBackShininess;
+        this._backSpecularColor     = this._origBackSpecularColor;
+        this._backTransparency      = this._origBackTransparency;
+    };
+
+};
 /*
  * X3DOM JavaScript Library
  * http://www.x3dom.org
@@ -1100,87 +1154,561 @@ get : function(urls, onloadCallbacks, priorities) {
 /**
  *  Parts Object is return
  */
-x3dom.Parts = function(multiPart, ids, colorMap, visibilityMap)
+x3dom.Parts = function(multiPart, ids, colorMap, emissiveMap, specularMap, visibilityMap)
 {
     var parts = this;
     this.multiPart = multiPart;
     this.ids = ids;
     this.colorMap = colorMap;
+    this.emissiveMap = emissiveMap;
+    this.specularMap = specularMap;
     this.visibilityMap = visibilityMap;
+    this.width = parts.colorMap.getWidth();
+    this.widthTwo =  this.width * this.width;
 
     /**
      *
      * @param color
+     * @param frontSide
      */
-    this.setColor = function(color) {
+    this.setDiffuseColor = function(color, side)
+    {
+        var i, partID, pixelIDFront, pixelIDBack;
 
-        var i, x, y;
-
-        if (color.split(" ").length == 3) {
-            color += " 1";
+        if(side == undefined && side != "front" && side != "back" && side != "both") {
+            side = "both";
         }
 
-        var colorRGBA = x3dom.fields.SFColorRGBA.parse(color);
+        color = x3dom.fields.SFColor.parse( color );
 
         if (ids.length && ids.length > 1) //Multi select
         {
+            //Get original pixels
             var pixels = parts.colorMap.getPixels();
 
-            for(i=0; i<parts.ids.length; i++) {
-                if (this.multiPart._highlightedParts[parts.ids[i]]){
-                    this.multiPart._highlightedParts[parts.ids[i]] = colorRGBA;
-                } else {
-                    pixels[parts.ids[i]] = colorRGBA;
+            for ( i=0; i < parts.ids.length; i++ )
+            {
+                partID = parts.ids[i];
+                pixelIDFront = partID;
+                pixelIDBack = partID + this.widthTwo;
+
+                //Check for front/back
+                if (side == "front")
+                {
+                    this.multiPart._materials[partID]._diffuseColor = color;
+                }
+                else if(side == "back")
+                {
+                    this.multiPart._materials[partID]._backDiffuseColor = color;
+                }
+                else if(side == "both")
+                {
+                    this.multiPart._materials[partID]._diffuseColor = color;
+                    this.multiPart._materials[partID]._backDiffuseColor = color;
+                }
+
+                //If part is not highlighted update the pixel
+                if ( !this.multiPart._materials[partID]._highlighted )
+                {
+                    if (side == "front") {
+                        pixels[pixelIDFront].r = color.r;
+                        pixels[pixelIDFront].g = color.g;
+                        pixels[pixelIDFront].b = color.b;
+                    } else if(side == "back") {
+                        pixels[pixelIDBack].r = color.r;
+                        pixels[pixelIDBack].g = color.g;
+                        pixels[pixelIDBack].b = color.b;
+                    } else if(side == "both") {
+                        pixels[pixelIDFront].r = color.r;
+                        pixels[pixelIDFront].g = color.g;
+                        pixels[pixelIDFront].b = color.b;
+                        pixels[pixelIDBack].r = color.r;
+                        pixels[pixelIDBack].g = color.g;
+                        pixels[pixelIDBack].b = color.b;
+                    }
                 }
             }
 
             parts.colorMap.setPixels(pixels);
         }
-        else //Single select
+        else
         {
-            if (this.multiPart._highlightedParts[parts.ids[0]]){
-                this.multiPart._highlightedParts[parts.ids[0]] = colorRGBA;
-            } else {
-                x = parts.ids[0] % parts.colorMap.getWidth();
-                y = Math.floor(parts.ids[0] / parts.colorMap.getHeight());
-                parts.colorMap.setPixel(x, y, colorRGBA);
+            var xFront, yFront, xBack, yBack, pixelFront, pixelBack;
+
+            partID = parts.ids[0];
+            pixelIDFront = partID;
+            pixelIDBack = partID + this.widthTwo;
+
+            //Check for front/back
+            if (side == "front")
+            {
+                xFront = pixelIDFront % this.width;
+                yFront = Math.floor(pixelIDFront / this.width);
+                pixelFront = parts.colorMap.getPixel(xFront, yFront);
+                this.multiPart._materials[partID]._diffuseColor = color;
+            }
+            else if(side == "back")
+            {
+                xBack = pixelIDBack % this.width;
+                yBack = Math.floor(pixelIDBack / this.width);
+                pixelBack = parts.colorMap.getPixel(xBack, yBack);
+                this.multiPart._materials[partID]._backDiffuseColor = color;
+            }
+            else if(side == "both")
+            {
+                xFront = pixelIDFront % this.width;
+                yFront = Math.floor(pixelIDFront / this.width);
+                xBack = pixelIDBack % this.width;
+                yBack = Math.floor(pixelIDBack / this.width);
+                pixelFront = parts.colorMap.getPixel(xFront, yFront);
+                pixelBack = parts.colorMap.getPixel(xBack, yBack);
+                this.multiPart._materials[partID]._diffuseColor = color;
+                this.multiPart._materials[partID]._backDiffuseColor = color;
+            }
+
+            //If part is not highlighted update the pixel
+            if ( !this.multiPart._materials[partID]._highlighted )
+            {
+                if (side == "front")
+                {
+                    pixelFront.r = color.r;
+                    pixelFront.g = color.g;
+                    pixelFront.b = color.b;
+
+                    parts.colorMap.setPixel(x, y, pixelFront);
+                }
+                else if(side == "back")
+                {
+                    pixelBack.r = color.r;
+                    pixelBack.g = color.g;
+                    pixelBack.b = color.b;
+
+                    parts.colorMap.setPixel(x, y, pixelBack);
+                }
+                else if(side == "both")
+                {
+                    pixelFront.r = color.r;
+                    pixelFront.g = color.g;
+                    pixelFront.b = color.b;
+                    pixelBack.r = color.r;
+                    pixelBack.g = color.g;
+                    pixelBack.b = color.b;
+
+                    parts.colorMap.setPixel(x, y, pixelFront);
+                    parts.colorMap.setPixel(x, y, pixelBack);
+                }
             }
         }
     };
-	
-	/**
-     *
-     * @param color
-     */
-    this.resetColor = function() {
 
-        var i, x, y, colorRGBA;
-		
+    /**
+     *
+     * @param frontSide
+     * @returns {*}
+     */
+    this.getDiffuseColor = function(side)
+    {
+        var i, partID;
+
+        if(side == undefined && side != "front" && side != "back") {
+            side = "front";
+        }
+
         if (ids.length && ids.length > 1) //Multi select
         {
-            var pixels = parts.colorMap.getPixels();
+            var diffuseColors = [];
 
-            for(i=0; i<parts.ids.length; i++) {
-				colorRGBA = this.multiPart._originalColor[parts.ids[i]];
-			
-                if (this.multiPart._highlightedParts[parts.ids[i]]){
-                    this.multiPart._highlightedParts[parts.ids[i]] = colorRGBA;
-                } else {
-                    pixels[parts.ids[i]] = colorRGBA;
+            for ( i=0; i < parts.ids.length; i++ )
+            {
+                partID = parts.ids[i];
+
+                if(side == "front")
+                {
+                    diffuseColors.push(this.multiPart._materials[partID]._diffuseColor);
+                }
+                else if(side == "back")
+                {
+                    diffuseColors.push(this.multiPart._materials[partID]._backDiffuseColor);
+                }
+            }
+            return diffuseColors;
+        }
+        else
+        {
+            partID = parts.ids[0];
+
+            if(side == "front")
+            {
+                return this.multiPart._materials[partID]._diffuseColor;
+            }
+            else if(side == "back")
+            {
+                return this.multiPart._materials[partID]._backDiffuseColor;
+            }
+        }
+    };
+
+    /**
+     *
+     * @param color
+     * @param side
+     */
+    this.setEmissiveColor = function(color, side)
+    {
+        var i, partID, pixelIDFront, pixelIDBack;
+
+        if(side == undefined && side != "front" && side != "back" && side != "both") {
+            side = "both";
+        }
+
+        color = x3dom.fields.SFColor.parse( color );
+
+        if (ids.length && ids.length > 1) //Multi select
+        {
+            //Get original pixels
+            var pixels = parts.emissiveMap.getPixels();
+
+            for ( i=0; i < parts.ids.length; i++ )
+            {
+                partID = parts.ids[i];
+                pixelIDFront = partID;
+                pixelIDBack = partID + this.widthTwo;
+
+                //Check for front/back
+                if (side == "front")
+                {
+                    this.multiPart._materials[partID]._emissiveColor = color;
+                }
+                else if(side == "back")
+                {
+                    this.multiPart._materials[partID]._backEmissiveColor = color;
+                }
+                else if(side == "both")
+                {
+                    this.multiPart._materials[partID]._emissiveColor = color;
+                    this.multiPart._materials[partID]._backEmissiveColor = color;
+                }
+
+                //If part is not highlighted update the pixel
+                if ( !this.multiPart._materials[partID]._highlighted )
+                {
+                    if (side == "front") {
+                        pixels[pixelIDFront].r = color.r;
+                        pixels[pixelIDFront].g = color.g;
+                        pixels[pixelIDFront].b = color.b;
+                    } else if(side == "back") {
+                        pixels[pixelIDBack].r = color.r;
+                        pixels[pixelIDBack].g = color.g;
+                        pixels[pixelIDBack].b = color.b;
+                    } else if(side == "both") {
+                        pixels[pixelIDFront].r = color.r;
+                        pixels[pixelIDFront].g = color.g;
+                        pixels[pixelIDFront].b = color.b;
+                        pixels[pixelIDBack].r = color.r;
+                        pixels[pixelIDBack].g = color.g;
+                        pixels[pixelIDBack].b = color.b;
+                    }
                 }
             }
 
-            parts.colorMap.setPixels(pixels);
+            parts.emissiveMap.setPixels(pixels);
         }
-        else //Single select
+        else
         {
-			colorRGBA = this.multiPart._originalColor[parts.ids[0]];
-            if (this.multiPart._highlightedParts[parts.ids[0]]){
-                this.multiPart._highlightedParts[parts.ids[0]] = colorRGBA;
-            } else {
-                x = parts.ids[0] % parts.colorMap.getWidth();
-                y = Math.floor(parts.ids[0] / parts.colorMap.getHeight());
-                parts.colorMap.setPixel(x, y, colorRGBA);
+            var xFront, yFront, xBack, yBack, pixelFront, pixelBack;
+
+            partID = parts.ids[0];
+            pixelIDFront = partID;
+            pixelIDBack = partID + this.widthTwo;
+
+            //Check for front/back
+            if (side == "front")
+            {
+                xFront = pixelIDFront % this.width;
+                yFront = Math.floor(pixelIDFront / this.width);
+                pixelFront = parts.emissiveMap.getPixel(xFront, yFront);
+                this.multiPart._materials[partID]._emissiveColor = color;
+            }
+            else if(side == "back")
+            {
+                xBack = pixelIDBack % this.width;
+                yBack = Math.floor(pixelIDBack / this.width);
+                pixelBack = parts.emissiveMap.getPixel(xBack, yBack);
+                this.multiPart._materials[partID]._backEmissiveColor = color;
+            }
+            else if(side == "both")
+            {
+                xFront = pixelIDFront % this.width;
+                yFront = Math.floor(pixelIDFront / this.width);
+                xBack = pixelIDBack % this.width;
+                yBack = Math.floor(pixelIDBack / this.width);
+                pixelFront = parts.emissiveMap.getPixel(xFront, yFront);
+                pixelBack = parts.emissiveMap.getPixel(xBack, yBack);
+                this.multiPart._materials[partID]._emissiveColor = color;
+                this.multiPart._materials[partID]._backEmissiveColor = color;
+            }
+
+            //If part is not highlighted update the pixel
+            if ( !this.multiPart._materials[partID]._highlighted )
+            {
+                if (side == "front")
+                {
+                    pixelFront.r = color.r;
+                    pixelFront.g = color.g;
+                    pixelFront.b = color.b;
+
+                    parts.emissiveMap.setPixel(x, y, pixelFront);
+                }
+                else if(side == "back")
+                {
+                    pixelBack.r = color.r;
+                    pixelBack.g = color.g;
+                    pixelBack.b = color.b;
+
+                    parts.emissiveMap.setPixel(x, y, pixelBack);
+                }
+                else if(side == "both")
+                {
+                    pixelFront.r = color.r;
+                    pixelFront.g = color.g;
+                    pixelFront.b = color.b;
+                    pixelBack.r = color.r;
+                    pixelBack.g = color.g;
+                    pixelBack.b = color.b;
+
+                    parts.emissiveMap.setPixel(x, y, pixelFront);
+                    parts.emissiveMap.setPixel(x, y, pixelBack);
+                }
+            }
+        }
+    };
+
+    /**
+     *
+     * @param side
+     * @returns {*}
+     */
+    this.getEmissiveColor = function(side)
+    {
+        var i, partID;
+
+        if(side == undefined && side != "front" && side != "back") {
+            side = "front";
+        }
+
+        if (ids.length && ids.length > 1) //Multi select
+        {
+            var emissiveColors = [];
+
+            for ( i=0; i < parts.ids.length; i++ )
+            {
+                partID = parts.ids[i];
+
+                if(side == "front")
+                {
+                    emissiveColors.push(this.multiPart._materials[partID]._emissiveColor);
+                }
+                else if(side == "back")
+                {
+                    emissiveColors.push(this.multiPart._materials[partID]._backEmissiveColor);
+                }
+            }
+            return emissiveColors;
+        }
+        else
+        {
+            partID = parts.ids[0];
+
+            if(side == "front")
+            {
+                return this.multiPart._materials[partID]._emissiveColor;
+            }
+            else if(side == "back")
+            {
+                return this.multiPart._materials[partID]._backEmissiveColor;
+            }
+        }
+    };
+
+    /**
+     *
+     * @param color
+     * @param side
+     */
+    this.setSpecularColor = function(color, side)
+    {
+        var i, partID, pixelIDFront, pixelIDBack;
+
+        if(side == undefined && side != "front" && side != "back" && side != "both") {
+            side = "both";
+        }
+
+        color = x3dom.fields.SFColor.parse( color );
+
+        if (ids.length && ids.length > 1) //Multi select
+        {
+            //Get original pixels
+            var pixels = parts.specularMap.getPixels();
+
+            for ( i=0; i < parts.ids.length; i++ )
+            {
+                partID = parts.ids[i];
+                pixelIDFront = partID;
+                pixelIDBack = partID + this.widthTwo;
+
+                //Check for front/back
+                if (side == "front")
+                {
+                    this.multiPart._materials[partID]._specularColor = color;
+                }
+                else if(side == "back")
+                {
+                    this.multiPart._materials[partID]._backSpecularColor = color;
+                }
+                else if(side == "both")
+                {
+                    this.multiPart._materials[partID]._specularColor = color;
+                    this.multiPart._materials[partID]._backSpecularColor = color;
+                }
+
+                //If part is not highlighted update the pixel
+                if ( !this.multiPart._materials[partID]._highlighted )
+                {
+                    if (side == "front") {
+                        pixels[pixelIDFront].r = color.r;
+                        pixels[pixelIDFront].g = color.g;
+                        pixels[pixelIDFront].b = color.b;
+                    } else if(side == "back") {
+                        pixels[pixelIDBack].r = color.r;
+                        pixels[pixelIDBack].g = color.g;
+                        pixels[pixelIDBack].b = color.b;
+                    } else if(side == "both") {
+                        pixels[pixelIDFront].r = color.r;
+                        pixels[pixelIDFront].g = color.g;
+                        pixels[pixelIDFront].b = color.b;
+                        pixels[pixelIDBack].r = color.r;
+                        pixels[pixelIDBack].g = color.g;
+                        pixels[pixelIDBack].b = color.b;
+                    }
+                }
+            }
+
+            parts.specularMap.setPixels(pixels);
+        }
+        else
+        {
+            var xFront, yFront, xBack, yBack, pixelFront, pixelBack;
+
+            partID = parts.ids[0];
+            pixelIDFront = partID;
+            pixelIDBack = partID + this.widthTwo;
+
+            //Check for front/back
+            if (side == "front")
+            {
+                xFront = pixelIDFront % this.width;
+                yFront = Math.floor(pixelIDFront / this.width);
+                pixelFront = parts.specularMap.getPixel(xFront, yFront);
+                this.multiPart._materials[partID]._specularColor = color;
+            }
+            else if(side == "back")
+            {
+                xBack = pixelIDBack % this.width;
+                yBack = Math.floor(pixelIDBack / this.width);
+                pixelBack = parts.specularMap.getPixel(xBack, yBack);
+                this.multiPart._materials[partID]._backSpecularColor = color;
+            }
+            else if(side == "both")
+            {
+                xFront = pixelIDFront % this.width;
+                yFront = Math.floor(pixelIDFront / this.width);
+                xBack = pixelIDBack % this.width;
+                yBack = Math.floor(pixelIDBack / this.width);
+                pixelFront = parts.specularMap.getPixel(xFront, yFront);
+                pixelBack = parts.specularMap.getPixel(xBack, yBack);
+                this.multiPart._materials[partID]._specularColor = color;
+                this.multiPart._materials[partID]._backSpecularColor = color;
+            }
+
+            //If part is not highlighted update the pixel
+            if ( !this.multiPart._materials[partID]._highlighted )
+            {
+                if (side == "front")
+                {
+                    pixelFront.r = color.r;
+                    pixelFront.g = color.g;
+                    pixelFront.b = color.b;
+
+                    parts.specularMap.setPixel(x, y, pixelFront);
+                }
+                else if(side == "back")
+                {
+                    pixelBack.r = color.r;
+                    pixelBack.g = color.g;
+                    pixelBack.b = color.b;
+
+                    parts.specularMap.setPixel(x, y, pixelBack);
+                }
+                else if(side == "both")
+                {
+                    pixelFront.r = color.r;
+                    pixelFront.g = color.g;
+                    pixelFront.b = color.b;
+                    pixelBack.r = color.r;
+                    pixelBack.g = color.g;
+                    pixelBack.b = color.b;
+
+                    parts.specularMap.setPixel(x, y, pixelFront);
+                    parts.specularMap.setPixel(x, y, pixelBack);
+                }
+            }
+        }
+    };
+
+
+    /**
+     *
+     * @param side
+     * @returns {*}
+     */
+    this.getSpecularColor = function(side)
+    {
+        var i, partID;
+
+        if(side == undefined && side != "front" && side != "back") {
+            side = "front";
+        }
+
+        if (ids.length && ids.length > 1) //Multi select
+        {
+            var specularColors = [];
+
+            for ( i=0; i < parts.ids.length; i++ )
+            {
+                partID = parts.ids[i];
+
+                if(side == "front")
+                {
+                    specularColors.push(this.multiPart._materials[partID]._specularColor);
+                }
+                else if(side == "back")
+                {
+                    specularColors.push(this.multiPart._materials[partID]._backSpecularColor);
+                }
+            }
+            return specularColors;
+        }
+        else
+        {
+            partID = parts.ids[0];
+
+            if(side == "front")
+            {
+                return this.multiPart._materials[partID]._specularColor;
+            }
+            else if(side == "back")
+            {
+                return this.multiPart._materials[partID]._backSpecularColor;
             }
         }
     };
@@ -1188,38 +1716,807 @@ x3dom.Parts = function(multiPart, ids, colorMap, visibilityMap)
     /**
      *
      * @param transparency
+     * @param side
      */
-    this.setTransparency = function(transparency) {
+    this.setTransparency = function(transparency, side)
+    {
+        var i, partID, pixelIDFront, pixelIDBack;
 
-        var i, x, y;
+        if(side == undefined && side != "front" && side != "back" && side != "both") {
+            side = "both";
+        }
 
         if (ids.length && ids.length > 1) //Multi select
         {
+            //Get original pixels
             var pixels = parts.colorMap.getPixels();
 
-            for(i=0; i<parts.ids.length; i++) {
-                if (this.multiPart._highlightedParts[parts.ids[i]]){
-                    this.multiPart._highlightedParts[parts.ids[i]].a = 1.0 - transparency;
-                } else {
-                    pixels[parts.ids[i]].a = 1.0 - transparency;
+            for ( i=0; i < parts.ids.length; i++ )
+            {
+                partID = parts.ids[i];
+                pixelIDFront = partID;
+                pixelIDBack = partID + this.widthTwo;
+
+                //Check for front/back
+                if (side == "front")
+                {
+                    this.multiPart._materials[partID]._transparency = transparency;
+                }
+                else if(side == "back")
+                {
+                    this.multiPart._materials[partID]._backTransparency = transparency;
+                }
+                else if(side == "both")
+                {
+                    this.multiPart._materials[partID]._transparency = transparency;
+                    this.multiPart._materials[partID]._backTransparency = transparency;
+                }
+
+                //If part is not highlighted update the pixel
+                if ( !this.multiPart._materials[partID]._highlighted )
+                {
+                    if (side == "front") {
+                        pixels[pixelIDFront].a = 1.0 - transparency;
+                    } else if(side == "back") {
+                        pixels[pixelIDBack].a = 1.0 - transparency;
+                    } else if(side == "both") {
+                        pixels[pixelIDFront].a = 1.0 - transparency;
+                        pixels[pixelIDBack].a = 1.0 - transparency;
+                    }
                 }
             }
 
             parts.colorMap.setPixels(pixels);
         }
+        else
+        {
+            var xFront, yFront, xBack, yBack, pixelFront, pixelBack;
+
+            partID = parts.ids[0];
+            pixelIDFront = partID;
+            pixelIDBack = partID + this.widthTwo;
+
+            //Check for front/back
+            if (side == "front")
+            {
+                xFront = pixelIDFront % this.width;
+                yFront = Math.floor(pixelIDFront / this.width);
+                pixelFront = parts.colorMap.getPixel(xFront, yFront);
+                this.multiPart._materials[partID]._transparency = transparency;
+            }
+            else if(side == "back")
+            {
+                xBack = pixelIDBack % this.width;
+                yBack = Math.floor(pixelIDBack / this.width);
+                pixelBack = parts.colorMap.getPixel(xBack, yBack);
+                this.multiPart._materials[partID]._backTransparency = transparency;
+            }
+            else if(side == "both")
+            {
+                xFront = pixelIDFront % this.width;
+                yFront = Math.floor(pixelIDFront / this.width);
+                xBack = pixelIDBack % this.width;
+                yBack = Math.floor(pixelIDBack / this.width);
+                pixelFront = parts.colorMap.getPixel(xFront, yFront);
+                pixelBack = parts.colorMap.getPixel(xBack, yBack);
+                this.multiPart._materials[partID]._transparency = transparency;
+                this.multiPart._materials[partID]._backTransparency = transparency;
+            }
+
+            //If part is not highlighted update the pixel
+            if ( !this.multiPart._materials[partID]._highlighted )
+            {
+                if (side == "front")
+                {
+                    pixelFront.a = 1.0 - transparency;
+
+                    parts.colorMap.setPixel(x, y, pixelFront);
+                }
+                else if(side == "back")
+                {
+                    pixelBack.a = 1.0 - transparency;
+
+                    parts.colorMap.setPixel(x, y, pixelBack);
+                }
+                else if(side == "both")
+                {
+                    pixelFront.a = 1.0 - transparency;
+                    pixelBack.a = 1.0 - transparency;
+
+                    parts.colorMap.setPixel(x, y, pixelFront);
+                    parts.colorMap.setPixel(x, y, pixelBack);
+                }
+            }
+        }
+    };
+
+
+    /**
+     *
+     * @param side
+     * @returns {*}
+     */
+    this.getTransparency = function(side)
+    {
+        var i, partID;
+
+        if(side == undefined && side != "front" && side != "back") {
+            side = "front";
+        }
+
+        if (ids.length && ids.length > 1) //Multi select
+        {
+            var transparencies = [];
+
+            for ( i=0; i < parts.ids.length; i++ )
+            {
+                partID = parts.ids[i];
+
+                if(side == "front")
+                {
+                    transparencies.push(this.multiPart._materials[partID]._transparency);
+                }
+                else if(side == "back")
+                {
+                    transparencies.push(this.multiPart._materials[partID]._backTransparency);
+                }
+            }
+            return transparencies;
+        }
+        else
+        {
+            partID = parts.ids[0];
+
+            if(side == "front")
+            {
+                return this.multiPart._materials[partID]._transparency;
+            }
+            else if(side == "back")
+            {
+                return this.multiPart._materials[partID]._backTransparency;
+            }
+        }
+    };
+
+    /**
+     *
+     * @param shininess
+     * @param frontSide
+     */
+    this.setShininess = function(shininess, side)
+    {
+        var i, partID, pixelIDFront, pixelIDBack;
+
+        if(side == undefined && side != "front" && side != "back" && side != "both") {
+            side = "both";
+        }
+
+        if (ids.length && ids.length > 1) //Multi select
+        {
+            //Get original pixels
+            var pixels = parts.specularMap.getPixels();
+
+            for ( i=0; i < parts.ids.length; i++ )
+            {
+                partID = parts.ids[i];
+                pixelIDFront = partID;
+                pixelIDBack = partID + this.widthTwo;
+
+                //Check for front/back
+                if (side == "front")
+                {
+                    this.multiPart._materials[partID]._shininess = shininess;
+                }
+                else if(side == "back")
+                {
+                    this.multiPart._materials[partID]._backShininess = shininess;
+                }
+                else if(side == "both")
+                {
+                    this.multiPart._materials[partID]._shininess = shininess;
+                    this.multiPart._materials[partID]._backShininess = shininess;
+                }
+
+                //If part is not highlighted update the pixel
+                if ( !this.multiPart._materials[partID]._highlighted )
+                {
+                    if (side == "front") {
+                        pixels[pixelIDFront].a = shininess;
+                    } else if(side == "back") {
+                        pixels[pixelIDBack].a = shininess;
+                    } else if(side == "both") {
+                        pixels[pixelIDFront].a = shininess;
+                        pixels[pixelIDBack].a = shininess;
+                    }
+                }
+            }
+
+            parts.specularMap.setPixels(pixels);
+        }
+        else
+        {
+            var xFront, yFront, xBack, yBack, pixelFront, pixelBack;
+
+            partID = parts.ids[0];
+            pixelIDFront = partID;
+            pixelIDBack = partID + this.widthTwo;
+
+            //Check for front/back
+            if (side == "front")
+            {
+                xFront = pixelIDFront % this.width;
+                yFront = Math.floor(pixelIDFront / this.width);
+                pixelFront = parts.specularMap.getPixel(xFront, yFront);
+                this.multiPart._materials[partID]._shininess = shininess;
+            }
+            else if(side == "back")
+            {
+                xBack = pixelIDBack % this.width;
+                yBack = Math.floor(pixelIDBack / this.width);
+                pixelBack = parts.specularMap.getPixel(xBack, yBack);
+                this.multiPart._materials[partID]._backShininess = shininess;
+            }
+            else if(side == "both")
+            {
+                xFront = pixelIDFront % this.width;
+                yFront = Math.floor(pixelIDFront / this.width);
+                xBack = pixelIDBack % this.width;
+                yBack = Math.floor(pixelIDBack / this.width);
+                pixelFront = parts.specularMap.getPixel(xFront, yFront);
+                pixelBack = parts.specularMap.getPixel(xBack, yBack);
+                this.multiPart._materials[partID]._shininess = shininess;
+                this.multiPart._materials[partID]._backShininess = shininess;
+            }
+
+            //If part is not highlighted update the pixel
+            if ( !this.multiPart._materials[partID]._highlighted )
+            {
+                if (side == "front")
+                {
+                    pixelFront.a = shininess;
+
+                    parts.specularMap.setPixel(x, y, pixelFront);
+                }
+                else if(side == "back")
+                {
+                    pixelBack.a = shininess;
+
+                    parts.specularMap.setPixel(x, y, pixelBack);
+                }
+                else if(side == "both")
+                {
+                    pixelFront.a = shininess;
+                    pixelBack.a = shininess;
+
+                    parts.specularMap.setPixel(x, y, pixelFront);
+                    parts.specularMap.setPixel(x, y, pixelBack);
+                }
+            }
+        }
+    };
+
+
+    /**
+     *
+     * @param side
+     * @returns {*}
+     */
+    this.getShininess = function(side)
+    {
+        var i, partID;
+
+        if(side == undefined && side != "front" && side != "back") {
+            side = "front";
+        }
+
+        if (ids.length && ids.length > 1) //Multi select
+        {
+            var shininesses = [];
+
+            for ( i=0; i < parts.ids.length; i++ )
+            {
+                partID = parts.ids[i];
+
+                if(side == "front")
+                {
+                    shininesses.push(this.multiPart._materials[partID]._shininess);
+                }
+                else if(side == "back")
+                {
+                    shininesses.push(this.multiPart._materials[partID]._backShininess);
+                }
+            }
+            return shininesses;
+        }
+        else
+        {
+            partID = parts.ids[0];
+
+            if(side == "front")
+            {
+                return this.multiPart._materials[partID]._shininess;
+            }
+            else if(side == "back")
+            {
+                return this.multiPart._materials[partID]._backShininess;
+            }
+        }
+    };
+
+    /**
+     *
+     * @param ambientIntensity
+     * @param side
+     */
+    this.setAmbientIntensity = function(ambientIntensity, side)
+    {
+        var i, partID, pixelIDFront, pixelIDBack;
+
+        if(side == undefined && side != "front" && side != "back" && side != "both") {
+            side = "both";
+        }
+
+        if (ids.length && ids.length > 1) //Multi select
+        {
+            //Get original pixels
+            var pixels = parts.emissiveMap.getPixels();
+
+            for ( i=0; i < parts.ids.length; i++ )
+            {
+                partID = parts.ids[i];
+                pixelIDFront = partID;
+                pixelIDBack = partID + this.widthTwo;
+
+                //Check for front/back
+                if (side == "front")
+                {
+                    this.multiPart._materials[partID]._ambientIntensity = ambientIntensity;
+                }
+                else if(side == "back")
+                {
+                    this.multiPart._materials[partID]._backAmbientIntensity = ambientIntensity;
+                }
+                else if(side == "both")
+                {
+                    this.multiPart._materials[partID]._ambientIntensity = ambientIntensity;
+                    this.multiPart._materials[partID]._backAmbientIntensity = ambientIntensity;
+                }
+
+                //If part is not highlighted update the pixel
+                if ( !this.multiPart._materials[partID]._highlighted )
+                {
+                    if (side == "front") {
+                        pixels[pixelIDFront].a = ambientIntensity;
+                    } else if(side == "back") {
+                        pixels[pixelIDBack].a = ambientIntensity;
+                    } else if(side == "both") {
+                        pixels[pixelIDFront].a = ambientIntensity;
+                        pixels[pixelIDBack].a = ambientIntensity;
+                    }
+                }
+            }
+
+            parts.emissiveMap.setPixels(pixels);
+        }
+        else
+        {
+            var xFront, yFront, xBack, yBack, pixelFront, pixelBack;
+
+            partID = parts.ids[0];
+            pixelIDFront = partID;
+            pixelIDBack = partID + this.widthTwo;
+
+            //Check for front/back
+            if (side == "front")
+            {
+                xFront = pixelIDFront % this.width;
+                yFront = Math.floor(pixelIDFront / this.width);
+                pixelFront = parts.emissiveMap.getPixel(xFront, yFront);
+                this.multiPart._materials[partID]._ambientIntensity = ambientIntensity;
+            }
+            else if(side == "back")
+            {
+                xBack = pixelIDBack % this.width;
+                yBack = Math.floor(pixelIDBack / this.width);
+                pixelBack = parts.emissiveMap.getPixel(xBack, yBack);
+                this.multiPart._materials[partID]._backAmbientIntensity = ambientIntensity;
+            }
+            else if(side == "both")
+            {
+                xFront = pixelIDFront % this.width;
+                yFront = Math.floor(pixelIDFront / this.width);
+                xBack = pixelIDBack % this.width;
+                yBack = Math.floor(pixelIDBack / this.width);
+                pixelFront = parts.emissiveMap.getPixel(xFront, yFront);
+                pixelBack = parts.emissiveMap.getPixel(xBack, yBack);
+                this.multiPart._materials[partID]._ambientIntensity = ambientIntensity;
+                this.multiPart._materials[partID]._backAmbientIntensity = ambientIntensity;
+            }
+
+            //If part is not highlighted update the pixel
+            if ( !this.multiPart._materials[partID]._highlighted )
+            {
+                if (side == "front")
+                {
+                    pixelFront.a = ambientIntensity;
+
+                    parts.emissiveMap.setPixel(x, y, pixelFront);
+                }
+                else if(side == "back")
+                {
+                    pixelBack.a = ambientIntensity;
+
+                    parts.emissiveMap.setPixel(x, y, pixelBack);
+                }
+                else if(side == "both")
+                {
+                    pixelFront.a = ambientIntensity;
+                    pixelBack.a = ambientIntensity;
+
+                    parts.emissiveMap.setPixel(x, y, pixelFront);
+                    parts.emissiveMap.setPixel(x, y, pixelBack);
+                }
+            }
+        }
+    };
+
+
+    /**
+     *
+     * @param side
+     * @returns {*}
+     */
+    this.getAmbientIntensity = function(side)
+    {
+        var i, partID;
+
+        if(side == undefined && side != "front" && side != "back") {
+            side = "front";
+        }
+
+        if (ids.length && ids.length > 1) //Multi select
+        {
+            var ambientIntensities = [];
+
+            for ( i=0; i < parts.ids.length; i++ )
+            {
+                partID = parts.ids[i];
+
+                if(side == "front")
+                {
+                    ambientIntensities.push(this.multiPart._materials[partID]._ambientIntensity);
+                }
+                else if(side == "back")
+                {
+                    ambientIntensities.push(this.multiPart._materials[partID]._backAmbientIntensity);
+                }
+            }
+            return ambientIntensities;
+        }
+        else
+        {
+            partID = parts.ids[0];
+
+            if(side == "front")
+            {
+                return this.multiPart._materials[partID]._ambientIntensity;
+            }
+            else if(side == "back")
+            {
+                return this.multiPart._materials[partID]._backAmbientIntensity;
+            }
+        }
+    };
+
+    /**
+     *
+     * @param color
+     */
+    this.highlight = function (color)
+    {
+        var i, partID, pixelIDFront, pixelIDBack, dtColor, eaColor, ssColor;
+
+        color = x3dom.fields.SFColor.parse( color );
+
+        if (ids.length && ids.length > 1) //Multi select
+        {
+            //Get original pixels
+            var dtPixels = parts.colorMap.getPixels();
+            var eaPixels = parts.emissiveMap.getPixels();
+            var ssPixels = parts.specularMap.getPixels();
+
+            dtColor = new x3dom.fields.SFColorRGBA(0, 0, 0, 1.0);
+            eaColor = new x3dom.fields.SFColorRGBA(color.r, color.g, color.b, 0);
+            ssColor = new x3dom.fields.SFColorRGBA(0, 0, 0, 0);
+
+            for ( i=0; i < parts.ids.length; i++ ) {
+                partID = parts.ids[i];
+                pixelIDFront = partID;
+                pixelIDBack  = partID + this.widthTwo;
+
+                if( !this.multiPart._materials[partID]._highlighted )
+                {
+                    this.multiPart._materials[partID]._highlighted = true;
+
+                    dtPixels[pixelIDFront] = dtColor;
+                    eaPixels[pixelIDFront] = eaColor;
+                    ssPixels[pixelIDFront] = ssColor;
+
+                    dtPixels[pixelIDBack] = dtColor;
+                    eaPixels[pixelIDBack] = eaColor;
+                    ssPixels[pixelIDBack] = ssColor;
+                }
+            }
+
+            this.colorMap.setPixels(dtPixels, false);
+            this.emissiveMap.setPixels(eaPixels, false);
+            this.specularMap.setPixels(ssPixels, true);
+        }
+        else
+        {
+            partID = parts.ids[0];
+            pixelIDFront = partID;
+            pixelIDBack  = partID + this.widthTwo;
+
+            var xFront = pixelIDFront % this.width;
+            var yFront = Math.floor(pixelIDFront / this.width);
+
+            var xBack = pixelIDBack % this.width;
+            var yBack = Math.floor(pixelIDBack / this.width);
+
+            //If part is not highlighted update the pixel
+            if ( !this.multiPart._materials[partID]._highlighted )
+            {
+                this.multiPart._materials[partID]._highlighted = true;
+
+                dtColor = new x3dom.fields.SFColorRGBA(0, 0, 0, 1);
+                eaColor = new x3dom.fields.SFColorRGBA(color.r, color.g, color.b, 0);
+                ssColor = new x3dom.fields.SFColorRGBA(0, 0, 0, 0);
+
+                this.colorMap.setPixel(xFront, yFront, dtColor, false);
+                this.emissiveMap.setPixel(xFront, yFront, eaColor, false);
+                this.specularMap.setPixel(xFront, yFront, ssColor, false);
+
+                this.colorMap.setPixel(xBack, yBack, dtColor, false);
+                this.emissiveMap.setPixel(xBack, yBack, eaColor, false);
+                this.specularMap.setPixel(xBack, yBack, ssColor, true);
+            }
+        }
+    };
+
+    this.unhighlight = function() {
+        var i, partID, pixelIDFront, pixelIDBack, material;
+        var dtColorFront, eaColorFront, ssColorFront;
+        var dtColorBack, eaColorBack, ssColorBack;
+
+        if (ids.length && ids.length > 1) //Multi select
+        {
+            //Get original pixels
+            var dtPixels = parts.colorMap.getPixels();
+            var eaPixels = parts.emissiveMap.getPixels();
+            var ssPixels = parts.specularMap.getPixels();
+
+            for ( i=0; i < parts.ids.length; i++ ) {
+                partID = parts.ids[i];
+                pixelIDFront = partID;
+                pixelIDBack  = partID + this.widthTwo;
+
+                material = this.multiPart._materials[partID];
+
+                if( material._highlighted )
+                {
+                    material._highlighted = false;
+
+                    dtPixels[pixelIDFront] = new x3dom.fields.SFColorRGBA(material._diffuseColor.r, material._diffuseColor.g,
+                                                                          material._diffuseColor.b, 1.0 - material._transparency);
+                    eaPixels[pixelIDFront] = new x3dom.fields.SFColorRGBA(material._emissiveColor.r, material._emissiveColor.g,
+                                                                          material._emissiveColor.b, material._ambientIntensity);
+                    ssPixels[pixelIDFront] = new x3dom.fields.SFColorRGBA(material._specularColor.r, material._specularColor.g,
+                                                                          material._specularColor.b, material._shininess);
+
+                    dtPixels[pixelIDBack] = new x3dom.fields.SFColorRGBA(material._backDiffuseColor.r, material._backDiffuseColor.g,
+                                                                         material._backDiffuseColor.b, 1.0 - material._backTransparency);
+                    eaPixels[pixelIDBack] = new x3dom.fields.SFColorRGBA(material._backEmissiveColor.r, material._backEmissiveColor.g,
+                                                                         material._backEmissiveColor.b, material._backAmbientIntensity);
+                    ssPixels[pixelIDBack] = new x3dom.fields.SFColorRGBA(material._backSpecularColor.r, material._backSpecularColor.g,
+                                                                         material._backSpecularColor.b, material._backShininess);
+                }
+            }
+
+            this.colorMap.setPixels(dtPixels, false);
+            this.emissiveMap.setPixels(eaPixels, false);
+            this.specularMap.setPixels(ssPixels, true);
+        }
+        else
+        {
+            partID = parts.ids[0];
+            pixelIDFront = partID;
+            pixelIDBack  = partID + this.widthTwo;
+
+            var xFront = pixelIDFront % this.width;
+            var yFront = Math.floor(pixelIDFront / this.width);
+
+            var xBack = pixelIDBack % this.width;
+            var yBack = Math.floor(pixelIDBack / this.width);
+
+            material = this.multiPart._materials[partID];
+
+            //If part is not highlighted update the pixel
+            if ( material._highlighted )
+            {
+                material._highlighted = false;
+
+                dtColorFront = new x3dom.fields.SFColorRGBA(material._diffuseColor.r, material._diffuseColor.g,
+                                                            material._diffuseColor.b, 1.0 - material._transparency);
+                eaColorFront = new x3dom.fields.SFColorRGBA(material._emissiveColor.r, material._emissiveColor.g,
+                                                            material._emissiveColor.b, material._ambientIntensity);
+                ssColorFront = new x3dom.fields.SFColorRGBA(material._specularColor.r, material._specularColor.g,
+                                                            material._specularColor.b, material._shininess);
+
+                dtColorBack = new x3dom.fields.SFColorRGBA(material._backDiffuseColor.r, material._backDiffuseColor.g,
+                                                           material._backDiffuseColor.b, 1.0 - material._backTransparency);
+                eaColorBack = new x3dom.fields.SFColorRGBA(material._backEmissiveColor.r, material._backEmissiveColor.g,
+                                                           material._backEmissiveColor.b, material._backAmbientIntensity);
+                ssColorBack = new x3dom.fields.SFColorRGBA(material._backSpecularColor.r, material._backSpecularColor.g,
+                                                           material._backSpecularColor.b, material._backShininess);
+
+                this.colorMap.setPixel(xFront, yFront, dtColorFront, false);
+                this.emissiveMap.setPixel(xFront, yFront, eaColorFront, false);
+                this.specularMap.setPixel(xFront, yFront, ssColorFront, false);
+
+                this.colorMap.setPixel(xBack, yBack, dtColorBack, false);
+                this.emissiveMap.setPixel(xBack, yBack, eaColorBack, false);
+                this.specularMap.setPixel(xBack, yBack, ssColorBack, true);
+            }
+        }
+    };
+
+
+    /**
+     *
+     * @param color
+     */
+    this.toggleHighlight = function ( color ) {
+        for ( var i=0; i < parts.ids.length; i++ ) {
+            if ( this.multiPart._materials[parts.ids[i]]._highlighted ) {
+                this.unhighlight();
+            } else {
+                this.highlight(color);
+            }
+        }
+    };
+
+
+    /**
+     *
+     * @param color
+     * @param side
+     */
+    this.setColor = function(color, side) {
+        this.setDiffuseColor(color, side);
+    };
+
+
+    /**
+     * Returns the RGB string representation of a color
+     * @returns {String}
+     */
+    this.getColorRGB = function() {
+        var str = this.getColorRGBA();
+
+        var values = str.split(" ");
+
+        return values[0] + " " + values[1] + " " + values[2];
+    };
+
+    /**
+     * Returns the RGBA string representation of a color
+     * @returns {String}
+     */
+    this.getColorRGBA = function() {
+        var x, y;
+
+        //in case of multi select, this function returns the color of the first object
+        var colorRGBA = this.multiPart._originalColor[parts.ids[0]];
+
+        if (this.multiPart._highlightedParts[parts.ids[0]]){
+            colorRGBA = this.multiPart._highlightedParts[parts.ids[0]];
+        } else {
+            x = parts.ids[0] % parts.colorMap.getWidth();
+            y = Math.floor(parts.ids[0] / parts.colorMap.getWidth());
+            colorRGBA = parts.colorMap.getPixel(x, y);
+        }
+
+        return colorRGBA.toString();
+    };
+
+	/**
+     *
+     */
+    this.resetColor = function() {
+
+        var i, partID, pixelIDFront, pixelIDBack, material;
+        var dtColorFront, eaColorFront, ssColorFront;
+        var dtColorBack, eaColorBack, ssColorBack;
+		
+        if (ids.length && ids.length > 1) //Multi select
+        {
+            //Get original pixels
+            var dtPixels = parts.colorMap.getPixels();
+            var eaPixels = parts.emissiveMap.getPixels();
+            var ssPixels = parts.specularMap.getPixels();
+
+            for ( i=0; i < parts.ids.length; i++ ) {
+                partID = parts.ids[i];
+                pixelIDFront = partID;
+                pixelIDBack  = partID + this.widthTwo;
+
+                material = this.multiPart._materials[partID];
+
+                material.reset();
+
+                if( !material._highlighted )
+                {
+                    dtPixels[pixelIDFront] = new x3dom.fields.SFColorRGBA(material._diffuseColor.r, material._diffuseColor.g,
+                                                                          material._diffuseColor.b, 1.0 - material._transparency);
+                    eaPixels[pixelIDFront] = new x3dom.fields.SFColorRGBA(material._emissiveColor.r, material._emissiveColor.g,
+                                                                          material._emissiveColor.b, material._ambientIntensity);
+                    ssPixels[pixelIDFront] = new x3dom.fields.SFColorRGBA(material._specularColor.r, material._specularColor.g,
+                                                                          material._specularColor.b, material._shininess);
+
+                    dtPixels[pixelIDBack] = new x3dom.fields.SFColorRGBA(material._backDiffuseColor.r, material._backDiffuseColor.g,
+                                                                         material._backDiffuseColor.b, 1.0 - material._backTransparency);
+                    eaPixels[pixelIDBack] = new x3dom.fields.SFColorRGBA(material._backEmissiveColor.r, material._backEmissiveColor.g,
+                                                                         material._backEmissiveColor.b, material._backAmbientIntensity);
+                    ssPixels[pixelIDBack] = new x3dom.fields.SFColorRGBA(material._backSpecularColor.r, material._backSpecularColor.g,
+                                                                         material._backSpecularColor.b, material._backShininess);
+                }
+            }
+
+            this.colorMap.setPixels(dtPixels, false);
+            this.emissiveMap.setPixels(eaPixels, false);
+            this.specularMap.setPixels(ssPixels, true);
+        }
         else //Single select
         {
-            if (this.multiPart._highlightedParts[parts.ids[0]]){
-                this.multiPart._highlightedParts[parts.ids[0]].a = 1.0 - transparency;
-            } else {
-                x = parts.ids[0] % parts.colorMap.getWidth();
-                y = Math.floor(parts.ids[0] / parts.colorMap.getHeight());
+            partID = parts.ids[0];
+            pixelIDFront = partID;
+            pixelIDBack  = partID + this.widthTwo;
 
-                var pixel = parts.colorMap.getPixel(x, y);
+            var xFront = pixelIDFront % this.width;
+            var yFront = Math.floor(pixelIDFront / this.width);
 
-                pixel.a = 1.0 - transparency;
+            var xBack = pixelIDBack % this.width;
+            var yBack = Math.floor(pixelIDBack / this.width);
 
-                parts.colorMap.setPixel(x, y, pixel);
+            material = this.multiPart._materials[partID];
+
+            material.reset();
+
+            //If part is not highlighted update the pixel
+            if ( !material._highlighted )
+            {
+                dtColorFront = new x3dom.fields.SFColorRGBA(material._diffuseColor.r, material._diffuseColor.g,
+                                                            material._diffuseColor.b, 1.0 - material._transparency);
+                eaColorFront = new x3dom.fields.SFColorRGBA(material._emissiveColor.r, material._emissiveColor.g,
+                                                            material._emissiveColor.b, material._ambientIntensity);
+                ssColorFront = new x3dom.fields.SFColorRGBA(material._specularColor.r, material._specularColor.g,
+                                                            material._specularColor.b, material._shininess);
+
+                dtColorBack = new x3dom.fields.SFColorRGBA(material._backDiffuseColor.r, material._backDiffuseColor.g,
+                                                           material._backDiffuseColor.b, 1.0 - material._backTransparency);
+                eaColorBack = new x3dom.fields.SFColorRGBA(material._backEmissiveColor.r, material._backEmissiveColor.g,
+                                                           material._backEmissiveColor.b, material._backAmbientIntensity);
+                ssColorBack = new x3dom.fields.SFColorRGBA(material._backSpecularColor.r, material._backSpecularColor.g,
+                                                           material._backSpecularColor.b, material._backShininess);
+
+                this.colorMap.setPixel(xFront, yFront, dtColorFront, false);
+                this.emissiveMap.setPixel(xFront, yFront, eaColorFront, false);
+                this.specularMap.setPixel(xFront, yFront, ssColorFront, false);
+
+                this.colorMap.setPixel(xBack, yBack, dtColorBack, false);
+                this.emissiveMap.setPixel(xBack, yBack, eaColorBack, false);
+                this.specularMap.setPixel(xBack, yBack, ssColorBack, true);
             }
         }
     };
@@ -1234,7 +2531,7 @@ x3dom.Parts = function(multiPart, ids, colorMap, visibilityMap)
 
         if (!(ids.length && ids.length > 1)) {
             x = parts.ids[0] % parts.colorMap.getWidth();
-            y = Math.floor(parts.ids[0] / parts.colorMap.getHeight());
+            y = Math.floor(parts.ids[0] / parts.colorMap.getWidth());
 
             var pixel = parts.visibilityMap.getPixel(x, y);
 
@@ -1307,75 +2604,45 @@ x3dom.Parts = function(multiPart, ids, colorMap, visibilityMap)
         }
     };
 
+
     /**
+     * get bounding volume
      *
-     * @param color
      */
-    this.highlight = function(color) {
+    this.getVolume = function() {
 
-        var i, x, y;
-
-        if (color.split(" ").length == 3) {
-            color += " 1";
-        }
-
-        var colorRGBA = x3dom.fields.SFColorRGBA.parse(color);
+        var volume;
+        var transmat = this.multiPart.getCurrentTransform();
 
         if (ids.length && ids.length > 1) //Multi select
         {
-            var pixels = parts.colorMap.getPixels();
+            volume = new x3dom.fields.BoxVolume();
 
-            for(i=0; i<parts.ids.length; i++) {
-                if (this.multiPart._highlightedParts[parts.ids[i]] == undefined) {
-                    this.multiPart._highlightedParts[parts.ids[i]] = pixels[parts.ids[i]]
-                    pixels[parts.ids[i]] = colorRGBA;
-                }
+            for(var i=0; i<parts.ids.length; i++) {
+                volume.extendBounds(this.multiPart._partVolume[parts.ids[i]].min, this.multiPart._partVolume[parts.ids[i]].max);
             }
 
-            parts.colorMap.setPixels(pixels);
+            volume.transform(transmat);
+
+            return volume;
         }
-        else //Single select
+        else
         {
-            if (this.multiPart._highlightedParts[parts.ids[0]] == undefined){
-
-                x = parts.ids[0] % parts.colorMap.getWidth();
-                y = Math.floor(parts.ids[0] / parts.colorMap.getHeight());
-                this.multiPart._highlightedParts[parts.ids[0]] = parts.colorMap.getPixel(x, y);
-                parts.colorMap.setPixel(x, y, colorRGBA);
-            }
+            volume = x3dom.fields.BoxVolume.copy(this.multiPart._partVolume[parts.ids[0]]);
+            volume.transform(transmat);
+            return volume;
         }
     };
 
     /**
-     *
-     * @param color
+     * Fit the selected Parts to the screen
+     * @param updateCenterOfRotation
      */
-    this.unhighlight = function() {
+    this.fit = function (updateCenterOfRotation) {
 
-        var i, x, y;
+        var volume = this.getVolume();
 
-        if (ids.length && ids.length > 1) //Multi select
-        {
-            var pixels = parts.colorMap.getPixels();
-            for(i=0; i<parts.ids.length; i++) {
-                if (this.multiPart._highlightedParts[parts.ids[i]]) {
-                    pixels[parts.ids[i]] = this.multiPart._highlightedParts[parts.ids[i]];
-                    this.multiPart._highlightedParts[parts.ids[i]] = undefined;
-                }
-            }
-            parts.colorMap.setPixels(pixels);
-        }
-        else
-        {
-            if (this.multiPart._highlightedParts[parts.ids[0]]) {
-
-                x = parts.ids[0] % parts.colorMap.getWidth();
-                y = Math.floor(parts.ids[0] / parts.colorMap.getHeight());
-                var pixel = this.multiPart._highlightedParts[parts.ids[0]];
-                this.multiPart._highlightedParts[parts.ids[0]] = undefined;
-                parts.colorMap.setPixel(x, y, pixel);
-            }
-        }
+        this.multiPart._nameSpace.doc._viewarea.fit(volume.min, volume.max, updateCenterOfRotation);
     };
 };
 /*
@@ -1841,7 +3108,7 @@ x3dom.Utils.isNumber = function(n) {
 /*****************************************************************************
 * 
 *****************************************************************************/
-x3dom.Utils.createTexture2D = function(gl, doc, src, bgnd, withCredentials, scale, genMipMaps)
+x3dom.Utils.createTexture2D = function(gl, doc, src, bgnd, crossOrigin, scale, genMipMaps)
 {
 	var texture = gl.createTexture();
 
@@ -1860,7 +3127,24 @@ x3dom.Utils.createTexture2D = function(gl, doc, src, bgnd, withCredentials, scal
 	    return texture;
 	
 	var image = new Image();
-	image.crossOrigin = withCredentials ? 'use-credentials' : '';
+
+    switch(crossOrigin.toLowerCase()) {
+        case 'anonymous': {
+            image.crossOrigin = 'anonymous';
+        } break;
+        case 'use-credentials': {
+            image.crossOrigin = 'use-credentials'
+        } break;
+        case 'none': {
+            //this is needed to omit the default case, if default is none, erase this and the default case
+        } break;
+        default: {
+            if(x3dom.Utils.forbiddenBySOP(src)) {
+                image.crossOrigin = 'anonymous';
+            }
+        }
+    }
+
 	image.src = src;
 	
 	doc.downloadCount++;	
@@ -1903,7 +3187,7 @@ x3dom.Utils.createTexture2D = function(gl, doc, src, bgnd, withCredentials, scal
 /*****************************************************************************
 * 
 *****************************************************************************/
-x3dom.Utils.createTextureCube = function(gl, doc, url, bgnd, withCredentials, scale, genMipMaps)
+x3dom.Utils.createTextureCube = function(gl, doc, src, bgnd, crossOrigin, scale, genMipMaps)
 {
 	var texture = gl.createTexture();
 
@@ -1931,7 +3215,24 @@ x3dom.Utils.createTextureCube = function(gl, doc, url, bgnd, withCredentials, sc
 		var face = faces[i];
 
 		var image = new Image();
-		image.crossOrigin = withCredentials ? 'use-credentials' : '';
+
+        switch(crossOrigin.toLowerCase()) {
+            case 'anonymous': {
+                image.crossOrigin = 'anonymous';
+            } break;
+            case 'use-credentials': {
+                image.crossOrigin = 'use-credentials'
+            } break;
+            case 'none': {
+                //this is needed to omit the default case, if default is none, erase this and the default case
+            } break;
+            default: {
+                if(x3dom.Utils.forbiddenBySOP(src[i])) {
+                    image.crossOrigin = 'anonymous';
+                }
+            }
+        }
+
 		texture.pendingTextureLoads++;
 		doc.downloadCount++;
 		
@@ -1981,7 +3282,7 @@ x3dom.Utils.createTextureCube = function(gl, doc, url, bgnd, withCredentials, sc
 		};
 		
 		// backUrl, frontUrl, bottomUrl, topUrl, leftUrl, rightUrl (for bgnd)
-		image.src = url[i];
+		image.src = src[i];
 	}
 	
 	return texture;
@@ -2503,6 +3804,7 @@ x3dom.Utils.generateProperties = function (viewarea, shape)
         property.LIGHTS           = (!property.POINTLINE2D && appearance && shape.isLit() && (material || property.CSSHADER)) ?
                                      viewarea.getLights().length + (viewarea._scene.getNavigationInfo()._vf.headlight) : 0;
         property.TEXTURED         = (texture || property.TEXT) ? 1 : 0;
+        property.PIXELTEX         = (texture && x3dom.isa(texture, x3dom.nodeTypes.PixelTexture)) ? 1 : 0;
         property.TEXTRAFO         = (appearance && appearance._cf.textureTransform.node) ? 1 : 0;
         property.DIFFUSEMAP       = (property.CSSHADER && appearance._shader.getDiffuseMap()) ? 1 : 0;
         property.NORMALMAP        = (property.CSSHADER && appearance._shader.getNormalMap()) ? 1 : 0;
@@ -2511,6 +3813,8 @@ x3dom.Utils.generateProperties = function (viewarea, shape)
         property.DISPLACEMENTMAP  = (property.CSSHADER && appearance._shader.getDisplacementMap()) ? 1 : 0;
         property.DIFFPLACEMENTMAP = (property.CSSHADER && appearance._shader.getDiffuseDisplacementMap()) ? 1 : 0;
         property.MULTIDIFFALPMAP  = (property.VERTEXID && property.CSSHADER && appearance._shader.getMultiDiffuseAlphaMap()) ? 1 : 0;
+        property.MULTIEMIAMBMAP   = (property.VERTEXID && property.CSSHADER && appearance._shader.getMultiEmissiveAmbientMap()) ? 1 : 0;
+        property.MULTISPECSHINMAP = (property.VERTEXID && property.CSSHADER && appearance._shader.getMultiSpecularShininessMap()) ? 1 : 0;
         property.MULTIVISMAP      = (property.VERTEXID && property.CSSHADER && appearance._shader.getMultiVisibilityMap()) ? 1 : 0;
         property.CUBEMAP          = (texture && x3dom.isa(texture, x3dom.nodeTypes.X3DEnvironmentTextureNode)) ? 1 : 0;
         property.BLENDING         = (property.TEXT || property.CUBEMAP || (texture && texture._blending)) ? 1 : 0;
@@ -2558,6 +3862,7 @@ x3dom.Utils.generateProperties = function (viewarea, shape)
 
 	return property;
 };
+
 
 /*****************************************************************************
 * Returns "shader" such that "shader.foo = [1,2,3]" magically sets the 
@@ -2635,8 +3940,13 @@ x3dom.Utils.wrapProgram = function (gl, program, shaderID)
 					(function (loc) { return function (val) { gl.uniform2f(loc, val[0], val[1]); }; })(loc));           
 				break;
 			case gl.FLOAT_VEC3:
-				shader.__defineSetter__(obj.name, 
-					(function (loc) { return function (val) { gl.uniform3f(loc, val[0], val[1], val[2]); }; })(loc));
+				/* Passing arrays of vec3. see above.*/
+				if (obj.name.indexOf("[0]") != -1)
+					shader.__defineSetter__(obj.name.substring(0, obj.name.length-3), 
+						(function (loc) { return function (val) { gl.uniform3fv(loc, new Float32Array(val)); }; })(loc));
+				else
+					shader.__defineSetter__(obj.name, 
+						(function (loc) { return function (val) { gl.uniform3f(loc, val[0], val[1], val[2]); }; })(loc));
 				break;
 			case gl.FLOAT_VEC4:
 				shader.__defineSetter__(obj.name, 
@@ -2686,6 +3996,57 @@ x3dom.Utils.wrapProgram = function (gl, program, shaderID)
 	return shader;
 };
 
+
+/**
+ * Matches a given URI with document.location. If domain, port and protocol are the same SOP won't forbid access to the resource.
+ * @param {String} uri_string
+ * @returns {boolean}
+ */
+x3dom.Utils.forbiddenBySOP = function (uri_string) {
+
+    uri_string = uri_string.toLowerCase();
+    // scheme ":" hier-part [ "?" query ] [ "#" fragment ]
+    var Scheme_AuthorityPQF = uri_string.split('//'); //Scheme and AuthorityPathQueryFragment
+    var Scheme;
+    var AuthorityPQF;
+    var Authority;
+    var UserInfo_HostPort;
+    var HostPort;
+    var Host_Port;
+    var Port;
+    var Host;
+    var originPort = document.location.port === "" ? "80" : document.location.port;
+
+    if (Scheme_AuthorityPQF.length === 2) { // if there is '//' authority is given;
+        Scheme = Scheme_AuthorityPQF[0];
+        AuthorityPQF = Scheme_AuthorityPQF[1];
+
+        /*
+         * The authority component is preceded by a double slash ("//") and is
+         * terminated by the next slash ("/"), question mark ("?"), or number
+         * sign ("#") character, or by the end of the URI.
+         */
+        Authority = AuthorityPQF.split('/')[0].split('?')[0].split('#')[0];
+
+        //authority   = [ userinfo "@" ] host [ ":" port ]
+        UserInfo_HostPort = Authority.split('@');
+        if (UserInfo_HostPort.length === 1) { //No Userinfo given
+            HostPort = UserInfo_HostPort[0];
+        } else {
+            HostPort = UserInfo_HostPort[1];
+        }
+
+        Host_Port = HostPort.split(':');
+        Host = Host_Port[0];
+        Port = Host_Port[1];
+    } // else will return false for an invalid URL or URL without authority
+
+    Port = Port || "80";
+    Host = Host || document.location.host;
+    Scheme = Scheme || document.location.protocol;
+    return !(Port === originPort && Host === document.location.host && Scheme === document.location.protocol);
+};
+
 /*
  * X3DOM JavaScript Library
  * http://www.x3dom.org
@@ -2709,12 +4070,15 @@ x3dom.States = function (x3dElem) {
 
     var title = document.createElement('div');
     title.className = 'x3dom-states-head';
-    //title.appendChild(document.createTextNode('x3dom'));
+    title.appendChild(document.createTextNode('x3dom'));
 
     var subTitle = document.createElement('span');
     subTitle.className = 'x3dom-states-head2';
-    //subTitle.appendChild(document.createTextNode('stats'));
+    subTitle.appendChild(document.createTextNode('stats'));
     title.appendChild(subTitle);
+
+    this.renderMode = document.createElement('div');
+    this.renderMode.className = 'x3dom-states-rendermode-hardware';
 
     this.measureList = document.createElement('ul');
     this.measureList.className = 'x3dom-states-list';
@@ -2722,7 +4086,8 @@ x3dom.States = function (x3dElem) {
     this.infoList = document.createElement('ul');
     this.infoList.className = 'x3dom-states-list';
 
-    this.viewer.appendChild(title);
+    //this.viewer.appendChild(title);
+    this.viewer.appendChild(this.renderMode);
     this.viewer.appendChild(this.measureList);
     this.viewer.appendChild(this.infoList);
 
@@ -2762,6 +4127,17 @@ x3dom.States = function (x3dElem) {
 
         var infos = x3dElem.runtime.states.infos;
         var measurements = x3dElem.runtime.states.measurements;
+
+        var renderMode = x3dom.caps.RENDERMODE;
+
+        if ( renderMode == "HARDWARE" ) {
+            this.renderMode.innerHTML = "Hardware-Rendering";
+            this.renderMode.className = 'x3dom-states-rendermode-hardware';
+        } else if ( renderMode == "SOFTWARE" ) {
+            this.renderMode.innerHTML = "Software-Rendering";
+            this.renderMode.className = 'x3dom-states-rendermode-software';
+        }
+
 
         //Clear measure list
         this.measureList.innerHTML = "";
@@ -5115,6 +6491,7 @@ x3dom.X3DCanvas = function(x3dElem, canvasIdx)
 
     this.doc = null;
 
+    this.lastMousePos = { x: 0, y: 0 };
     //try to determine behavior of certain DOMNodeInsertedEvent:
     //IE11 dispatches one event for each node in an inserted subtree, other browsers use a single event per subtree
     x3dom.caps.DOMNodeInsertedEvent_perSubtree = !(navigator.userAgent.indexOf('MSIE')    != -1 ||
@@ -5343,26 +6720,30 @@ x3dom.X3DCanvas = function(x3dElem, canvasIdx)
         this.canvas.addEventListener('mousemove', function (evt) {
             if(!this.isMulti) {
 
-                if (evt.shiftKey) { this.mouse_button = 1; }
-                if (evt.ctrlKey)  { this.mouse_button = 4; }
-                if (evt.altKey)   { this.mouse_button = 2; }
-
                 var pos = this.parent.mousePosition(evt);
-                this.mouse_drag_x = pos.x;
-                this.mouse_drag_y = pos.y;
+                
+                if ( pos.x != that.lastMousePos.x || pos.y != that.lastMousePos.y ) {
+                    that.lastMousePos = pos;
+                    if (evt.shiftKey) { this.mouse_button = 1; }
+                    if (evt.ctrlKey)  { this.mouse_button = 4; }
+                    if (evt.altKey)   { this.mouse_button = 2; }
 
-                if (this.mouse_dragging) {
-                    this.parent.doc.onDrag(that.gl, this.mouse_drag_x, this.mouse_drag_y, this.mouse_button);
+                    this.mouse_drag_x = pos.x;
+                    this.mouse_drag_y = pos.y;
+
+                    if (this.mouse_dragging) {
+                        this.parent.doc.onDrag(that.gl, this.mouse_drag_x, this.mouse_drag_y, this.mouse_button);
+                    }
+                    else {
+                        this.parent.doc.onMove(that.gl, this.mouse_drag_x, this.mouse_drag_y, this.mouse_button);
+                    }
+
+                    this.parent.doc.needRender = true;
+
+                    // deliberately different for performance reasons
+                    evt.preventDefault();
+                    evt.stopPropagation();
                 }
-                else {
-                    this.parent.doc.onMove(that.gl, this.mouse_drag_x, this.mouse_drag_y, this.mouse_button);
-                }
-
-                this.parent.doc.needRender = true;
-
-                // deliberately different for performance reasons
-                evt.preventDefault();
-                evt.stopPropagation();
             }
         }, false);
 
@@ -5370,11 +6751,12 @@ x3dom.X3DCanvas = function(x3dElem, canvasIdx)
             if(!this.isMulti) {
                 this.focus();
 
+                var originalY = this.parent.mousePosition(evt).y;
+
                 this.mouse_drag_y += 2 * evt.detail;
 
-                this.parent.doc.onDrag(that.gl, this.mouse_drag_x, this.mouse_drag_y, 2);
+                this.parent.doc.onWheel(that.gl, this.mouse_drag_x, this.mouse_drag_y, originalY);
                 this.parent.doc.needRender = true;
-                this.parent.doc.onMouseRelease(that.gl, this.mouse_drag_x, this.mouse_drag_y, 0, 0);
 
                 evt.preventDefault();
                 evt.stopPropagation();
@@ -5385,11 +6767,12 @@ x3dom.X3DCanvas = function(x3dElem, canvasIdx)
             if(!this.isMulti) {
                 this.focus();
 
+                var originalY = this.parent.mousePosition(evt).y;
+
                 this.mouse_drag_y -= 0.1 * evt.wheelDelta;
 
-                this.parent.doc.onDrag(that.gl, this.mouse_drag_x, this.mouse_drag_y, 2);
+                this.parent.doc.onWheel(that.gl, this.mouse_drag_x, this.mouse_drag_y, originalY);
                 this.parent.doc.needRender = true;
-                this.parent.doc.onMouseRelease(that.gl, this.mouse_drag_x, this.mouse_drag_y, 0, 0);
 
                 evt.preventDefault();
                 evt.stopPropagation();
@@ -6019,20 +7402,21 @@ x3dom.X3DCanvas.prototype._createFlashObject = function (x3dElem) {
 
         if (!this._fileExists(swf_path)) {
             var version;
-            if (x3dom.versionInfo === undefined ||
-                x3dom.versionInfo.version.indexOf('dev') != -1) //use dev version
+
+            //No version info or a dev string?
+            if (x3dom.versionInfo === undefined || x3dom.versionInfo.version.indexOf('dev') != -1) //use dev version
             {
                 version = "dev";
             }
-            else {
-                //Get modification number
-                var modification = test.substr(test.length-1);
+            //Stable version?
+            else
+            {
+                version = x3dom.versionInfo.version;
 
-                //Check if modification number is greater than 0
-                if(modification > 0) {
-                    version = x3dom.versionInfo.version;
-                } else {
-                    version = x3dom.versionInfo.version.substr(3);
+                //If version ends with ".0" (modification number), remove this part from path to download folder
+                var modification = version.substr(version.length-1);
+                if(modification == 0) {
+                    version = version.substr(0, 3);
                 }
             }
 
@@ -6079,7 +7463,7 @@ x3dom.X3DCanvas.prototype._createFlashObject = function (x3dElem) {
         obj.setAttribute('id', id);
 
         //Check for xhtml
-        if (!document.doctype || document.doctype && document.doctype.publicId.search(/DTD XHTML/i) != -1) {
+        if (!document.doctype || document.doctype && document.doctype.publicId && document.doctype.publicId.search(/DTD XHTML/i) != -1) {
             x3dom.debug.logWarning("Flash backend doesn't like XHTML, please use HTML5!");
             obj.setAttribute('style', 'width:' + width + 'px; height:' + height + 'px;');
         } else {
@@ -8043,12 +9427,12 @@ x3dom.Cache = function () {
 /**
  * Returns a Texture 2D
  */
-x3dom.Cache.prototype.getTexture2D = function (gl, doc, url, bgnd, withCredentials, scale, genMipMaps) {
+x3dom.Cache.prototype.getTexture2D = function (gl, doc, url, bgnd, crossOrigin, scale, genMipMaps) {
     var textureIdentifier = url;
 
     if (this.textures[textureIdentifier] === undefined) {
         this.textures[textureIdentifier] = x3dom.Utils.createTexture2D(
-                                           gl, doc, url, bgnd, withCredentials, scale, genMipMaps);
+                                           gl, doc, url, bgnd, crossOrigin, scale, genMipMaps);
     }
 
     return this.textures[textureIdentifier];
@@ -8070,7 +9454,7 @@ x3dom.Cache.prototype.getTexture2DByDEF = function (gl, nameSpace, def) {
 /**
  * Returns a Cube Texture
  */
-x3dom.Cache.prototype.getTextureCube = function (gl, doc, url, bgnd, withCredentials, scale, genMipMaps) {
+x3dom.Cache.prototype.getTextureCube = function (gl, doc, url, bgnd, crossOrigin, scale, genMipMaps) {
     var textureIdentifier = "";
 
     for (var i = 0; i < url.length; ++i) {
@@ -8079,7 +9463,7 @@ x3dom.Cache.prototype.getTextureCube = function (gl, doc, url, bgnd, withCredent
 
     if (this.textures[textureIdentifier] === undefined) {
         this.textures[textureIdentifier] = x3dom.Utils.createTextureCube(
-                                           gl, doc, url, bgnd, withCredentials, scale, genMipMaps);
+                                           gl, doc, url, bgnd, crossOrigin, scale, genMipMaps);
     }
 
     return this.textures[textureIdentifier];
@@ -8373,7 +9757,7 @@ x3dom.Texture.prototype.update = function()
 	}
 };
 
-x3dom.Texture.prototype.setPixel = function(x, y, pixel)
+x3dom.Texture.prototype.setPixel = function(x, y, pixel, update)
 {
     var gl  = this.gl;
 
@@ -8386,8 +9770,10 @@ x3dom.Texture.prototype.setPixel = function(x, y, pixel)
     gl.texSubImage2D(this.type, 0, x, y, 1, 1, this.format, gl.UNSIGNED_BYTE, pixels);
 
     gl.bindTexture(this.type, null);
-    
-    this.doc.needRender = true;
+
+    if(update) {
+        this.doc.needRender = true;
+    }
 };
 
 x3dom.Texture.prototype.updateTexture = function()
@@ -8472,7 +9858,9 @@ x3dom.Texture.prototype.updateTexture = function()
 
         if (this.samplerName == "displacementMap" ||
             this.samplerName == "multiDiffuseAlphaMap" ||
-            this.samplerName == "multiVisibilityMap")
+            this.samplerName == "multiVisibilityMap" ||
+            this.samplerName == "multiEmissiveAmbientMap" ||
+            this.samplerName == "multiSpecularShininessMap")
         {
             this.wrapS = gl.CLAMP_TO_EDGE;
             this.wrapT = gl.CLAMP_TO_EDGE;
@@ -8532,7 +9920,7 @@ x3dom.Texture.prototype.updateTexture = function()
 
         if (pixelArr.length < pixelArrfont_size)
         {
-            var pixelArr = tex._vf.image.toGL();
+            pixelArr = tex._vf.image.toGL();
 
             while (pixelArr.length < pixelArrfont_size) {
                 pixelArr.push(0);
@@ -8634,12 +10022,12 @@ x3dom.Texture.prototype.updateTexture = function()
 	else if (x3dom.isa(tex, x3dom.nodeTypes.X3DEnvironmentTextureNode)) 
 	{
 		this.texture = this.cache.getTextureCube(gl, doc, tex.getTexUrl(), false, 
-		                                         tex._vf.withCredentials, tex._vf.scale, this.genMipMaps);
+		                                         tex._vf.crossOrigin, tex._vf.scale, this.genMipMaps);
 	}
 	else 
 	{
 		this.texture = this.cache.getTexture2D(gl, doc, tex._nameSpace.getURL(tex._vf.url[0]), 
-		                                       false, tex._vf.withCredentials, tex._vf.scale, this.genMipMaps);
+		                                       false, tex._vf.crossOrigin, tex._vf.scale, this.genMipMaps);
 	}
 };
 
@@ -9188,6 +10576,16 @@ x3dom.X3DDocument.prototype.onDrag = function (ctx, x, y, buttonState) {
     if (this._viewarea._scene._vf.doPickPass)
         ctx.pickValue(this._viewarea, x, y, buttonState);
     this._viewarea.onDrag(x, y, buttonState);
+};
+
+x3dom.X3DDocument.prototype.onWheel = function (ctx, x, y, originalY) {
+    if (!ctx || !this._viewarea) {
+        return;
+    }
+
+    if (this._viewarea._scene._vf.doPickPass)
+        ctx.pickValue(this._viewarea, x, originalY, 0);
+    this._viewarea.onDrag(x, y, 2);
 };
 
 x3dom.X3DDocument.prototype.onMousePress = function (ctx, x, y, buttonState) {
@@ -9798,6 +11196,27 @@ x3dom.Viewarea.prototype.navigateTo = function(timeStamp)
                          navType.substr(0, 5) === "looka")) );
     
     this._deltaT = timeStamp - this._lastTS;
+    
+    var removeZeroMargin = function(val, offset) {
+        if (val > 0) {
+            if (val <= offset) {
+                return 0;
+            } else {
+                return val - offset;
+            }
+        } else if (val <= 0) {
+            if (val >= -offset) {
+                return 0;
+            } else {
+                return val + offset;
+            }
+        }
+    };
+    
+    // slightly increasing slope function
+    var humanizeDiff = function(scale, diff) {
+        return ((diff < 0) ? -1 : 1 ) * Math.pow(scale * Math.abs(diff), 1.65 /*lower is easier on the novice*/);
+    };
 
     if (needNavAnim)
     {
@@ -9810,18 +11229,34 @@ x3dom.Viewarea.prototype.navigateTo = function(timeStamp)
             avatarHeight = navi._vf.avatarSize[1];
             avatarKnee = navi._vf.avatarSize[2];
         }
+        
+        
 
         // get current view matrix
         var currViewMat = this.getViewMatrix();
         var dist = 0;
+        
+        // estimate one screen size for motion puposes so navigation behaviour
+        // is less dependent on screen geometry. This makes no sense for very
+        // anisotropic cases, so it should probably be configurable.
+        var screenSize = Math.min(this._width, this._height);
+        var rdeltaX = removeZeroMargin((this._pressX - this._lastX) / screenSize, 0.01);
+        var rdeltaY = removeZeroMargin((this._pressY - this._lastY) / screenSize, 0.01);
+        
+        var userXdiff = humanizeDiff(1, rdeltaX);
+        var userYdiff = humanizeDiff(1, rdeltaY);
 
         // check if forwards or backwards (on right button)
         var step = (this._lastButton & 2) ? -1 : 1;
         step *= (this._deltaT * navi._vf.speed);
-
-        var phi = 2 * Math.PI * this._deltaT * (this._pressX - this._lastX) / this._width;
-        var theta = Math.PI * this._deltaT * (this._pressY - this._lastY) / this._height;
-
+        
+        // factor in delta time and the nav speed setting
+        var userXstep = this._deltaT * navi._vf.speed * userXdiff;
+        var userYstep = this._deltaT * navi._vf.speed * userYdiff;
+        
+        var phi = Math.PI * this._deltaT * userXdiff;
+        var theta = Math.PI * this._deltaT * userYdiff;
+        
         if (this._needNavigationMatrixUpdate === true)
         {
             this._needNavigationMatrixUpdate = false;
@@ -9847,11 +11282,21 @@ x3dom.Viewarea.prototype.navigateTo = function(timeStamp)
 
             if (navType === "helicopter")
                 this._at.y = this._from.y;
-            
-            if (navType.substr(0, 5) !== "looka")
-                this._up = new x3dom.fields.SFVec3f(0, 1, 0);
-            else
+
+            //lookat, lookaround
+            if (navType.substr(0, 5) === "looka")
+            {
                 this._up = this._flyMat.e1();
+            }
+            //all other modes
+            else
+            {
+                //initially read up-vector from current orientation and keep it
+                if (typeof this._up == 'undefined')
+                {
+                    this._up = this._flyMat.e1();
+                }
+            }
 
             this._pitch = angleX * 180 / Math.PI;
             this._yaw = angleY * 180 / Math.PI;
@@ -9894,10 +11339,8 @@ x3dom.Viewarea.prototype.navigateTo = function(timeStamp)
             tmpMat = x3dom.fields.SFMatrix4f.lookAt(tmpFrom, tmpAt, tmpUp);
             tmpMat = tmpMat.inverse();
 
-            this._scene._forcePicking = true;
             this._scene._nameSpace.doc.ctx.pickValue(this, this._width/2, this._height/2,
                         this._lastButton, tmpMat, this.getProjectionMatrix().mult(tmpMat));
-            this._scene._forcePicking = false;            
 
             if (this._pickingInfo.pickObj)
             {
@@ -9917,26 +11360,25 @@ x3dom.Viewarea.prototype.navigateTo = function(timeStamp)
 
             return needNavAnim;
         }   // game
-        else if (navType === "helicopter")
-        {
+        else if (navType === "helicopter") {
             var typeParams = navi.getTypeParams();
 
-            if (this._lastButton & 2)
-            {
-                var stepUp = this._deltaT * this._deltaT * navi._vf.speed;
-                stepUp *= 0.1 * (this._pressY - this._lastY) * Math.abs(this._pressY - this._lastY);
-                typeParams[1] += stepUp;
+            
 
+            if (this._lastButton & 2) // up/down levelling
+            {
+                var stepUp = 200 * userYstep;
+                typeParams[1] += stepUp;
                 navi.setTypeParams(typeParams);
             }
 
-            if (this._lastButton & 1) {
-                step *= 0.01 * (this._pressY - this._lastY) * Math.abs(this._pressY - this._lastY);
+            if (this._lastButton & 1) {  // forward/backward motion
+                step = 300 * userYstep;
             }
             else {
                 step = 0;
             }
-
+            
             theta = typeParams[0];
             this._from.y = typeParams[1];
             this._at.y = this._from.y;
@@ -10017,7 +11459,6 @@ x3dom.Viewarea.prototype.navigateTo = function(timeStamp)
             var currProjMat = this.getProjectionMatrix();
 
             if (navType !== "freefly") {
-                this._scene._forcePicking = true;
                 if (step < 0) {
                     // backwards: negate viewing direction
                     tmpMat = new x3dom.fields.SFMatrix4f();
@@ -10030,7 +11471,6 @@ x3dom.Viewarea.prototype.navigateTo = function(timeStamp)
                 else {
                     this._scene._nameSpace.doc.ctx.pickValue(this, this._width/2, this._height/2, this._lastButton);
                 }
-                this._scene._forcePicking = false;
                 if (this._pickingInfo.pickObj)
                 {
                     dist = this._pickingInfo.pickPos.subtract(this._from).length();
@@ -10055,10 +11495,8 @@ x3dom.Viewarea.prototype.navigateTo = function(timeStamp)
                 tmpMat = x3dom.fields.SFMatrix4f.lookAt(this._from, tmpAt, tmpUp);
                 tmpMat = tmpMat.inverse();
 
-                this._scene._forcePicking = true;
                 this._scene._nameSpace.doc.ctx.pickValue(this, this._width/2, this._height/2,
                             this._lastButton, tmpMat, currProjMat.mult(tmpMat));
-                this._scene._forcePicking = false;            
 
                 if (this._pickingInfo.pickObj)
                 {
@@ -10101,9 +11539,7 @@ x3dom.Viewarea.prototype.moveFwd = function()
         var fMat = this._flyMat.inverse();
 
         // check front for collisions
-        this._scene._forcePicking = true;
         this._scene._nameSpace.doc.ctx.pickValue(this, this._width/2, this._height/2, this._lastButton);
-        this._scene._forcePicking = false;
 
         if (this._pickingInfo.pickObj)
         {
@@ -10881,8 +12317,10 @@ x3dom.Viewarea.prototype.initMouseState = function()
     this._needNavigationMatrixUpdate = true;
 };
 
-x3dom.Viewarea.prototype.initTurnTable = function(navi)
+x3dom.Viewarea.prototype.initTurnTable = function(navi, flyTo)
 {
+    flyTo = (flyTo == undefined) ? true : flyTo;
+
     var currViewMat = this.getViewMatrix();
 
     var viewpoint = this._scene.getViewpoint();
@@ -10898,7 +12336,12 @@ x3dom.Viewarea.prototype.initTurnTable = function(navi)
     this._flyMat = x3dom.fields.SFMatrix4f.lookAt(this._from, this._at, this._up);
     this._flyMat = this.calcOrbit(0, 0, navi);
 
-    var dur = 0.2 / navi._vf.speed;   // fly to pivot point
+    var dur = 0.0;
+
+    if (flyTo) {
+        dur = 0.2 / navi._vf.speed;   // fly to pivot point
+    }
+
     this.animateTo(this._flyMat.inverse(), viewpoint, dur);
 
     this.resetNavHelpers();
@@ -10926,7 +12369,7 @@ x3dom.Viewarea.prototype.onMousePress = function (x, y, buttonState)
         var navi = this._scene.getNavigationInfo();
 
         if (navi.getType() === "turntable") {
-            this.initTurnTable(navi);
+            this.initTurnTable(navi, false);
         }
     }
 };
@@ -11074,6 +12517,16 @@ x3dom.Viewarea.prototype.onMouseOut = function (x, y, buttonState)
     this._lastX = x;
     this._lastY = y;
     this._deltaT = 0;
+
+    //if the mouse is moved out of the canvas, reset the list of currently affected pointing sensors
+    //(this behaves similar to a mouse release inside the canvas)
+    var i;
+    var affectedPointingSensorsList = this._doc._nodeBag.affectedPointingSensors;
+    for (i = 0; i < affectedPointingSensorsList.length; ++i)
+    {
+        affectedPointingSensorsList[i].pointerReleased();
+    }
+    this._doc._nodeBag.affectedPointingSensors = [];
 };
 
 x3dom.Viewarea.prototype.onDoubleClick = function (x, y)
@@ -11262,36 +12715,36 @@ x3dom.Viewarea.prototype.onDrag = function (x, y, buttonState)
             }
             if (buttonState & 2) //right
             {
-                d = (this._scene._lastMax.subtract(this._scene._lastMin)).length();
-                d = ((d < x3dom.fields.Eps) ? 1 : d) * navi._vf.speed;
+                    d = (this._scene._lastMax.subtract(this._scene._lastMin)).length();
+                    d = ((d < x3dom.fields.Eps) ? 1 : d) * navi._vf.speed;
 
-            vec = new x3dom.fields.SFVec3f(0, 0, d*(dx+dy)/this._height);
+                vec = new x3dom.fields.SFVec3f(0, 0, d*(dx+dy)/this._height);
 
-            if (x3dom.isa(viewpoint, x3dom.nodeTypes.OrthoViewpoint))
-            {
-                viewpoint._vf.fieldOfView[0] += vec.z;
-                viewpoint._vf.fieldOfView[1] += vec.z;
-                viewpoint._vf.fieldOfView[2] -= vec.z;
-                viewpoint._vf.fieldOfView[3] -= vec.z;
-                viewpoint._projMatrix = null;
+                if (x3dom.isa(viewpoint, x3dom.nodeTypes.OrthoViewpoint))
+                {
+                    viewpoint._vf.fieldOfView[0] += vec.z;
+                    viewpoint._vf.fieldOfView[1] += vec.z;
+                    viewpoint._vf.fieldOfView[2] -= vec.z;
+                    viewpoint._vf.fieldOfView[3] -= vec.z;
+                    viewpoint._projMatrix = null;
+                }
+                else
+                {
+                    this._movement = this._movement.add(vec);
+                    mat = this.getViewpointMatrix().mult(this._transMat);
+                    //TODO; move real distance along viewing ray
+                    this._transMat = mat.inverse().
+                                     mult(x3dom.fields.SFMatrix4f.translation(this._movement)).
+                                     mult(mat);
+                }
             }
-            else
-            {
-                this._movement = this._movement.add(vec);
-                mat = this.getViewpointMatrix().mult(this._transMat);
-                //TODO; move real distance along viewing ray
-                this._transMat = mat.inverse().
-                                 mult(x3dom.fields.SFMatrix4f.translation(this._movement)).
-                                 mult(mat);
-            }
-        }
 
             this._isMoving = true;
         }
         else if (navType === "turntable")   // requires that y is up vector in world coords
         {
             if (!this._flyMat)
-                this.initTurnTable(navi);
+                this.initTurnTable(navi, false);
 
             if (buttonState & 1) //left
             {
@@ -11398,8 +12851,8 @@ x3dom.Viewarea.prototype.calcOrbit = function (alpha, beta, navi)
     // angle from y-axis
     var theta = Math.atan2(Math.sqrt(offset.x * offset.x + offset.z * offset.z), offset.y);
 
-    phi -= Math.min(beta, 0.1);
-    theta -= Math.min(alpha, 0.1);
+    phi -= beta;
+    theta -= alpha;
 
     // clamp theta
     var typeParams = navi.getTypeParams();
@@ -13479,7 +14932,7 @@ x3dom.fields.SFMatrix4f.prototype.getEulerAngles = function() {
     var psi_1, psi_2, psi;
     var cos_theta_1, cos_theta_2;
 
-    if (Math.abs(this._20) != 1.0) {
+    if ( Math.abs((Math.abs(this._20) - 1.0)) > 0.0001) {
         theta_1 = -Math.asin(this._20);
         theta_2 = Math.PI - theta_1;
 
@@ -13886,8 +15339,8 @@ x3dom.fields.Quaternion = function(x, y, z, w) {
     if (arguments.length === 0) {
         this.x = 0;
         this.y = 0;
-        this.z = 1;
-        this.w = 0;
+        this.z = 0;
+        this.w = 1;
     }
     else {
         this.x = x;
@@ -16389,6 +17842,7 @@ x3dom.shader.BLUR = "blur";
 x3dom.shader.DEPTH = "depth";
 x3dom.shader.NORMAL = "normal";
 x3dom.shader.TEXTURE_REFINEMENT = "textureRefinement";
+x3dom.shader.SSAO = "ssao";
 
 /*
  * X3DOM JavaScript Library
@@ -17346,6 +18800,16 @@ x3dom.shader.DynamicShader.prototype.generateFragmentShader = function(gl, prope
             shader += "uniform float multiDiffuseAlphaWidth;\n";
             shader += "uniform float multiDiffuseAlphaHeight;\n";
         }
+        if (properties.MULTIEMIAMBMAP) {
+            shader += "uniform sampler2D multiEmissiveAmbientMap;\n";
+            shader += "uniform float multiEmissiveAmbientWidth;\n";
+            shader += "uniform float multiEmissiveAmbientHeight;\n";
+        }
+        if (properties.MULTISPECSHINMAP) {
+            shader += "uniform sampler2D multiSpecularShininessMap;\n";
+            shader += "uniform float multiSpecularShininessWidth;\n";
+            shader += "uniform float multiSpecularShininessHeight;\n";
+        }
         if (properties.MULTIVISMAP) {
             shader += "uniform sampler2D multiVisibilityMap;\n";
             shader += "uniform float multiVisibilityWidth;\n";
@@ -17408,25 +18872,41 @@ x3dom.shader.DynamicShader.prototype.generateFragmentShader = function(gl, prope
 	shader += "color.rgb = " + x3dom.shader.decodeGamma(properties, "diffuseColor") + ";\n";
 	shader += "color.a = 1.0 - transparency;\n";
 
-    if (properties.MULTIVISMAP || properties.MULTIDIFFALPMAP) {
+    shader += "vec3 _emissiveColor     = emissiveColor;\n";
+    shader += "float _shininess        = shininess;\n";
+    shader += "vec3 _specularColor     = specularColor;\n";
+    shader += "float _ambientIntensity = ambientIntensity;\n";
+
+    if (properties.MULTIVISMAP || properties.MULTIDIFFALPMAP || properties.MULTISPECSHINMAP || properties.MULTIEMIAMBMAP) {
         shader += "vec2 idCoord;\n";
-        shader += "float roundedID = floor(fragID+0.5);\n";
+        shader += "float roundedIDVisibility = floor(fragID+0.5);\n";
+        shader += "float roundedIDMaterial = floor(fragID+0.5);\n";
+        shader += "if(!gl_FrontFacing) {\n";
+        shader += "    roundedIDMaterial = floor(fragID + (multiDiffuseAlphaWidth*multiDiffuseAlphaWidth) + 0.5);\n";
+        shader += "}\n";
     }
 
     if (properties.MULTIVISMAP) {
-        shader += "idCoord.x = (mod(roundedID, multiVisibilityWidth)) * (1.0 / multiVisibilityWidth) + (0.5 / multiVisibilityWidth);\n";
-        shader += "idCoord.y = (floor(roundedID / multiVisibilityHeight)) * (1.0 / multiVisibilityHeight) + (0.5 / multiVisibilityHeight);\n";
+        shader += "idCoord.x = mod(roundedIDVisibility, multiVisibilityWidth) * (1.0 / multiVisibilityWidth) + (0.5 / multiVisibilityWidth);\n";
+        shader += "idCoord.y = floor(roundedIDVisibility / multiVisibilityWidth) * (1.0 / multiVisibilityHeight) + (0.5 / multiVisibilityHeight);\n";
         shader += "vec4 visibility = texture2D( multiVisibilityMap, idCoord );\n";
         shader += "if (visibility.r < 1.0) discard; \n";
     }
 
     if (properties.MULTIDIFFALPMAP) {
-        shader += "idCoord.x = (mod(roundedID, multiDiffuseAlphaWidth)) * (1.0 / multiDiffuseAlphaWidth) + (0.5 / multiDiffuseAlphaWidth);\n";
-        shader += "idCoord.y = (floor(roundedID / multiDiffuseAlphaHeight)) * (1.0 / multiDiffuseAlphaHeight) + (0.5 / multiDiffuseAlphaHeight);\n";
+        shader += "idCoord.x = mod(roundedIDMaterial, multiDiffuseAlphaWidth) * (1.0 / multiDiffuseAlphaWidth) + (0.5 / multiDiffuseAlphaWidth);\n";
+        shader += "idCoord.y = floor(roundedIDMaterial / multiDiffuseAlphaWidth) * (1.0 / multiDiffuseAlphaHeight) + (0.5 / multiDiffuseAlphaHeight);\n";
         shader += "vec4 diffAlpha = texture2D( multiDiffuseAlphaMap, idCoord );\n";
         shader += "color.rgb = " + x3dom.shader.decodeGamma(properties, "diffAlpha.rgb") + ";\n";
         shader += "color.a = diffAlpha.a;\n";
+    }
 
+    if (properties.MULTIEMIAMBMAP) {
+        shader += "idCoord.x = mod(roundedIDMaterial, multiDiffuseAlphaWidth) * (1.0 / multiDiffuseAlphaWidth) + (0.5 / multiDiffuseAlphaWidth);\n";
+        shader += "idCoord.y = floor(roundedIDMaterial / multiDiffuseAlphaWidth) * (1.0 / multiDiffuseAlphaHeight) + (0.5 / multiDiffuseAlphaHeight);\n";
+        shader += "vec4 emiAmb = texture2D( multiEmissiveAmbientMap, idCoord );\n";
+        shader += "_emissiveColor = emiAmb.rgb;\n";
+        shader += "_ambientIntensity = emiAmb.a;\n";
     }
 			
 	if(properties.VERTEXCOLOR) {
@@ -17444,10 +18924,7 @@ x3dom.shader.DynamicShader.prototype.generateFragmentShader = function(gl, prope
 		shader += "vec3 normal 	  = normalize(fragNormal);\n";
 		shader += "vec3 eye 	  = -fragPosition.xyz;\n";
 
-        shader += "float _shininess     = shininess;\n";
-        shader += "vec3 _specularColor  = specularColor;\n";
-        shader += "vec3 _emissiveColor  = emissiveColor;\n";
-        shader += "float _ambientIntensity = ambientIntensity;\n";
+
 		
 		//Normalmap
 		if(properties.NORMALMAP){
@@ -17472,6 +18949,19 @@ x3dom.shader.DynamicShader.prototype.generateFragmentShader = function(gl, prope
         if(properties.SHINMAP){
             shader += "_shininess = texture2D( shininessMap, vec2(fragTexcoord.x, 1.0-fragTexcoord.y) ).r;\n";
         }
+
+        //Specularmap
+        if(properties.SPECMAP) {
+            shader += "_specularColor = " + x3dom.shader.decodeGamma(properties, "texture2D(specularMap, vec2(fragTexcoord.x, 1.0-fragTexcoord.y)).rgb") + ";\n";
+        }
+
+        if (properties.MULTISPECSHINMAP) {
+            shader += "idCoord.x = mod(roundedIDMaterial, multiSpecularShininessWidth) * (1.0 / multiSpecularShininessWidth) + (0.5 / multiSpecularShininessWidth);\n";
+            shader += "idCoord.y = floor(roundedIDMaterial / multiSpecularShininessWidth) * (1.0 / multiSpecularShininessHeight) + (0.5 / multiSpecularShininessHeight);\n";
+            shader += "vec4 specShin = texture2D( multiSpecularShininessMap, idCoord );\n";
+            shader += "_specularColor = specShin.rgb;\n";
+            shader += "_shininess = specShin.a;\n";
+        }
 		
 		//Solid
 		if(!properties.SOLID || properties.TWOSIDEDMAT) {
@@ -17481,7 +18971,7 @@ x3dom.shader.DynamicShader.prototype.generateFragmentShader = function(gl, prope
 		}
 
         if(properties.SEPARATEBACKMAT) {
-            shader += "  if(gl_FrontFacing) {\n";
+            shader += "  if(!gl_FrontFacing) {\n";
             shader += "    color.rgb = " + x3dom.shader.decodeGamma(properties, "backDiffuseColor") + ";\n";
             shader += "    color.a = 1.0 - backTransparency;\n";
             shader += "    _shininess = backShininess;\n";
@@ -17519,13 +19009,8 @@ x3dom.shader.DynamicShader.prototype.generateFragmentShader = function(gl, prope
             shader += "specular = max(specular, 0.0);\n";
         }
 		
-		//Specularmap
-		if(properties.SPECMAP) {
-			shader += "specular *= " + x3dom.shader.decodeGamma(properties, "texture2D(specularMap, vec2(fragTexcoord.x, 1.0-fragTexcoord.y)).rgb") + ";\n";
-		}
-		
 		//Textures
-		if(properties.TEXTURED || properties.DIFFUSEMAP || properties.DIFFPLACEMENTMAP){
+		if(properties.TEXTURED || properties.DIFFUSEMAP || properties.DIFFPLACEMENTMAP){        
 			if(properties.CUBEMAP) {
 				shader += "vec3 viewDir = normalize(fragViewDir);\n";
 				shader += "vec3 reflected = reflect(viewDir, normal);\n";
@@ -17540,7 +19025,11 @@ x3dom.shader.DynamicShader.prototype.generateFragmentShader = function(gl, prope
             }
             else
             {
-				shader += "vec2 texCoord = vec2(fragTexcoord.x, 1.0-fragTexcoord.y);\n";
+                if (properties.PIXELTEX) {
+                    shader += "vec2 texCoord = fragTexcoord;\n";
+                } else {
+                    shader += "vec2 texCoord = vec2(fragTexcoord.x, 1.0-fragTexcoord.y);\n";
+                }
 				shader += "vec4 texColor = " + x3dom.shader.decodeGamma(properties, "texture2D(diffuseMap, texCoord)") + ";\n";
 				shader += "color.a *= texColor.a;\n";
 			}
@@ -17564,7 +19053,11 @@ x3dom.shader.DynamicShader.prototype.generateFragmentShader = function(gl, prope
 		}
 		
 		if(properties.TEXTURED || properties.DIFFUSEMAP){
-            shader += "vec2 texCoord = vec2(fragTexcoord.x, 1.0-fragTexcoord.y);\n";
+            if (properties.PIXELTEX) {
+                shader += "vec2 texCoord = fragTexcoord;\n";
+            } else {
+                shader += "vec2 texCoord = vec2(fragTexcoord.x, 1.0-fragTexcoord.y);\n";
+            }
 
             if (properties.IS_PARTICLE) {
                 shader += "texCoord = clamp(gl_PointCoord, 0.01, 0.99);\n";
@@ -17573,15 +19066,15 @@ x3dom.shader.DynamicShader.prototype.generateFragmentShader = function(gl, prope
             shader += "color.a = texColor.a;\n";
 
 			if(properties.BLENDING || properties.IS_PARTICLE){
-				shader += "color.rgb += emissiveColor.rgb;\n";
+				shader += "color.rgb += _emissiveColor.rgb;\n";
 				shader += "color.rgb *= texColor.rgb;\n";
 			} else {
 				shader += "color = texColor;\n";
 			}
 		} else if(!properties.VERTEXCOLOR && !properties.POINTLINE2D){
-			shader += "color.rgb += emissiveColor;\n";
+			shader += "color.rgb += _emissiveColor;\n";
 		} else if(!properties.VERTEXCOLOR && properties.POINTLINE2D && !properties.MULTIDIFFALPMAP){
-			shader += "color.rgb = emissiveColor;\n";
+			shader += "color.rgb = _emissiveColor;\n";
             if (properties.IS_PARTICLE) {
                 shader += "float pAlpha = 1.0 - clamp(length((gl_PointCoord - 0.5) * 2.0), 0.0, 1.0);\n";
                 shader += "color.rgb *= vec3(pAlpha);\n";
@@ -17941,7 +19434,7 @@ x3dom.shader.DynamicMobileShader.prototype.generateVertexShader = function(gl, p
 			} else if(properties.COLCOMPONENTS  == 4) {
 				shader += "vec4 vertColor = color;";
 			}
-			if(properties.REQUIREBBOXNOR) {
+			if(properties.REQUIREBBOXCOL) {
 				shader += "vertColor = vertColor / bgPrecisionColMax;\n";
 			}
 		}
@@ -18015,18 +19508,16 @@ x3dom.shader.DynamicMobileShader.prototype.generateVertexShader = function(gl, p
 		if(!properties.SOLID || properties.TWOSIDEDMAT) {
 			shader += "if (dot(normalMV, eye) < 0.0) {\n";
 			shader += "	 normalMV *= -1.0;\n";
-		}
-
-        if(properties.SEPARATEBACKMAT) {
-            shader += "  if(gl_FrontFacing) {\n";
-            shader += "    color.rgb = " + x3dom.shader.decodeGamma(properties, "backDiffuseColor") + ";\n";
-            shader += "    color.a = 1.0 - backTransparency;\n";
-            shader += "    _shininess = backShininess;\n";
-            shader += "    _emissiveColor = backEmissiveColor;\n";
-            shader += "    _specularColor = backSpecularColor;\n";
-            shader += "    _ambientIntensity = backAmbientIntensity;\n";
+            if(properties.SEPARATEBACKMAT) {
+                shader += "    rgb = backDiffuseColor;\n";
+                shader += "    alpha = 1.0 - backTransparency;\n";
+                shader += "    _shininess = backShininess;\n";
+                shader += "    _emissiveColor = backEmissiveColor;\n";
+                shader += "    _specularColor = backSpecularColor;\n";
+                shader += "    _ambientIntensity = backAmbientIntensity;\n";
+            }
             shader += "  }\n";
-        }
+		}
 		
 		//Calculate lighting
         if (properties.LIGHTS) {
@@ -18391,7 +19882,7 @@ x3dom.shader.DynamicShaderPicking.prototype.generateVertexShader = function(gl, 
             shader += "fragColor = color;\n";
         } else if(pickMode == 1 && properties.REQUIREBBOXCOL) { //Color Picking
             shader += "fragColor = color / bgPrecisionColMax;\n";
-        } else  if(pickMode == 2 && !properties.REQUIREBBOXCOL) { //TexCoord Picking
+        } else  if(pickMode == 2 && !properties.REQUIREBBOXTEX) { //TexCoord Picking
             shader += "fragColor = vec3(abs(texcoord.x), abs(texcoord.y), 0.0);\n";
         } else if(pickMode == 2 && properties.REQUIREBBOXTEX) { //TexCoord Picking
             shader += "vec2 texCoord = texcoord / bgPrecisionTexMax;\n";
@@ -18507,7 +19998,7 @@ x3dom.shader.DynamicShaderPicking.prototype.generateFragmentShader = function(gl
         }
     }
 
-    if(pickMode != 1 || pickMode != 2) {
+    if(pickMode != 1 && pickMode != 2) {
         shader += "float d = length(worldCoord) / sceneSize;\n";
     }
 
@@ -19650,6 +21141,519 @@ x3dom.shader.BlurShader.prototype.generateFragmentShader = function(gl)
 	return fragmentShader;
 };
 
+/**
+ * Generate the final ShadowShader program
+ */
+x3dom.shader.SSAOShader = function(gl)
+{
+	this.program = gl.createProgram();
+	
+	var vertexShader 	= this.generateVertexShader(gl);
+	var fragmentShader 	= this.generateFragmentShader(gl);
+	
+	gl.attachShader(this.program, vertexShader);
+    gl.attachShader(this.program, fragmentShader);
+    
+    // optional, but position should be at location 0 for performance reasons
+    gl.bindAttribLocation(this.program, 0, "position");
+    
+	gl.linkProgram(this.program);
+	return this.program;
+};
+
+/**
+ * Generate the vertex shader
+ */
+x3dom.shader.SSAOShader.prototype.generateVertexShader = function(gl)
+{
+	var shader = 	"attribute vec3 position;\n" +
+					"varying vec2 depthTexCoord;\n" +
+					"varying vec2 randomTexCoord;\n"+
+					"uniform vec2 randomTextureTilingFactor;\n"+
+					"\n" +
+					"void main(void) {\n" +
+					"    vec2 texCoord = (position.xy + 1.0) * 0.5;\n" +
+					"    depthTexCoord = texCoord;\n" +
+					"	 randomTexCoord = randomTextureTilingFactor*texCoord;\n"+
+					"    gl_Position = vec4(position.xy, 0.0, 1.0);\n" +
+					"}\n";
+
+	var vertexShader = gl.createShader(gl.VERTEX_SHADER);
+	gl.shaderSource(vertexShader, shader);
+    gl.compileShader(vertexShader);
+		
+	if(!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)){
+		x3dom.debug.logError("[SSAOShader] VertexShader " + gl.getShaderInfoLog(vertexShader));		
+	}
+	
+	return vertexShader;
+};
+
+/**
+ * Returns the code for a function "getDepth(vec2 depthTexCoord)" that returns the linear depth.
+ * It also introduces two uniform floats depthReconstructionConstantA and depthReconstructionConstantB,
+ * which are needed for the depth reconstruction.
+ */
+x3dom.shader.SSAOShader.depthReconsructionFunctionCode = function()
+{
+	var code = 	"uniform float depthReconstructionConstantA;\n"+
+				"uniform float depthReconstructionConstantB;\n";
+	if (!x3dom.caps.FP_TEXTURES || x3dom.caps.MOBILE) 
+		code += 	x3dom.shader.rgbaPacking();
+		
+	code+= 	"float getDepth(vec2 depthTexCoord) {\n"+
+				"    vec4 col = texture2D(depthTexture, depthTexCoord);\n"+
+				"    float d;\n";
+	
+	if (!x3dom.caps.FP_TEXTURES || x3dom.caps.MOBILE){
+		code+="    d = unpackDepth(col);\n";
+	} else {
+		code+="    d = col.b;\n"
+	}
+	code+=    "    return depthReconstructionConstantB/(depthReconstructionConstantA+d);\n";
+	code+=	"}\n";
+	return code;
+}
+
+/**
+ * Generate the fragment shader
+ */
+x3dom.shader.SSAOShader.prototype.generateFragmentShader = function(gl)
+{
+  var shader = 	"#ifdef GL_FRAGMENT_PRECISION_HIGH\n";
+  shader += 	"precision highp float;\n";
+  shader += 	"#else\n";
+  shader += 	" precision mediump float;\n";
+  shader += 	"#endif\n\n";
+
+	shader += 	"uniform sampler2D depthTexture;\n" +
+				"uniform sampler2D randomTexture;\n"+
+				"uniform float nearPlane;\n"+
+				"uniform float farPlane;\n"+
+				"uniform float radius;\n"+
+				"uniform float depthBufferEpsilon;\n"+
+				"uniform vec3 samples[16];\n"+
+				"varying vec2 depthTexCoord;\n" +
+				"varying vec2 randomTexCoord;\n";
+
+	shader += 	x3dom.shader.SSAOShader.depthReconsructionFunctionCode();
+		
+	shader+=	"void main(void) {\n" +
+				"    float referenceDepth = getDepth(depthTexCoord);\n" +
+				"    if(referenceDepth == 1.0)\n"+ //background
+                "    {\n"+
+                "        gl_FragColor = vec4(1.0,1.0,1.0, 1.0);\n"+
+                "        return;\n"+
+                "    }\n"+
+				"    int numOcclusions = 0;\n"+
+				"    for(int i = 0; i<16; ++i){\n"+
+				"        float scale  = 1.0/referenceDepth;\n"+
+				"        vec3 samplepos = reflect(samples[i],texture2D(randomTexture,randomTexCoord).xyz*2.0-vec3(1.0,1.0,1.0));\n"+
+				"        float sampleDepth = getDepth(depthTexCoord+samplepos.xy*scale*radius);\n"+
+				"        //if(abs(sampleDepth-referenceDepth)<=radius*(1.0/nearPlane))\n"+ //leads to bright halos
+				"        if( sampleDepth < referenceDepth-depthBufferEpsilon) {\n"+
+				"            ++numOcclusions;\n"+
+				"        }\n"+
+				"    }\n"+
+				"    float r = 1.0-float(numOcclusions)/16.0;\n"+
+				"    r*=2.0;\n"+
+				"    gl_FragColor = vec4(r,r,r, 1.0);\n" +
+				"}\n";
+
+    var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+	gl.shaderSource(fragmentShader, shader);
+    gl.compileShader(fragmentShader);
+		
+	if(!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)){
+		x3dom.debug.logError("[SSAOhader] FragmentShader " + gl.getShaderInfoLog(fragmentShader));		
+	}
+	
+	return fragmentShader;
+};
+
+
+/**
+ * Generate the final ShadowShader program
+ */
+x3dom.shader.SSAOBlurShader = function(gl)
+{
+	this.program = gl.createProgram();
+	
+	var vertexShader 	= this.generateVertexShader(gl);
+	var fragmentShader 	= this.generateFragmentShader(gl);
+	
+	gl.attachShader(this.program, vertexShader);
+    gl.attachShader(this.program, fragmentShader);
+    
+    // optional, but position should be at location 0 for performance reasons
+    gl.bindAttribLocation(this.program, 0, "position");
+
+    gl.linkProgram(this.program);
+	return this.program;
+};
+
+/**
+ * Generate the vertex shader
+ */
+x3dom.shader.SSAOBlurShader.prototype.generateVertexShader = function(gl)
+{
+	var shader = 	"attribute vec3 position;\n" +
+					"varying vec2 fragTexCoord;\n" +
+					"\n" +
+					"void main(void) {\n" +
+					"    vec2 texCoord = (position.xy + 1.0) * 0.5;\n" +
+					"    fragTexCoord = texCoord;\n" +
+					"    gl_Position = vec4(position.xy, 0.0, 1.0);\n" +
+					"}\n";
+
+	var vertexShader = gl.createShader(gl.VERTEX_SHADER);
+	gl.shaderSource(vertexShader, shader);
+    gl.compileShader(vertexShader);
+		
+	if(!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)){
+		x3dom.debug.logError("[SSAOShader] VertexShader " + gl.getShaderInfoLog(vertexShader));		
+	}
+	
+	return vertexShader;
+};
+
+/**
+ * Generate the fragment shader
+ */
+x3dom.shader.SSAOBlurShader.prototype.generateFragmentShader = function(gl)
+{
+  var shader = 	"#ifdef GL_FRAGMENT_PRECISION_HIGH\n";
+	  shader += "precision highp float;\n";
+	  shader += "#else\n";
+	  shader += " precision mediump float;\n";
+	  shader += "#endif\n\n";
+  
+
+	shader += 	"uniform sampler2D SSAOTexture;\n" +
+				"uniform sampler2D depthTexture;\n" +
+				"uniform float nearPlane;\n"+
+				"uniform float farPlane;\n"+
+				"uniform float amount;\n"+
+				"uniform vec2 pixelSize;\n"+
+				"uniform float depthThreshold;\n"+
+				"varying vec2 fragTexCoord;\n";
+
+
+	shader += 	x3dom.shader.SSAOShader.depthReconsructionFunctionCode();
+
+	shader+="void main(void) {\n" +
+			"    float sum = 0.0;\n"+
+			"    float numSamples = 0.0;\n"+
+			"    float referenceDepth = getDepth(fragTexCoord);\n"+
+			"    for(int i = -2; i<2;i++){\n"+
+			"        for(int j = -2; j<2;j++){\n"+
+			"            vec2 sampleTexCoord = fragTexCoord+vec2(pixelSize.x*float(i),pixelSize.y*float(j));\n"+
+			"            if(abs(referenceDepth - getDepth(sampleTexCoord))<depthThreshold){\n"+
+			"                sum+= texture2D(SSAOTexture,sampleTexCoord).r;\n"+
+			"                numSamples++;\n"+
+			"    }}}\n"+
+			"    float intensity = mix(1.0,sum/numSamples,amount);\n"+
+			"    gl_FragColor = vec4(intensity,intensity,intensity,1.0);\n"+
+			"}\n";
+
+    var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+	gl.shaderSource(fragmentShader, shader);
+    gl.compileShader(fragmentShader);
+		
+	if(!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)){
+		x3dom.debug.logError("[SSAOhader] FragmentShader " + gl.getShaderInfoLog(fragmentShader));		
+	}
+	
+	return fragmentShader;
+};
+
+
+x3dom.SSAO = {};
+x3dom.SSAO.isEnabled = function(scene){return scene.getEnvironment()._vf.SSAO};
+
+/**
+ * Reinitializes the shaders if they were not created yet or need to be updated.
+ */
+x3dom.SSAO.reinitializeShadersIfNecessary = function(gl){
+	if(x3dom.SSAO.shaderProgram === undefined){
+		x3dom.SSAO.shaderProgram = x3dom.Utils.wrapProgram(gl, new x3dom.shader.SSAOShader(gl), "ssao");
+	}
+	if(x3dom.SSAO.blurShaderProgram === undefined){
+		x3dom.SSAO.blurShaderProgram = x3dom.Utils.wrapProgram(gl, new x3dom.shader.SSAOBlurShader(gl), "ssao-blur");
+	}
+};
+
+/**
+ * Reinitializes the random Texture if it was not created yet or if it's size changed.
+ */
+x3dom.SSAO.reinitializeRandomTextureIfNecessary = function(gl,scene){
+	var sizeHasChanged = scene.getEnvironment()._vf.SSAOrandomTextureSize != x3dom.SSAO.currentRandomTextureSize;
+
+	if(x3dom.SSAO.randomTexture === undefined){
+		//create random texture
+		x3dom.SSAO.randomTexture = gl.createTexture();
+	}
+
+	if(x3dom.SSAO.randomTexture === undefined || sizeHasChanged){
+		gl.bindTexture(gl.TEXTURE_2D,x3dom.SSAO.randomTexture);
+		var rTexSize = x3dom.SSAO.currentRandomTextureSize = scene.getEnvironment()._vf.SSAOrandomTextureSize;
+		var randomImageBuffer = new ArrayBuffer(rTexSize*rTexSize*4); //rTexSize^2 pixels with 4 bytes each
+		var randomImageView = new Uint8Array(randomImageBuffer);
+		//fill the image with random unit Vectors in the z-y-plane:
+		for(var i = 0; i<rTexSize*rTexSize;++i){
+			var x = Math.random()*2.0-1.0;
+			var y = Math.random()*2.0-1.0;
+			var z = 0;
+			var length = Math.sqrt(x*x+y*y+z*z);
+			x /=length;
+			y /=length;
+			randomImageView[4*i] = (x+1.0)*0.5*255.0;
+			randomImageView[4*i+1] = (y+1.0)*0.5*255.0;
+			randomImageView[4*i+2] = (z+1.0)*0.5*255.0;
+			randomImageView[4*i+3] = 255;
+		}
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA,rTexSize,rTexSize,0, gl.RGBA,gl.UNSIGNED_BYTE, randomImageView);
+		gl.bindTexture(gl.TEXTURE_2D,null);
+	}
+};
+
+/**
+ * Reinitializes the FBO render target for the SSAO if it wasn't created yet or if the canvas size changed.
+ */
+x3dom.SSAO.reinitializeFBOIfNecessary = function(gl,canvas){
+
+	var dimensionsHaveChanged =
+		x3dom.SSAO.currentFBOWidth != canvas.width || 
+		x3dom.SSAO.currentFBOHeight != canvas.height;
+
+	if(x3dom.SSAO.fbo === undefined || dimensionsHaveChanged)
+	{
+		x3dom.SSAO.currentFBOWidth = canvas.width;
+		x3dom.SSAO.currentFBOHeight = canvas.height;
+		var oldfbo = gl.getParameter(gl.FRAMEBUFFER_BINDING);
+		if(x3dom.SSAO.fbo === undefined){
+			//create framebuffer
+			x3dom.SSAO.fbo = gl.createFramebuffer();
+		}
+		gl.bindFramebuffer(gl.FRAMEBUFFER, x3dom.SSAO.fbo);
+		if(x3dom.SSAO.fbotex === undefined){
+			//create render texture
+			x3dom.SSAO.fbotex = gl.createTexture();
+		}
+		gl.bindTexture(gl.TEXTURE_2D,x3dom.SSAO.fbotex);
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA,x3dom.SSAO.currentFBOWidth,
+			x3dom.SSAO.currentFBOHeight,0, gl.RGBA,gl.UNSIGNED_BYTE, null);
+		gl.bindTexture(gl.TEXTURE_2D,null);
+		gl.framebufferTexture2D(gl.FRAMEBUFFER,
+			gl.COLOR_ATTACHMENT0,
+			gl.TEXTURE_2D,
+			x3dom.SSAO.fbotex,
+			0);
+		gl.bindFramebuffer(gl.FRAMEBUFFER, oldfbo);
+	}
+};
+
+/*
+ * Renders a sparsely sampled Screen-Space Ambient Occlusion Factor.
+ * @param stateManager x3dom webgl stateManager
+ * @param gl WebGL context
+ * @param scene Scene Node
+ * @param tex depth texture
+ * @param canvas Canvas the scene is rendered on (needed for dimensions)
+ * @param fbo FrameBufferObject handle that should be used as a target (null to use curent fbo)
+ */
+x3dom.SSAO.render = function(stateManager,gl,scene,tex,canvas,fbo) {
+	//save previous fbo
+	var oldfbo = gl.getParameter(gl.FRAMEBUFFER_BINDING);
+	if(fbo != null){
+		gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+	}
+	
+	stateManager.frontFace(gl.CCW);
+	stateManager.disable(gl.CULL_FACE);
+	stateManager.disable(gl.DEPTH_TEST);
+	
+	var sp = x3dom.SSAO.shaderProgram;
+	
+	stateManager.useProgram(sp);
+
+	//set up uniforms
+	sp.depthTexture = 0;
+	sp.randomTexture = 1;
+	sp.radius = scene.getEnvironment()._vf.SSAOradius;
+	sp.randomTextureTilingFactor = [canvas.width/x3dom.SSAO.currentRandomTextureSize,canvas.height/x3dom.SSAO.currentRandomTextureSize];
+
+	var viewpoint = scene.getViewpoint();
+	var nearPlane = viewpoint.getNear();
+	var farPlane = viewpoint.getFar();
+	sp.nearPlane = nearPlane;
+	sp.farPlane = farPlane;
+	sp.depthReconstructionConstantA = (farPlane+nearPlane)/(nearPlane-farPlane);
+	sp.depthReconstructionConstantB = (2.0*farPlane*nearPlane)/(nearPlane-farPlane);
+	sp.depthBufferEpsilon = 0.0001*(farPlane-nearPlane);
+	//16 samples with a well distributed pseudo random opposing-pairs sampling pattern:
+	sp.samples = [0.03800223814729654,0.10441029119843426,-0.04479934806797181,
+				-0.03800223814729654,-0.10441029119843426,0.04479934806797181,
+				-0.17023209847088397,0.1428416910414532,0.6154407640895228,
+				0.17023209847088397,-0.1428416910414532,-0.6154407640895228,
+				-0.288675134594813,-0.16666666666666646,-0.3774214123135722,
+				0.288675134594813,0.16666666666666646,0.3774214123135722,
+				0.07717696785196887,-0.43769233467209245,-0.5201284112706428,
+				-0.07717696785196887,0.43769233467209245,0.5201284112706428,
+				0.5471154183401156,-0.09647120981496134,-0.15886420745887797,
+				-0.5471154183401156,0.09647120981496134,0.15886420745887797,
+				0.3333333333333342,0.5773502691896253,-0.8012446019636266,
+				-0.3333333333333342,-0.5773502691896253,0.8012446019636266,
+				-0.49994591864508653,0.5958123446480936,-0.15385106176844343,
+				0.49994591864508653,-0.5958123446480936,0.15385106176844343,
+				-0.8352823295874743,-0.3040179051783715,0.7825440557226517,
+				0.8352823295874743,0.3040179051783715,-0.7825440557226517];
+	if (!sp.tex) {
+		sp.tex = 0;
+	}
+
+	//depth texture
+	gl.activeTexture(gl.TEXTURE0);
+	gl.bindTexture(gl.TEXTURE_2D, tex);
+
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+	
+	//random texture:
+	gl.activeTexture(gl.TEXTURE1);
+	gl.bindTexture(gl.TEXTURE_2D, x3dom.SSAO.randomTexture);
+
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+
+	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, scene._fgnd._webgl.buffers[0]);
+	gl.bindBuffer(gl.ARRAY_BUFFER, scene._fgnd._webgl.buffers[1]);
+	gl.vertexAttribPointer(sp.position, 3, gl.FLOAT, false, 0, 0);
+	gl.enableVertexAttribArray(sp.position);
+
+	gl.drawElements(scene._fgnd._webgl.primType, scene._fgnd._webgl.indexes.length, gl.UNSIGNED_SHORT, 0);
+
+	gl.disableVertexAttribArray(sp.position);
+
+	gl.activeTexture(gl.TEXTURE0);
+	gl.bindTexture(gl.TEXTURE_2D, null);
+	gl.activeTexture(gl.TEXTURE1);
+	gl.bindTexture(gl.TEXTURE_2D, null);
+	
+	//restore prevoius fbo
+	if(fbo != null){
+		gl.bindFramebuffer(gl.FRAMEBUFFER, oldfbo);
+	}
+};
+
+/**
+ * Applies a depth-aware averaging filter.
+ * @param stateManager x3dom webgl stateManager
+ * @param gl WebGL context
+ * @param scene Scene Node
+ * @param ssaoTexture texture that contains the SSAO factor
+ * @param depthTexture depth texture
+ * @param canvas Canvas the scene is rendered on (needed for dimensions)
+ * @param fbo FrameBufferObject handle that should be used as a target (null to use curent fbo)
+ */
+x3dom.SSAO.blur = function(stateManager,gl,scene,ssaoTexture,depthTexture,canvas,fbo) {
+
+	//save previous fbo
+	var oldfbo = gl.getParameter(gl.FRAMEBUFFER_BINDING);
+	if(fbo != null){
+		gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+	}
+
+	stateManager.frontFace(gl.CCW);
+	stateManager.disable(gl.CULL_FACE);
+	stateManager.disable(gl.DEPTH_TEST);
+	
+	var sp = x3dom.SSAO.blurShaderProgram;
+	
+	stateManager.useProgram(sp);
+
+	sp.SSAOTexture = 0;
+	sp.depthTexture = 1;
+
+	sp.depthThreshold = scene.getEnvironment()._vf.SSAOblurDepthTreshold;
+
+	var viewpoint = scene.getViewpoint();
+	var nearPlane = viewpoint.getNear();
+	var farPlane = viewpoint.getFar();
+	sp.nearPlane = nearPlane;
+	sp.farPlane = farPlane;
+	sp.depthReconstructionConstantA = (farPlane+nearPlane)/(nearPlane-farPlane);
+	sp.depthReconstructionConstantB = (2.0*farPlane*nearPlane)/(nearPlane-farPlane);
+	sp.pixelSize = [1.0/canvas.width,1.0/canvas.height];
+	sp.amount = scene.getEnvironment()._vf.SSAOamount;
+
+	//ssao texture
+	gl.activeTexture(gl.TEXTURE0);
+	gl.bindTexture(gl.TEXTURE_2D, ssaoTexture);
+
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+	//depth texture
+	gl.activeTexture(gl.TEXTURE1);
+	gl.bindTexture(gl.TEXTURE_2D, depthTexture);
+
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, scene._fgnd._webgl.buffers[0]);
+	gl.bindBuffer(gl.ARRAY_BUFFER, scene._fgnd._webgl.buffers[1]);
+	gl.vertexAttribPointer(sp.position, 3, gl.FLOAT, false, 0, 0);
+	gl.enableVertexAttribArray(sp.position);
+
+	gl.drawElements(scene._fgnd._webgl.primType, scene._fgnd._webgl.indexes.length, gl.UNSIGNED_SHORT, 0);
+
+	gl.disableVertexAttribArray(sp.position);
+
+	gl.activeTexture(gl.TEXTURE0);
+	gl.bindTexture(gl.TEXTURE_2D, null);
+	gl.activeTexture(gl.TEXTURE1);
+	gl.bindTexture(gl.TEXTURE_2D, null);
+	
+	//restore previous fbo
+	if(fbo != null){
+		gl.bindFramebuffer(gl.FRAMEBUFFER, oldfbo);
+	}
+};
+
+/**
+ * Renders Screen-Space Ambeint Occlusion multiplicatively on top of the scene.
+ * @param stateManager state manager for the WebGL context
+ * @param gl WebGL context
+ * @param scene current scene
+ * @param canvas canvas that the scene is rendered to
+ */
+x3dom.SSAO.renderSSAO = function(stateManager, gl, scene, canvas) {
+
+	//set up resources if they are non-existent or if they are outdated:
+	this.reinitializeShadersIfNecessary(gl);
+	this.reinitializeRandomTextureIfNecessary(gl,scene);
+	this.reinitializeFBOIfNecessary(gl,canvas);
+		
+	stateManager.viewport(0,0,canvas.width, canvas.height);
+
+    //render SSAO into fbo
+    this.render(stateManager,gl, scene, scene._webgl.fboScene.tex,canvas,x3dom.SSAO.fbo);
+    //render blurred SSAO multiplicatively
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.DST_COLOR, gl.ONE_MINUS_SRC_ALPHA);
+    this.blur(stateManager,gl, scene, x3dom.SSAO.fbotex,scene._webgl.fboScene.tex,canvas,null);		
+    gl.disable(gl.BLEND);
+};
+
 /*
  * X3DOM JavaScript Library
  * http://www.x3dom.org
@@ -19698,19 +21702,35 @@ x3dom.gfx_webgl = (function () {
         }
 
         var ctx = null;
+
+        // TODO; FIXME; this is an ugly hack, don't look for elements like this 
+        // (e.g., Bindable nodes may only exist in backend etc.)
+        var envNodes   = x3dElem.getElementsByTagName("Environment");
+        var ssaoEnabled = (envNodes && envNodes[0] && envNodes[0].hasAttribute("SSAO") && 
+                    envNodes[0].getAttribute("SSAO").toLowerCase() === 'true') ? true : false;
+
         // Context creation params
         var ctxAttribs = {
             alpha: true,
             depth: true,
             stencil: true,
-            antialias: true,
+            antialias: !ssaoEnabled,
             premultipliedAlpha: false,
-            preserveDrawingBuffer: true
+            preserveDrawingBuffer: true,
+            failIfMajorPerformanceCaveat : true
         };
 
         for (var i = 0; i < validContextNames.length; i++) {
             try {
                 ctx = canvas.getContext(validContextNames[i], ctxAttribs);
+
+                //If context creation fails, retry the creation with failIfMajorPerformanceCaveat = false
+                if ( !ctx ) {
+                    x3dom.caps.RENDERMODE = "SOFTWARE";
+                    ctxAttribs.failIfMajorPerformanceCaveat = false;
+                    ctx = canvas.getContext(validContextNames[i], ctxAttribs);
+                }
+
                 if (ctx) {
                     var newCtx = new Context(ctx, canvas, 'webgl', x3dElem);
 
@@ -19744,11 +21764,21 @@ x3dom.gfx_webgl = (function () {
                         x3dom.caps.FPL_TEXTURES = ctx.getExtension("OES_texture_float_linear");
                         x3dom.caps.STD_DERIVATIVES = ctx.getExtension("OES_standard_derivatives");
                         x3dom.caps.DRAW_BUFFERS = ctx.getExtension("WEBGL_draw_buffers");
+                        x3dom.caps.DEBUGRENDERINFO = ctx.getExtension("WEBGL_debug_renderer_info");
                         x3dom.caps.EXTENSIONS = ctx.getSupportedExtensions();
+
+                        if ( x3dom.caps.DEBUGRENDERINFO ) {
+                            x3dom.caps.UNMASKED_RENDERER_WEBGL = ctx.getParameter( x3dom.caps.DEBUGRENDERINFO.UNMASKED_RENDERER_WEBGL );
+                            x3dom.caps.UNMASKED_VENDOR_WEBGL = ctx.getParameter( x3dom.caps.DEBUGRENDERINFO.UNMASKED_VENDOR_WEBGL );
+                        } else {
+                            x3dom.caps.UNMASKED_RENDERER_WEBGL = "";
+                            x3dom.caps.UNMASKED_VENDOR_WEBGL = "";
+                        }
 
                         var extString = x3dom.caps.EXTENSIONS.toString().replace(/,/g, ", ");
                         x3dom.debug.logInfo(validContextNames[i] + " context found\nVendor: " + x3dom.caps.VENDOR +
-                            ", Renderer: " + x3dom.caps.RENDERER + ", " + "Version: " + x3dom.caps.VERSION + ", " +
+                            " " + x3dom.caps.UNMASKED_VENDOR_WEBGL + ", Renderer: " + x3dom.caps.RENDERER +
+                            " " + x3dom.caps.UNMASKED_RENDERER_WEBGL + ", " + "Version: " + x3dom.caps.VERSION + ", " +
                             "ShadingLangV.: " + x3dom.caps.SHADING_LANGUAGE_VERSION
                             + ", MSAA samples: " + x3dom.caps.SAMPLES + "\nExtensions: " + extString);
 
@@ -20397,7 +22427,7 @@ x3dom.gfx_webgl = (function () {
                 bgnd._webgl.shader = this.cache.getShader(gl, x3dom.shader.BACKGROUND_CUBETEXTURE);
 
                 bgnd._webgl.texture = x3dom.Utils.createTextureCube(gl, bgnd._nameSpace.doc, url,
-                    true, bgnd._vf.withCredentials, true, false);
+                    true, bgnd._vf.crossOrigin, true, false);
             }
             else {
                 bgnd._webgl = {
@@ -20411,7 +22441,7 @@ x3dom.gfx_webgl = (function () {
                 url = bgnd._nameSpace.getURL(url[0]);
 
                 bgnd._webgl.texture = x3dom.Utils.createTexture2D(gl, bgnd._nameSpace.doc, url,
-                    true, bgnd._vf.withCredentials, true, false);
+                    true, bgnd._vf.crossOrigin, true, false);
 
                 bgnd._webgl.primType = gl.TRIANGLE_STRIP;
 
@@ -21187,11 +23217,12 @@ x3dom.gfx_webgl = (function () {
                 sp.modelViewMatrix = mat_view.mult(trafo).toGL();
                 sp.viewMatrixInverse = mat_view.inverse().toGL();
                 for (var cp = 0; cp < shape._clipPlanes.length; cp++) {
-                    var clip_trafo = shape._clipPlanes[cp].getCurrentTransform();
+                    var clip_plane = shape._clipPlanes[cp].plane;
+                    var clip_trafo = shape._clipPlanes[cp].trafo;
 
-                    sp['clipPlane' + cp + '_Plane'] = clip_trafo.multMatrixPlane(shape._clipPlanes[cp]._vf.plane).toGL();
-                    sp['clipPlane' + cp + '_CappingStrength'] = shape._clipPlanes[cp]._vf.cappingStrength;
-                    sp['clipPlane' + cp + '_CappingColor'] = shape._clipPlanes[cp]._vf.cappingColor.toGL();
+                    sp['clipPlane' + cp + '_Plane'] = clip_trafo.multMatrixPlane(clip_plane._vf.plane).toGL();
+                    sp['clipPlane' + cp + '_CappingStrength'] = clip_plane._vf.cappingStrength;
+                    sp['clipPlane' + cp + '_CappingColor'] = clip_plane._vf.cappingColor.toGL();
                 }
             }
 
@@ -21345,21 +23376,22 @@ x3dom.gfx_webgl = (function () {
                     shape._coordStrideOffset[0], shape._coordStrideOffset[1]);
                 gl.enableVertexAttribArray(sp.position);
 
-                if (pickMode == 1 && sp.texcoord !== undefined && s_gl.buffers[q6 + 3]) {
-                    gl.bindBuffer(gl.ARRAY_BUFFER, s_gl.buffers[q6 + 3]);
-
-                    gl.vertexAttribPointer(sp.texcoord,
-                        s_msh._numTexComponents, s_gl.texCoordType, false,
-                        shape._texCoordStrideOffset[0], shape._texCoordStrideOffset[1]);
-                    gl.enableVertexAttribArray(sp.texcoord);
-                }
-                if (pickMode == 2 && sp.color !== undefined && s_gl.buffers[q6 + 4]) {
+                if (pickMode == 1 && sp.color !== undefined && s_gl.buffers[q6 + 4]) {
                     gl.bindBuffer(gl.ARRAY_BUFFER, s_gl.buffers[q6 + 4]);
 
                     gl.vertexAttribPointer(sp.color,
                         s_msh._numColComponents, s_gl.colorType, false,
                         shape._colorStrideOffset[0], shape._colorStrideOffset[1]);
                     gl.enableVertexAttribArray(sp.color);
+                }
+
+                if (pickMode == 2 && sp.texcoord !== undefined && s_gl.buffers[q6 + 3]) {
+                    gl.bindBuffer(gl.ARRAY_BUFFER, s_gl.buffers[q6 + 3]);
+
+                    gl.vertexAttribPointer(sp.texcoord,
+                        s_msh._numTexComponents, s_gl.texCoordType, false,
+                        shape._texCoordStrideOffset[0], shape._texCoordStrideOffset[1]);
+                    gl.enableVertexAttribArray(sp.texcoord);
                 }
 
                 if (sp.id !== undefined && s_gl.buffers[q6 + 5]) {
@@ -21620,13 +23652,21 @@ x3dom.gfx_webgl = (function () {
                 tex = x3dom.Utils.findTextureByName(s_gl.texture, "multiDiffuseAlphaMap");
                 sp.multiDiffuseAlphaWidth = tex.texture.width;
                 sp.multiDiffuseAlphaHeight = tex.texture.height;
-
+            }
+            if (shader.getMultiEmissiveAmbientMap()) {
+                tex = x3dom.Utils.findTextureByName(s_gl.texture, "multiEmissiveAmbientMap");
+                sp.multiEmissiveAmbientWidth = tex.texture.width;
+                sp.multiEmissiveAmbientHeight = tex.texture.height;
+            }
+            if (shader.getMultiSpecularShininessMap()) {
+                tex = x3dom.Utils.findTextureByName(s_gl.texture, "multiSpecularShininessMap");
+                sp.multiSpecularShininessWidth = tex.texture.width;
+                sp.multiSpecularShininessHeight = tex.texture.height;
             }
             if (shader.getMultiVisibilityMap()) {
                 tex = x3dom.Utils.findTextureByName(s_gl.texture, "multiVisibilityMap");
                 sp.multiVisibilityWidth = tex.texture.width;
                 sp.multiVisibilityHeight = tex.texture.height;
-
             }
         }
         else if (mat) {
@@ -21754,11 +23794,12 @@ x3dom.gfx_webgl = (function () {
         //===========================================================================
         if (shape._clipPlanes) {
             for (var cp = 0; cp < shape._clipPlanes.length; cp++) {
-                var clip_trafo = shape._clipPlanes[cp].getCurrentTransform();
+                var clip_plane = shape._clipPlanes[cp].plane;
+                var clip_trafo = shape._clipPlanes[cp].trafo;
 
-                sp['clipPlane' + cp + '_Plane'] = clip_trafo.multMatrixPlane(shape._clipPlanes[cp]._vf.plane).toGL();
-                sp['clipPlane' + cp + '_CappingStrength'] = shape._clipPlanes[cp]._vf.cappingStrength;
-                sp['clipPlane' + cp + '_CappingColor'] = shape._clipPlanes[cp]._vf.cappingColor.toGL();
+                sp['clipPlane' + cp + '_Plane'] = clip_trafo.multMatrixPlane(clip_plane._vf.plane).toGL();
+                sp['clipPlane' + cp + '_CappingStrength'] = clip_plane._vf.cappingStrength;
+                sp['clipPlane' + cp + '_CappingColor'] = clip_plane._vf.cappingColor.toGL();
             }
         }
 
@@ -21907,7 +23948,6 @@ x3dom.gfx_webgl = (function () {
         if (s_gl.popGeometry) {
             this.updatePopState(drawable, s_geo, sp, s_gl, scene, model_view, viewarea, this.x3dElem.runtime.fps);
         }
-
 
         for (var cnt = 0, cnt_n = s_gl.texture.length; cnt < cnt_n; cnt++) {
             tex = s_gl.texture[cnt];
@@ -22366,307 +24406,224 @@ x3dom.gfx_webgl = (function () {
         
         var scene = viewarea._scene;
         
-        if (scene._forcePicking || scene._vf.pickOnNav || (!viewarea._isMoving && !viewarea._isAnimating)) 
+        var gl = this.ctx3d;
+        
+        // method requires that scene has already been rendered at least once
+        if (!gl || !scene || !scene._webgl || !scene.drawableCollection) {
+            return false;
+        }
+
+        var pm = scene._vf.pickMode.toLowerCase();
+        var pickMode = 0;
+
+        switch (pm) {
+            case "box":      return false;
+            case "idbuf":    pickMode = 0; break;
+            case "idbuf24":  pickMode = 3; break;
+            case "idbufid":  pickMode = 4; break;
+            case "color":    pickMode = 1; break;
+            case "texcoord": pickMode = 2; break;
+        }
+
+        
+        // ViewMatrix and ViewProjectionMatrix
+        var mat_view, mat_scene;
+
+        if (arguments.length > 4) {
+            mat_view = viewMat;
+            mat_scene = sceneMat;
+        }
+        else {
+            mat_view = viewarea._last_mat_view;
+            mat_scene = viewarea._last_mat_scene;
+        }
+
+        // remember correct scene bbox
+        var min = x3dom.fields.SFVec3f.copy(scene._lastMin);
+        var max = x3dom.fields.SFVec3f.copy(scene._lastMax);
+        // get current camera position
+        var from = mat_view.inverse().e3();
+
+        // get bbox of scene bbox and camera position
+        var _min = x3dom.fields.SFVec3f.copy(from);
+        var _max = x3dom.fields.SFVec3f.copy(from);
+
+        if (_min.x > min.x) { _min.x = min.x; }
+        if (_min.y > min.y) { _min.y = min.y; }
+        if (_min.z > min.z) { _min.z = min.z; }
+
+        if (_max.x < max.x) { _max.x = max.x; }
+        if (_max.y < max.y) { _max.y = max.y; }
+        if (_max.z < max.z) { _max.z = max.z; }
+
+        // temporarily set scene size to include camera
+        scene._lastMin.setValues(_min);
+        scene._lastMax.setValues(_max);
+
+        // get scalar scene size and adapted projection matrix
+        var sceneSize = scene._lastMax.subtract(scene._lastMin).length();
+        var cctowc = viewarea.getCCtoWCMatrix();
+
+        // restore correct scene bbox
+        scene._lastMin.setValues(min);
+        scene._lastMax.setValues(max);
+
+        // for deriving shadow ids together with shape ids
+        var baseID = x3dom.nodeTypes.Shape.objectID + 2;
+
+
+        // render to texture for reading pixel values
+        this.renderPickingPass(gl, scene, mat_view, mat_scene, from, sceneSize, pickMode, x, y, 2, 2);
+
+        // the pixel values under mouse cursor
+        var pixelData = scene._webgl.fboPick.pixelData;
+
+        if (pixelData && pixelData.length)
         {
-            var gl = this.ctx3d;
-            
-            // method requires that scene has already been rendered at least once
-            if (!gl || !scene || !scene._webgl || !scene.drawableCollection) {
-                return false;
+            var pickPos = new x3dom.fields.SFVec3f(0, 0, 0);
+            var pickNorm = new x3dom.fields.SFVec3f(0, 0, 1);
+
+            var index = 0;
+            var objId = pixelData[index + 3], shapeId;
+
+            var pixelOffset = 1.0 / scene._webgl.pickScale;
+            var denom = 1.0 / 256.0;
+            var dist, line, lineoff, right, up;
+
+            if (pickMode == 0) {
+                objId += 256 * pixelData[index + 2];
+
+                dist = (pixelData[index    ] / 255.0) * denom +
+                       (pixelData[index + 1] / 255.0);
+
+                line = viewarea.calcViewRay(x, y, cctowc);
+
+                pickPos = line.pos.add(line.dir.multiply(dist * sceneSize));
+
+                index = 4;      // get right pixel
+                dist = (pixelData[index    ] / 255.0) * denom +
+                       (pixelData[index + 1] / 255.0);
+
+                lineoff = viewarea.calcViewRay(x + pixelOffset, y, cctowc);
+
+                right = lineoff.pos.add(lineoff.dir.multiply(dist * sceneSize));
+                right = right.subtract(pickPos).normalize();
+
+                index = 8;      // get top pixel
+                dist = (pixelData[index    ] / 255.0) * denom +
+                       (pixelData[index + 1] / 255.0);
+
+                lineoff = viewarea.calcViewRay(x, y - pixelOffset, cctowc);
+
+                up = lineoff.pos.add(lineoff.dir.multiply(dist * sceneSize));
+                up = up.subtract(pickPos).normalize();
+
+                pickNorm = right.cross(up).normalize();
             }
+            else if (pickMode == 3) {
+                objId +=   256 * pixelData[index + 2] +
+                         65536 * pixelData[index + 1];
 
-            var pm = scene._vf.pickMode.toLowerCase();
-            var pickMode = 0;
+                dist = pixelData[index] / 255.0;
 
-            switch (pm) {
-                case "box":      return false;
-                case "idbuf":    pickMode = 0; break;
-                case "idbuf24":  pickMode = 3; break;
-                case "idbufid":  pickMode = 4; break;
-                case "color":    pickMode = 1; break;
-                case "texcoord": pickMode = 2; break;
+                line = viewarea.calcViewRay(x, y, cctowc);
+
+                pickPos = line.pos.add(line.dir.multiply(dist * sceneSize));
+
+                index = 4;      // get right pixel
+                dist = pixelData[index] / 255.0;
+
+                lineoff = viewarea.calcViewRay(x + pixelOffset, y, cctowc);
+
+                right = lineoff.pos.add(lineoff.dir.multiply(dist * sceneSize));
+                right = right.subtract(pickPos).normalize();
+
+                index = 8;      // get top pixel
+                dist = pixelData[index] / 255.0;
+
+                lineoff = viewarea.calcViewRay(x, y - pixelOffset, cctowc);
+
+                up = lineoff.pos.add(lineoff.dir.multiply(dist * sceneSize));
+                up = up.subtract(pickPos).normalize();
+
+                pickNorm = right.cross(up).normalize();
             }
+            else if (pickMode == 4) {
+                objId += 256 * pixelData[index + 2];
 
-            
-            // ViewMatrix and ViewProjectionMatrix
-            var mat_view, mat_scene;
+                shapeId  =       pixelData[index + 1];
+                shapeId += 256 * pixelData[index    ];
 
-            if (arguments.length > 4) {
-                mat_view = viewMat;
-                mat_scene = sceneMat;
+                // check if standard shape picked without special shadow id
+                if (objId == 0 && (shapeId > 0 && shapeId < baseID)) {
+                    objId = shapeId;
+                }
             }
             else {
-                mat_view = viewarea._last_mat_view;
-                mat_scene = viewarea._last_mat_scene;
+                pickPos.x = pixelData[index    ];
+                pickPos.y = pixelData[index + 1];
+                pickPos.z = pixelData[index + 2];
             }
+            //x3dom.debug.logInfo(pickPos + " / " + objId);
 
-            // remember correct scene bbox
-            var min = x3dom.fields.SFVec3f.copy(scene._lastMin);
-            var max = x3dom.fields.SFVec3f.copy(scene._lastMax);
-            // get current camera position
-            var from = mat_view.inverse().e3();
+            var eventType = "shadowObjectIdChanged";
+            var shadowObjectIdChanged, event;
+            var button = Math.max(buttonState >>> 8, buttonState & 255);
 
-            // get bbox of scene bbox and camera position
-            var _min = x3dom.fields.SFVec3f.copy(from);
-            var _max = x3dom.fields.SFVec3f.copy(from);
+            if (objId >= baseID) {
+                objId -= baseID;
 
-            if (_min.x > min.x) { _min.x = min.x; }
-            if (_min.y > min.y) { _min.y = min.y; }
-            if (_min.z > min.z) { _min.z = min.z; }
+                var hitObject;
 
-            if (_max.x < max.x) { _max.x = max.x; }
-            if (_max.y < max.y) { _max.y = max.y; }
-            if (_max.z < max.z) { _max.z = max.z; }
+                if (pickMode != 4) {
+                    viewarea._pickingInfo.pickPos = pickPos;
+                    viewarea._pick.setValues(pickPos);
 
-            // temporarily set scene size to include camera
-            scene._lastMin.setValues(_min);
-            scene._lastMax.setValues(_max);
+                    viewarea._pickingInfo.pickNorm = pickNorm;
+                    viewarea._pickNorm.setValues(pickNorm);
 
-            // get scalar scene size and adapted projection matrix
-            var sceneSize = scene._lastMax.subtract(scene._lastMin).length();
-            var cctowc = viewarea.getCCtoWCMatrix();
+                    viewarea._pickingInfo.pickObj = null;
+                    viewarea._pickingInfo.lastClickObj = null;
 
-            // restore correct scene bbox
-            scene._lastMin.setValues(min);
-            scene._lastMax.setValues(max);
-
-            // for deriving shadow ids together with shape ids
-            var baseID = x3dom.nodeTypes.Shape.objectID + 2;
-
-
-            // render to texture for reading pixel values
-            this.renderPickingPass(gl, scene, mat_view, mat_scene, from, sceneSize, pickMode, x, y, 2, 2);
-
-            // the pixel values under mouse cursor
-            var pixelData = scene._webgl.fboPick.pixelData;
-
-            if (pixelData && pixelData.length)
-            {
-                var pickPos = new x3dom.fields.SFVec3f(0, 0, 0);
-                var pickNorm = new x3dom.fields.SFVec3f(0, 0, 1);
-
-                var index = 0;
-                var objId = pixelData[index + 3], shapeId;
-
-                var pixelOffset = 1.0 / scene._webgl.pickScale;
-                var denom = 1.0 / 256.0;
-                var dist, line, lineoff, right, up;
-
-                if (pickMode == 0) {
-                    objId += 256 * pixelData[index + 2];
-
-                    dist = (pixelData[index    ] / 255.0) * denom +
-                           (pixelData[index + 1] / 255.0);
-
-                    line = viewarea.calcViewRay(x, y, cctowc);
-
-                    pickPos = line.pos.add(line.dir.multiply(dist * sceneSize));
-
-                    index = 4;      // get right pixel
-                    dist = (pixelData[index    ] / 255.0) * denom +
-                           (pixelData[index + 1] / 255.0);
-
-                    lineoff = viewarea.calcViewRay(x + pixelOffset, y, cctowc);
-
-                    right = lineoff.pos.add(lineoff.dir.multiply(dist * sceneSize));
-                    right = right.subtract(pickPos).normalize();
-
-                    index = 8;      // get top pixel
-                    dist = (pixelData[index    ] / 255.0) * denom +
-                           (pixelData[index + 1] / 255.0);
-
-                    lineoff = viewarea.calcViewRay(x, y - pixelOffset, cctowc);
-
-                    up = lineoff.pos.add(lineoff.dir.multiply(dist * sceneSize));
-                    up = up.subtract(pickPos).normalize();
-
-                    pickNorm = right.cross(up).normalize();
-                }
-                else if (pickMode == 3) {
-                    objId +=   256 * pixelData[index + 2] +
-                             65536 * pixelData[index + 1];
-
-                    dist = pixelData[index] / 255.0;
-
-                    line = viewarea.calcViewRay(x, y, cctowc);
-
-                    pickPos = line.pos.add(line.dir.multiply(dist * sceneSize));
-
-                    index = 4;      // get right pixel
-                    dist = pixelData[index] / 255.0;
-
-                    lineoff = viewarea.calcViewRay(x + pixelOffset, y, cctowc);
-
-                    right = lineoff.pos.add(lineoff.dir.multiply(dist * sceneSize));
-                    right = right.subtract(pickPos).normalize();
-
-                    index = 8;      // get top pixel
-                    dist = pixelData[index] / 255.0;
-
-                    lineoff = viewarea.calcViewRay(x, y - pixelOffset, cctowc);
-
-                    up = lineoff.pos.add(lineoff.dir.multiply(dist * sceneSize));
-                    up = up.subtract(pickPos).normalize();
-
-                    pickNorm = right.cross(up).normalize();
-                }
-                else if (pickMode == 4) {
-                    objId += 256 * pixelData[index + 2];
-
-                    shapeId  =       pixelData[index + 1];
-                    shapeId += 256 * pixelData[index    ];
-
-                    // check if standard shape picked without special shadow id
-                    if (objId == 0 && (shapeId > 0 && shapeId < baseID)) {
-                        objId = shapeId;
-                    }
+                    hitObject = scene._xmlNode;
                 }
                 else {
-                    pickPos.x = pixelData[index    ];
-                    pickPos.y = pixelData[index + 1];
-                    pickPos.z = pixelData[index + 2];
+                    viewarea._pickingInfo.pickObj = x3dom.nodeTypes.Shape.idMap.nodeID[shapeId];
+
+                    hitObject = viewarea._pickingInfo.pickObj._xmlNode;
                 }
-                //x3dom.debug.logInfo(pickPos + " / " + objId);
-
-                var eventType = "shadowObjectIdChanged";
-                var shadowObjectIdChanged, event;
-                var button = Math.max(buttonState >>> 8, buttonState & 255);
-
-                if (objId >= baseID) {
-                    objId -= baseID;
-
-                    var hitObject;
-
-                    if (pickMode != 4) {
-                        viewarea._pickingInfo.pickPos = pickPos;
-                        viewarea._pick.setValues(pickPos);
-
-                        viewarea._pickingInfo.pickNorm = pickNorm;
-                        viewarea._pickNorm.setValues(pickNorm);
-
-                        viewarea._pickingInfo.pickObj = null;
-                        viewarea._pickingInfo.lastClickObj = null;
-
-                        hitObject = scene._xmlNode;
-                    }
-                    else {
-                        viewarea._pickingInfo.pickObj = x3dom.nodeTypes.Shape.idMap.nodeID[shapeId];
-
-                        hitObject = viewarea._pickingInfo.pickObj._xmlNode;
-                    }
 
 
-                    //Check if there are MultiParts
-                    if (scene._multiPartMap) {
-                        var mp, multiPart;
+                //Check if there are MultiParts
+                if (scene._multiPartMap) {
+                    var mp, multiPart;
 
-                        //Find related MultiPart
-                        for (mp=0; mp<scene._multiPartMap.multiParts.length; mp++)
-                        {
-                            multiPart = scene._multiPartMap.multiParts[mp];
-                            if (objId >= multiPart._minId && objId <= multiPart._maxId)
-                            {
-                                hitObject = multiPart._xmlNode;
-
-                                event = {
-                                    target: multiPart._xmlNode,
-                                    button: button, mouseup: ((buttonState >>> 8) > 0),
-                                    layerX: x, layerY: y,
-                                    pickedId: objId,
-                                    worldX: pickPos.x, worldY: pickPos.y, worldZ: pickPos.z,
-                                    normalX: pickNorm.x, normalY: pickNorm.y, normalZ: pickNorm.z,
-                                    hitPnt: pickPos.toGL(),
-                                    hitObject: hitObject,
-                                    cancelBubble: false,
-                                    stopPropagation: function () { this.cancelBubble = true; },
-                                    preventDefault:  function () { this.cancelBubble = true; }
-                                };
-
-                                multiPart.handleEvents(event);
-                            }
-                            else
-                            {
-                                event = {
-                                    target: multiPart._xmlNode,
-                                    button: button, mouseup: ((buttonState >>> 8) > 0),
-                                    layerX: x, layerY: y,
-                                    pickedId: -1,
-                                    cancelBubble: false,
-                                    stopPropagation: function () { this.cancelBubble = true; },
-                                    preventDefault:  function () { this.cancelBubble = true; }
-                                };
-
-                                multiPart.handleEvents(event);
-                            }
-                        }
-                    }
-
-                    shadowObjectIdChanged = (viewarea._pickingInfo.shadowObjectId != objId);
-                    viewarea._pickingInfo.lastShadowObjectId = viewarea._pickingInfo.shadowObjectId;
-                    viewarea._pickingInfo.shadowObjectId = objId;
-                    //x3dom.debug.logInfo(baseID + " + " + objId);
-
-                    if ((shadowObjectIdChanged || button) && scene._xmlNode &&
-                        (scene._xmlNode["on" + eventType] || scene._xmlNode.hasAttribute("on" + eventType) ||
-                         scene._listeners[eventType]))
+                    //Find related MultiPart
+                    for (mp=0; mp<scene._multiPartMap.multiParts.length; mp++)
                     {
-                        event = {
-                            target: scene._xmlNode,
-                            type: eventType,
-                            button: button, mouseup: ((buttonState >>> 8) > 0),
-                            layerX: x, layerY: y,
-                            shadowObjectId: objId,
-                            worldX: pickPos.x, worldY: pickPos.y, worldZ: pickPos.z,
-                            normalX: pickNorm.x, normalY: pickNorm.y, normalZ: pickNorm.z,
-                            hitPnt: pickPos.toGL(),
-                            hitObject: hitObject,
-                            cancelBubble: false,
-                            stopPropagation: function () { this.cancelBubble = true; },
-                            preventDefault:  function () { this.cancelBubble = true; }
-                        };
-                        scene.callEvtHandler(("on" + eventType), event);
-                    }
-
-                    if (scene._shadowIdMap && scene._shadowIdMap.mapping &&
-                        objId < scene._shadowIdMap.mapping.length) {
-                        var shIds = scene._shadowIdMap.mapping[objId].usage;
-                        var n, c, shObj;
-
-                        if (!line) {
-                            line = viewarea.calcViewRay(x, y, cctowc);
-                        }
-                        // find corresponding dom tree object
-                        for (c = 0; c < shIds.length; c++) {
-                            shObj = scene._nameSpace.defMap[shIds[c]];
-                            // FIXME; bbox test too coarse (+ should include trafo)
-                            if (shObj && shObj.doIntersect(line)) {
-                                viewarea._pickingInfo.pickObj = shObj;
-                                break;
-                            }
-                        }
-                        //Check for other namespaces e.g. Inline/Multipart (FIXME; check recursively)
-                        for (n = 0; n<scene._nameSpace.childSpaces.length; n++)
+                        multiPart = scene._multiPartMap.multiParts[mp];
+                        if (objId >= multiPart._minId && objId <= multiPart._maxId)
                         {
-                            for (c = 0; c < shIds.length; c++) {
-                                shObj = scene._nameSpace.childSpaces[n].defMap[shIds[c]];
-                                // FIXME; bbox test too coarse (+ should include trafo)
-                                if (shObj && shObj.doIntersect(line)) {
-                                    viewarea._pickingInfo.pickObj = shObj;
-                                    break;
-                                }
-                            }
+                            hitObject = multiPart._xmlNode;
+
+                            event = {
+                                target: multiPart._xmlNode,
+                                button: button, mouseup: ((buttonState >>> 8) > 0),
+                                layerX: x, layerY: y,
+                                pickedId: objId,
+                                worldX: pickPos.x, worldY: pickPos.y, worldZ: pickPos.z,
+                                normalX: pickNorm.x, normalY: pickNorm.y, normalZ: pickNorm.z,
+                                hitPnt: pickPos.toGL(),
+                                hitObject: hitObject,
+                                cancelBubble: false,
+                                stopPropagation: function () { this.cancelBubble = true; },
+                                preventDefault:  function () { this.cancelBubble = true; }
+                            };
+
+                            multiPart.handleEvents(event);
                         }
-                    }
-                }
-                else {
-                    //Check if there are MultiParts
-                    if (scene._multiPartMap) {
-
-                        //Find related MultiPart
-                        for (mp=0; mp<scene._multiPartMap.multiParts.length; mp++)
+                        else
                         {
-                            multiPart = scene._multiPartMap.multiParts[mp];
-
                             event = {
                                 target: multiPart._xmlNode,
                                 button: button, mouseup: ((buttonState >>> 8) > 0),
@@ -22680,42 +24637,122 @@ x3dom.gfx_webgl = (function () {
                             multiPart.handleEvents(event);
                         }
                     }
+                }
 
+                shadowObjectIdChanged = (viewarea._pickingInfo.shadowObjectId != objId);
+                viewarea._pickingInfo.lastShadowObjectId = viewarea._pickingInfo.shadowObjectId;
+                viewarea._pickingInfo.shadowObjectId = objId;
+                //x3dom.debug.logInfo(baseID + " + " + objId);
 
-                    shadowObjectIdChanged = (viewarea._pickingInfo.shadowObjectId != -1);
-                    viewarea._pickingInfo.shadowObjectId = -1;     // nothing hit
+                if ((shadowObjectIdChanged || button) && scene._xmlNode &&
+                    (scene._xmlNode["on" + eventType] || scene._xmlNode.hasAttribute("on" + eventType) ||
+                     scene._listeners[eventType]))
+                {
+                    event = {
+                        target: scene._xmlNode,
+                        type: eventType,
+                        button: button, mouseup: ((buttonState >>> 8) > 0),
+                        layerX: x, layerY: y,
+                        shadowObjectId: objId,
+                        worldX: pickPos.x, worldY: pickPos.y, worldZ: pickPos.z,
+                        normalX: pickNorm.x, normalY: pickNorm.y, normalZ: pickNorm.z,
+                        hitPnt: pickPos.toGL(),
+                        hitObject: hitObject,
+                        cancelBubble: false,
+                        stopPropagation: function () { this.cancelBubble = true; },
+                        preventDefault:  function () { this.cancelBubble = true; }
+                    };
+                    scene.callEvtHandler(("on" + eventType), event);
+                }
 
-                    if ( shadowObjectIdChanged && scene._xmlNode &&
-                        (scene._xmlNode["on" + eventType] || scene._xmlNode.hasAttribute("on" + eventType) ||
-                         scene._listeners[eventType]) )
+                if (scene._shadowIdMap && scene._shadowIdMap.mapping &&
+                    objId < scene._shadowIdMap.mapping.length) {
+                    var shIds = scene._shadowIdMap.mapping[objId].usage;
+                    var n, c, shObj;
+
+                    if (!line) {
+                        line = viewarea.calcViewRay(x, y, cctowc);
+                    }
+                    // find corresponding dom tree object
+                    for (c = 0; c < shIds.length; c++) {
+                        shObj = scene._nameSpace.defMap[shIds[c]];
+                        // FIXME; bbox test too coarse (+ should include trafo)
+                        if (shObj && shObj.doIntersect(line)) {
+                            viewarea._pickingInfo.pickObj = shObj;
+                            break;
+                        }
+                    }
+                    //Check for other namespaces e.g. Inline/Multipart (FIXME; check recursively)
+                    for (n = 0; n<scene._nameSpace.childSpaces.length; n++)
                     {
+                        for (c = 0; c < shIds.length; c++) {
+                            shObj = scene._nameSpace.childSpaces[n].defMap[shIds[c]];
+                            // FIXME; bbox test too coarse (+ should include trafo)
+                            if (shObj && shObj.doIntersect(line)) {
+                                viewarea._pickingInfo.pickObj = shObj;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            else {
+                //Check if there are MultiParts
+                if (scene._multiPartMap) {
+
+                    //Find related MultiPart
+                    for (mp=0; mp<scene._multiPartMap.multiParts.length; mp++)
+                    {
+                        multiPart = scene._multiPartMap.multiParts[mp];
+
                         event = {
-                            target: scene._xmlNode,
-                            type: eventType,
+                            target: multiPart._xmlNode,
                             button: button, mouseup: ((buttonState >>> 8) > 0),
                             layerX: x, layerY: y,
-                            shadowObjectId: viewarea._pickingInfo.shadowObjectId,
+                            pickedId: -1,
                             cancelBubble: false,
                             stopPropagation: function () { this.cancelBubble = true; },
                             preventDefault:  function () { this.cancelBubble = true; }
                         };
-                        scene.callEvtHandler(("on" + eventType), event);
-                    }
 
-                    if (objId > 0) {
-                        //x3dom.debug.logInfo(x3dom.nodeTypes.Shape.idMap.nodeID[objId]._DEF + " // " +
-                        //                    x3dom.nodeTypes.Shape.idMap.nodeID[objId]._xmlNode.localName);
-                        viewarea._pickingInfo.pickPos = pickPos;
-                        viewarea._pickingInfo.pickNorm = pickNorm;
-                        viewarea._pickingInfo.pickObj = x3dom.nodeTypes.Shape.idMap.nodeID[objId];
-                    }
-                    else {
-                        viewarea._pickingInfo.pickObj = null;
-                        //viewarea._pickingInfo.lastObj = null;
-                        viewarea._pickingInfo.lastClickObj = null;
+                        multiPart.handleEvents(event);
                     }
                 }
-            }        
+
+
+                shadowObjectIdChanged = (viewarea._pickingInfo.shadowObjectId != -1);
+                viewarea._pickingInfo.shadowObjectId = -1;     // nothing hit
+
+                if ( shadowObjectIdChanged && scene._xmlNode &&
+                    (scene._xmlNode["on" + eventType] || scene._xmlNode.hasAttribute("on" + eventType) ||
+                     scene._listeners[eventType]) )
+                {
+                    event = {
+                        target: scene._xmlNode,
+                        type: eventType,
+                        button: button, mouseup: ((buttonState >>> 8) > 0),
+                        layerX: x, layerY: y,
+                        shadowObjectId: viewarea._pickingInfo.shadowObjectId,
+                        cancelBubble: false,
+                        stopPropagation: function () { this.cancelBubble = true; },
+                        preventDefault:  function () { this.cancelBubble = true; }
+                    };
+                    scene.callEvtHandler(("on" + eventType), event);
+                }
+
+                if (objId > 0) {
+                    //x3dom.debug.logInfo(x3dom.nodeTypes.Shape.idMap.nodeID[objId]._DEF + " // " +
+                    //                    x3dom.nodeTypes.Shape.idMap.nodeID[objId]._xmlNode.localName);
+                    viewarea._pickingInfo.pickPos = pickPos;
+                    viewarea._pickingInfo.pickNorm = pickNorm;
+                    viewarea._pickingInfo.pickObj = x3dom.nodeTypes.Shape.idMap.nodeID[objId];
+                }
+                else {
+                    viewarea._pickingInfo.pickObj = null;
+                    //viewarea._pickingInfo.lastObj = null;
+                    viewarea._pickingInfo.lastClickObj = null;
+                }
+            }
         }
         var pickTime = x3dom.Utils.stopMeasure("picking");
         this.x3dElem.runtime.addMeasurement('PICKING', pickTime);
@@ -22746,14 +24783,14 @@ x3dom.gfx_webgl = (function () {
 
         // render to texture for reading pixel values
         this.renderPickingPass(gl, scene, viewarea._last_mat_view, viewarea._last_mat_scene,
-               from, sceneSize, 0, x, y, (width < 1) ? 1 : width, (height < 1) ? 1 : height);
+            from, sceneSize, 0, x, y, (width < 1) ? 1 : width, (height < 1) ? 1 : height);
 
         var index;
         var pickedObjects = [];
 
         // get objects in rectangle
         for (index = 0; scene._webgl.fboPick.pixelData &&
-                        index < scene._webgl.fboPick.pixelData.length; index += 4) {
+        index < scene._webgl.fboPick.pixelData.length; index += 4) {
             var objId = scene._webgl.fboPick.pixelData[index + 3] +
                 scene._webgl.fboPick.pixelData[index + 2] * 256;
 
@@ -22778,14 +24815,45 @@ x3dom.gfx_webgl = (function () {
 
         var pickedNodes = [];
 
+        var hitObject;
+
+        // for deriving shadow ids together with shape ids
+        var baseID = x3dom.nodeTypes.Shape.objectID + 2;
+
         for (index = 0; index < pickedObjects.length; index++) {
-            var obj = pickedObjects[index];
+            objId = pickedObjects[index];
 
-            obj = x3dom.nodeTypes.Shape.idMap.nodeID[obj];
-            obj = (obj && obj._xmlNode) ? obj._xmlNode : null;
+            if (objId >= baseID)
+            {
+                objId -= baseID;
 
-            if (obj)
-                pickedNodes.push(obj);
+                //Check if there are MultiParts
+                if (scene._multiPartMap) {
+                    var mp, multiPart, colorMap, emissiveMap, specularMap, visibilityMap;
+
+                    //Find related MultiPart
+                    for (mp = 0; mp < scene._multiPartMap.multiParts.length; mp++) {
+                        multiPart = scene._multiPartMap.multiParts[mp];
+                        colorMap = multiPart._inlineNamespace.defMap["MultiMaterial_ColorMap"];
+                        emissiveMap = multiPart._inlineNamespace.defMap["MultiMaterial_EmissiveMap"];
+                        specularMap = multiPart._inlineNamespace.defMap["MultiMaterial_SpecularMap"];
+                        visibilityMap = multiPart._inlineNamespace.defMap["MultiMaterial_VisibilityMap"];
+                        if (objId >= multiPart._minId && objId <= multiPart._maxId) {
+                            hitObject = new x3dom.Parts(multiPart, [objId], colorMap, emissiveMap, specularMap, visibilityMap);
+                            pickedNodes.push(hitObject);
+                        }
+                    }
+                }
+
+            }
+            else
+            {
+                hitObject = x3dom.nodeTypes.Shape.idMap.nodeID[objId];
+                hitObject = (hitObject && hitObject._xmlNode) ? hitObject._xmlNode : null;
+
+                if (hitObject)
+                    pickedNodes.push(hitObject);
+            }
         }
 
         return pickedNodes;
@@ -22878,7 +24946,7 @@ x3dom.gfx_webgl = (function () {
 					scene._webgl.fboShadow[i][j] = x3dom.Utils.initFBO(gl, size, size, shadowType, false, true);
 			}
 			
-			if (scene._webgl.fboShadow.length > 0)
+			if (scene._webgl.fboShadow.length > 0 || x3dom.SSAO.isEnabled(scene))
 				scene._webgl.fboScene = x3dom.Utils.initFBO(gl, this.canvas.width, this.canvas.height, shadowType, false, true);
 			scene._webgl.fboBlur = [];
 						
@@ -23044,7 +25112,7 @@ x3dom.gfx_webgl = (function () {
 					scene._webgl.fboBlur[scene._webgl.fboBlur.length] = x3dom.Utils.initFBO(gl, size, size, shadowType, false, true);
 			}
 
-			if (scene._webgl.fboShadow.length > 0 && typeof scene._webgl.fboScene == "undefined" || scene._webgl.fboScene &&
+			if ((x3dom.SSAO.isEnabled(scene) ||scene._webgl.fboShadow.length > 0) && typeof scene._webgl.fboScene == "undefined" || scene._webgl.fboScene &&
 				(this.canvas.width != scene._webgl.fboScene.width || this.canvas.height != scene._webgl.fboScene.height)) {
 				scene._webgl.fboScene = x3dom.Utils.initFBO(gl, this.canvas.width, this.canvas.height, shadowType, false, true);
 			}
@@ -23197,7 +25265,7 @@ x3dom.gfx_webgl = (function () {
         }
 
         //One pass for depth of scene from camera view (to enable post-processing shading)
-        if (shadowCount > 0) {
+        if (shadowCount > 0 || x3dom.SSAO.isEnabled(scene)) {
             this.renderShadowPass(gl, viewarea, mat_scene, mat_view, scene._webgl.fboScene, 0.0, true);
             var shadowTime = x3dom.Utils.stopMeasure('shadow');
             this.x3dElem.runtime.addMeasurement('SHADOW', shadowTime);
@@ -23249,7 +25317,10 @@ x3dom.gfx_webgl = (function () {
         this.stateManager.disable(gl.DEPTH_TEST);
 
         viewarea._numRenderedNodes = n;
-
+        
+        if(x3dom.SSAO.isEnabled(scene))
+            x3dom.SSAO.renderSSAO(this.stateManager, gl, scene, this.canvas);
+        
         // if _visDbgBuf then show helper buffers in foreground for debugging
         if (viewarea._visDbgBuf !== undefined && viewarea._visDbgBuf)
         {
@@ -23261,7 +25332,7 @@ x3dom.gfx_webgl = (function () {
                 scene._fgnd._webgl.render(gl, scene._webgl.fboPick.tex);
             }
 
-            if (shadowCount > 0) {
+            if (shadowCount > 0 || x3dom.SSAO.isEnabled(scene)) {
                 this.stateManager.viewport(this.canvas.width / 4, 3 * this.canvas.height / 4,
                                            this.canvas.width / 4, this.canvas.height / 4);
                 scene._fgnd._webgl.render(gl, scene._webgl.fboScene.tex);
@@ -26951,7 +29022,7 @@ x3dom.registerNodeType(
                     for (var j = 0; j < n; j++) {
                         if ( (cnode = this._childNodes[j]) ) {
                             if (x3dom.isa(cnode, x3dom.nodeTypes.ClipPlane) && cnode._vf.on && cnode._vf.enabled) {
-                                localClipPlanes.push(cnode);
+                                localClipPlanes.push({plane: cnode, trafo: childTransform});
                             }
                         }
                     }
@@ -28187,18 +30258,6 @@ x3dom.registerNodeType(
              * @instance
              */
             this.addField_SFBool(ctx, 'doPickPass', true);
-            
-            // experimental field to switch off picking during moving and animating
-
-            /**
-             * Flag to disable pick pass during moving and animating  
-             * @var {x3dom.fields.SFBool} pickOnNav
-             * @memberof x3dom.nodeTypes.Scene
-             * @initvalue true
-             * @field x3dom
-             * @instance
-             */
-            this.addField_SFBool(ctx, 'pickOnNav', false);
 
             // another experimental field for shadow DOM remapping
 
@@ -28219,9 +30278,6 @@ x3dom.registerNodeType(
             this.loadMapping();
 
             this._multiPartMap = null;
-            
-            this._forcePicking = false;
-        
         },
         {
             /* Bindable getter (e.g. getViewpoint) are added automatically */
@@ -28229,7 +30285,9 @@ x3dom.registerNodeType(
             fieldChanged: function(fieldName)
             {
                 if (fieldName == "shadowObjectIdMapping")
+                {
                     this.loadMapping();
+                }
             },
 
             updateVolume: function()
@@ -29116,9 +31174,9 @@ x3dom.registerNodeType(
 
                     this._mesh._colors[0] = colors.toGL();
 
-                    var numColComponents = 3;
+                    this._mesh._numColComponents = 3;
                     if (x3dom.isa(colorNode, x3dom.nodeTypes.ColorRGBA)) {
-                        numColComponents = 4;
+                        this._mesh._numColComponents = 4;
                     }
                 }
 
@@ -36448,6 +38506,251 @@ x3dom.registerNodeType(
 
 /** @namespace x3dom.nodeTypes */
 /*
+ * Based on code originally provided by
+ * http://www.x3dom.org
+ * 
+ * (C)2014 Toshiba Corporation, Japan.
+ * Dual licensed under the MIT and GPL
+ */
+
+// ### SplinePositionInterpolator ###
+x3dom.registerNodeType(
+    "SplinePositionInterpolator",
+    "Interpolation",
+    defineClass(x3dom.nodeTypes.X3DInterpolatorNode,
+        
+        /**
+         * Constructor for SplinePositionInterpolator
+         * @constructs x3dom.nodeTypes.SplinePositionInterpolator
+         * @x3d 3.3
+         * @component Interpolation
+         * @status experimental
+         * @extends x3dom.nodeTypes.X3DInterpolatorNode
+         * @param {Object} [ctx=null] - context object, containing initial settings like namespace
+         * @classdesc The SplinePositionInterpolator node non-linearly interpolates among a list of 3D vectors to produce an SFVec3f value_changed event. The keyValue, keyVelocity, and key fields shall each have the same number of values.
+         */
+        function (ctx) {
+            x3dom.nodeTypes.SplinePositionInterpolator.superClass.call(this, ctx);
+
+            /**
+             * Defines the set of data points, that are used for interpolation.
+             * @var {x3dom.fields.MFVec3f} keyValue
+             * @memberof x3dom.nodeTypes.SplinePositionInterpolator
+             * @initvalue []
+             * @field x3d
+             * @instance
+             */
+            this.addField_MFVec3f(ctx, 'keyValue', []);
+			
+			/**
+             * Defines the set of velocity vectors, that are used for interpolation.
+             * @var {x3dom.fields.MFVec3f} keyVelocity
+             * @memberof x3dom.nodeTypes.SplinePositionInterpolator
+             * @initvalue []
+             * @field x3d
+             * @instance
+             */
+			this.addField_MFVec3f(ctx, 'keyVelocity', []);
+			
+			/**
+             * Specifies whether the interpolator should provide a closed loop, with continuous velocity vectors as the interpolator transitions from the last key to the first key.
+             * @var {x3dom.fields.SFBool} closed
+             * @memberof x3dom.nodeTypes.SplinePositionInterpolator
+             * @initvalue false
+             * @field x3d
+             * @instance
+             */
+			this.addField_SFBool(ctx, 'closed', false);
+			
+			/**
+             * Specifies whether the velocity vectors are to be transformed into normalized tangency vectors.
+             * @var {x3dom.fields.SFBool} normalizeVelocity
+             * @memberof x3dom.nodeTypes.SplinePositionInterpolator
+             * @initvalue false
+             * @field x3d
+             * @instance
+             */
+			this.addField_SFBool(ctx, 'normalizeVelocity', false);
+			 
+			/******** Private variables and functions ***********/
+			
+			/* dtot is the sum of the distance between all adjacent keys.
+			 * dtot = SUM{i=0, i < n-1}(|vi - vi+1|)
+			 */
+			this.dtot = 0.0;
+			
+			/* Non-uniform interval adjusted velocity vectors
+			 */
+			this.T0 = [];
+			this.T1 = [];
+			
+			/* Checks sanity. Node is sane if (|key| == |key_value|) and (|key| == |key_velocity| or |key_velocity| == 0 or (|key_velocity| == 2 and |key| >= 2))
+			 */
+			this.checkSanity = function() {
+				var sane = (this._vf.key.length == this._vf.keyValue.length) &&
+						   ((this._vf.key.length == this._vf.keyVelocity.length) || (this._vf.keyVelocity.length == 2 && this._vf.key.length >= 2) || (this._vf.keyVelocity.length == 0));
+				if(!sane)
+					x3dom.debug.logWarning("SplinePositionInterpolator Node: 'key' , 'keyValue' and/or 'keyVelocity' fields have inappropriate sizes");
+			};
+			
+			/* Calculate dtot (sum of distances between all adjacent keys)
+			 */
+			this.calcDtot = function()
+			{
+				this.dtot = 0.0;
+				for(var i = 0; i < this._vf.key.length-1; i++) 
+				{
+					this.dtot += Math.abs(this._vf.key[i] - this._vf.key[i+1]);
+				}
+			};
+			 
+			/* Calculate non-uniform interval adjusted velocity vectors
+			 */
+			this.calcAdjustedKeyVelocity = function()
+			{
+				var i, Ti, F_plus_i, F_minus_i;
+				var N = this._vf.key.length;
+				
+				// If velocities are defined at all the control points, ignore 'closed' field
+				if(this._vf.keyVelocity.length == N)
+				{
+					for(i = 0; i < N; i++)
+					{
+						Ti = this._vf.keyVelocity[i];
+						
+						if(this._vf.normalizeVelocity)
+							Ti = Ti.multiply(this.dtot / Ti.length());
+						
+						F_plus_i = (i == 0 || i == N-1) ? 1.0 : 2.0 * (this._vf.key[i] - this._vf.key[i-1]) / (this._vf.key[i+1] - this._vf.key[i-1]);
+						F_minus_i= (i == 0 || i == N-1) ? 1.0 : 2.0 * (this._vf.key[i+1] - this._vf.key[i]) / (this._vf.key[i+1] - this._vf.key[i-1]);
+						
+						this.T0[i] =  Ti.multiply(F_plus_i);
+						this.T1[i] =  Ti.multiply(F_minus_i);
+					}
+				}
+				// if only first and last velocities are specified, ignore 'closed' field
+				else if(this._vf.keyVelocity.length == 2 && N > 2)
+				{
+					for(i = 0; i < N; i++)
+					{
+						if(i == 0)
+							Ti = this._vf.keyVelocity[0];
+						else if(i == N-1)
+							Ti = this._vf.keyVelocity[1];
+						else
+							Ti = this._vf.keyValue[i+1].subtract(this._vf.keyValue[i-1]).multiply(0.5);
+						
+						if(this._vf.normalizeVelocity)
+							Ti = Ti.multiply(this.dtot / Ti.length());
+						
+						F_plus_i = (i == 0 || i == N-1) ? 1.0 : 2.0 * (this._vf.key[i] - this._vf.key[i-1]) / (this._vf.key[i+1] - this._vf.key[i-1]);
+						F_minus_i= (i == 0 || i == N-1) ? 1.0 : 2.0 * (this._vf.key[i+1] - this._vf.key[i]) / (this._vf.key[i+1] - this._vf.key[i-1]);
+						
+						this.T0[i] =  Ti.multiply(F_plus_i);
+						this.T1[i] =  Ti.multiply(F_minus_i);
+					}
+				}
+				// velocities are unspecified
+				else
+				{
+					// ignore closed if first and last keyValues are not equal
+					var closed = this._vf.closed && this._vf.keyValue[0].equals(this._vf.keyValue[N-1], 0.00001);
+					
+					for(i = 0; i < N; i++)
+					{
+						if((i == 0 || i == N-1) && !closed)
+						{
+							this.T0[i] = new x3dom.fields.SFVec3f(0, 0, 0);
+							this.T1[i] = new x3dom.fields.SFVec3f(0, 0, 0);
+							continue;
+						}
+						else if((i == 0 || i == N-1) && closed)
+						{
+							Ti = this._vf.keyValue[1].subtract(this._vf.keyValue[N-2]).multiply(0.5);
+							if(i == 0) {
+								F_plus_i = 2.0 * (this._vf.key[0] - this._vf.key[N-2]) / (this._vf.key[1] - this._vf.key[N-2]);
+								F_minus_i= 2.0 * (this._vf.key[1] - this._vf.key[0]) / (this._vf.key[1] - this._vf.key[N-2]);
+							}
+							else {
+								F_plus_i = 2.0 * (this._vf.key[N-1] - this._vf.key[N-2]) / (this._vf.key[1] - this._vf.key[N-2]);
+								F_minus_i= 2.0 * (this._vf.key[1] - this._vf.key[N-1]) / (this._vf.key[1] - this._vf.key[N-2]);
+							}
+							F_plus_i = 2.0 * (this._vf.key[N-1] - this._vf.key[N-2]) / (this._vf.key[N-2] - this._vf.key[1]);
+							F_minus_i= 2.0 * (this._vf.key[1] - this._vf.key[0]) / (this._vf.key[N-2] - this._vf.key[1]);
+						}
+						else
+						{
+							Ti = this._vf.keyValue[i+1].subtract(this._vf.keyValue[i-1]).multiply(0.5);
+							F_plus_i = 2.0 * (this._vf.key[i] - this._vf.key[i-1]) / (this._vf.key[i+1] - this._vf.key[i-1]);
+							F_minus_i= 2.0 * (this._vf.key[i+1] - this._vf.key[i]) / (this._vf.key[i+1] - this._vf.key[i-1]);
+						}
+						
+						this.T0[i] =  Ti.multiply(F_plus_i);
+						this.T1[i] =  Ti.multiply(F_minus_i);
+					}
+				}
+			};
+			
+			this.checkSanity();
+			this.calcDtot();
+			this.calcAdjustedKeyVelocity();
+        },
+        {
+            fieldChanged: function(fieldName)
+            {
+				switch(fieldName)
+				{
+					case 'key':
+					case 'keyValue':
+					case 'keyVelocity':
+					{
+						this.checkSanity();
+						this.calcDtot();
+						this.calcAdjustedKeyVelocity();
+						break;
+					}
+					case 'closed':
+					case 'normalizeVelocity':
+					{
+						this.calcAdjustedKeyVelocity();
+						break;
+					}
+					case 'set_fraction':
+					{
+						var value;
+						
+						if(this._vf.key.length > 0.0) {
+							if (this._vf.set_fraction <= this._vf.key[0])
+								value = x3dom.fields.SFVec3f.copy(this._vf.keyValue[0]);
+
+							else if (this._vf.set_fraction >= this._vf.key[this._vf.key.length-1])
+								value = x3dom.fields.SFVec3f.copy(this._vf.keyValue[this._vf.key.length-1]);
+						}
+						
+						for(var i = 0; i < this._vf.key.length-1; i++) {
+							if ((this._vf.key[i] < this._vf.set_fraction) && (this._vf.set_fraction <= this._vf.key[i+1])) {
+								var s = (this._vf.set_fraction - this._vf.key[i]) / (this._vf.key[i+1]-this._vf.key[i]);
+								
+								var S_H = new x3dom.fields.SFVec4f(2.0*s*s*s - 3.0*s*s + 1.0, -2.0*s*s*s + 3.0*s*s, s*s*s - 2.0*s*s + s, s*s*s - s*s);
+								value = new x3dom.fields.SFVec3f(S_H.x * this._vf.keyValue[i].x + S_H.y * this._vf.keyValue[i+1].x + S_H.z * this.T0[i].x + S_H.w * this.T1[i+1].x,
+															     S_H.x * this._vf.keyValue[i].y + S_H.y * this._vf.keyValue[i+1].y + S_H.z * this.T0[i].y + S_H.w * this.T1[i+1].y,
+															     S_H.x * this._vf.keyValue[i].z + S_H.y * this._vf.keyValue[i+1].z + S_H.z * this.T0[i].z + S_H.w * this.T1[i+1].z);
+								break;
+							}
+						}
+						
+						if(value !== undefined)
+							this.postMessage('value_changed', value);
+						else
+							x3dom.debug.logWarning("SplinePositionInterpolator Node: value_changed is undefined!");
+					}
+				}
+            }
+        }
+    )
+);
+/** @namespace x3dom.nodeTypes */
+/*
  * X3DOM JavaScript Library
  * http://www.x3dom.org
  *
@@ -36919,7 +39222,7 @@ x3dom.registerNodeType(
                 // http://www.web3d.org/files/specifications/19775-1/V3.2/Part01/components/networking.html#Anchor
                 x3dom.debug.logInfo("Anchor url=" + url + ", target=" + target + ", #viewpoint=" + anchor);
 
-                if (target.length == 0 || target == "_blank") {
+                if(target.length !=0 || target != "_self") {
                     window.open(this._nameSpace.getURL(url), target);
                 }
                 else {
@@ -36929,6 +39232,7 @@ x3dom.registerNodeType(
         }
     )
 );
+
 /** @namespace x3dom.nodeTypes */
 /*
  * X3DOM JavaScript Library
@@ -37337,7 +39641,7 @@ x3dom.registerNodeType(
              * @field x3dom
              * @instance
              */
-            this.addField_SFBool(ctx, 'solid', true);
+            this.addField_SFBool(ctx, 'solid', false);
 
             /**
              * Change render order manually.
@@ -37366,6 +39670,7 @@ x3dom.registerNodeType(
             this._minId = 0;
             this._maxId = 0;
             this._lastId = -1;
+            this._lastClickedId = -1;
             this._lastButton = 0;
             this._identifierToPartId = [];
             this._identifierToAppId = [];
@@ -37373,6 +39678,7 @@ x3dom.registerNodeType(
             this._partVolume = [];
             this._partVisibility = [];
 			this._originalColor = [];
+            this._materials = [];
 
         },
         {
@@ -37430,51 +39736,66 @@ x3dom.registerNodeType(
             {
                 if( this._inlineNamespace ) {
                     var colorMap = this._inlineNamespace.defMap["MultiMaterial_ColorMap"];
+                    var emissiveMap = this._inlineNamespace.defMap["MultiMaterial_EmissiveMap"];
+                    var specularMap = this._inlineNamespace.defMap["MultiMaterial_SpecularMap"];
                     var visibilityMap = this._inlineNamespace.defMap["MultiMaterial_VisibilityMap"];
 
+                    //Check for Background press and release
+                    if (e.pickedId == -1 && e.button != 0) {
+                        this._lastClickedId = -1;
+                        this._lastButton = e.button;
+                    } else if (e.pickedId == -1 && e.button == 0) {
+                        this._lastClickedId = -1;
+                        this._lastButton = 0;
+                    }
+
                     if (e.pickedId != -1) {
-                        e.part = new x3dom.Parts(this, [e.pickedId - this._minId], colorMap, visibilityMap);
+                        e.part = new x3dom.Parts(this, [e.pickedId - this._minId], colorMap, emissiveMap, specularMap, visibilityMap);
                         e.partID = this._idMap.mapping[e.pickedId - this._minId].name;
 
                         //fire mousemove event
                         e.type = "mousemove";
                         this.callEvtHandler("onmousemove", e);
 
-                        //fire mousemove event
+                        //fire mouseover event
                         e.type = "mouseover";
                         this.callEvtHandler("onmouseover", e);
 
-                        //fire click event
-                        if (e.button && e.button != this._lastButton) {
-                            e.type = "click";
-                            this.callEvtHandler("onclick", e);
-                            this._lastButton = e.button;
-                        }
-
                         //if some mouse button is down fire mousedown event
-                        if (e.button) {
+                        if (!e.mouseup && e.button && e.button != this._lastButton) {
                             e.type = "mousedown";
-                            this.callEvtHandler("onmousedown", e);
                             this._lastButton = e.button;
+                            if ( this._lastClickedId == -1 ) {
+                                this._lastClickedId = e.pickedId;
+                            }
+                            this.callEvtHandler("onmousedown", e);
                         }
 
                         //if some mouse button is up fire mouseup event
-                        if (this._lastButton != 0 && e.button == 0) {
+                        if (e.mouseup || (this._lastButton != 0 && e.button == 0)) {
                             e.type = "mouseup";
                             this.callEvtHandler("onmouseup", e);
                             this._lastButton = 0;
+
+                            if ( e.pickedId == this._lastClickedId ) {
+                                this._lastClickedId = -1;
+                                e.type = "click";
+                                this.callEvtHandler("onclick", e);
+                            }
+
+                            this._lastClickedId = -1;
                         }
 
                         //If the picked id has changed we enter+leave a part
                         if (e.pickedId != this._lastId) {
                             if (this._lastId != -1) {
-                                e.part = new x3dom.Parts(this, [this._lastId - this._minId], colorMap, visibilityMap);
+                                e.part = new x3dom.Parts(this, [this._lastId - this._minId], colorMap, emissiveMap, specularMap, visibilityMap);
                                 e.partID = this._idMap.mapping[this._lastId - this._minId].name;
                                 e.type = "mouseleave";
                                 this.callEvtHandler("onmouseleave", e);
                             }
 
-                            e.part = new x3dom.Parts(this, [e.pickedId - this._minId], colorMap, visibilityMap);
+                            e.part = new x3dom.Parts(this, [e.pickedId - this._minId], colorMap, emissiveMap, specularMap, visibilityMap);
                             e.partID = this._idMap.mapping[e.pickedId - this._minId].name;
                             e.type = "mouseenter";
                             this.callEvtHandler("onmouseenter", e);
@@ -37484,7 +39805,7 @@ x3dom.registerNodeType(
                         this._lastId = e.pickedId;
                     }
                     else if (this._lastId != -1) {
-                        e.part = new x3dom.Parts(this, [this._lastId - this._minId], colorMap, visibilityMap);
+                        e.part = new x3dom.Parts(this, [this._lastId - this._minId], colorMap, emissiveMap, specularMap, visibilityMap);
                         e.partID = this._idMap.mapping[this._lastId - this._minId].name;
                         e.type = "mouseout";
                         this.callEvtHandler("onmouseout", e);
@@ -37500,7 +39821,7 @@ x3dom.registerNodeType(
             {
                 if (this._vf.urlIDMap.length && this._vf.urlIDMap[0].length)
                 {
-                    var i, min, max;
+                    var i;
 
                     var that = this;
 
@@ -37563,16 +39884,22 @@ x3dom.registerNodeType(
                 }
             },
 
-            createColorData: function ()
+            createMaterialData: function ()
             {
-                var diffuseColor, transparency, rgba;
+                var diffuseColor, transparency, specularColor, shininess, emissiveColor, ambientIntensity;
+                var backDiffuseColor, backTransparency, backSpecularColor, backShininess, backEmissiveColor, backAmbientIntensity;
+                var rgba_DT = "", rgba_SS = "", rgba_EA = "";
+                var rgba_DT_B = "", rgba_SS_B = "", rgba_EA_B = "";
 
                 var size = Math.ceil(Math.sqrt(this._idMap.numberOfIDs));
 
                 //scale image data array size to the next highest power of two
                 size = x3dom.Utils.nextHighestPowerOfTwo(size);
+                var sizeTwo = size * 2.0;
 
-                var colorData = size + " " + size + " 4";
+                var diffuseTransparencyData = size + " " + sizeTwo + " 4";
+                var specularShininessData = size + " " + sizeTwo + " 4";
+                var emissiveAmbientIntensityData = size + " " + sizeTwo + " 4";
 
                 for (var i=0; i<size*size; i++)
                 {
@@ -37581,22 +39908,137 @@ x3dom.registerNodeType(
                         var appName = this._idMap.mapping[i].appearance;
                         var appID = this._identifierToAppId[appName];
 
-                        diffuseColor = this._idMap.appearance[appID].material.diffuseColor;
-                        transparency = this._idMap.appearance[appID].material.transparency;
+                        //AmbientIntensity
+                        if (this._idMap.appearance[appID].material.ambientIntensity) {
+                            ambientIntensity = this._idMap.appearance[appID].material.ambientIntensity
+                        } else {
+                            ambientIntensity = "0.2";
+                        }
 
-                        rgba = x3dom.fields.SFColorRGBA.parse(diffuseColor + " " + transparency);
+                        //BackAmbientIntensity
+                        if (this._idMap.appearance[appID].material.backAmbientIntensity) {
+                            backAmbientIntensity = this._idMap.appearance[appID].material.backAmbientIntensity
+                        } else {
+                            backAmbientIntensity = ambientIntensity;
+                        }
 
-                        colorData += " " + rgba.toUint();
-						
-						this._originalColor[i] = rgba;
+                        //DiffuseColor
+                        if (this._idMap.appearance[appID].material.diffuseColor) {
+                            diffuseColor = this._idMap.appearance[appID].material.diffuseColor
+                        } else {
+                            diffuseColor = "0.8 0.8 0.8";
+                        }
+
+                        //BackDiffuseColor
+                        if (this._idMap.appearance[appID].material.backDiffuseColor) {
+                            backDiffuseColor = this._idMap.appearance[appID].material.backDiffuseColor
+                        } else {
+                            backDiffuseColor = diffuseColor;
+                        }
+
+                        //EmissiveColor
+                        if (this._idMap.appearance[appID].material.emissiveColor) {
+                            emissiveColor = this._idMap.appearance[appID].material.emissiveColor
+                        } else {
+                            emissiveColor = "0.0 0.0 0.0";
+                        }
+
+                        //BackEmissiveColor
+                        if (this._idMap.appearance[appID].material.backEmissiveColor) {
+                            backEmissiveColor = this._idMap.appearance[appID].material.backEmissiveColor
+                        } else {
+                            backEmissiveColor = emissiveColor;
+                        }
+
+                        //Shininess
+                        if (this._idMap.appearance[appID].material.shininess) {
+                            shininess = this._idMap.appearance[appID].material.shininess;
+                        } else {
+                            shininess = "0.2";
+                        }
+
+                        //BackShininess
+                        if (this._idMap.appearance[appID].material.backShininess) {
+                            backShininess = this._idMap.appearance[appID].material.backShininess;
+                        } else {
+                            backShininess = shininess;
+                        }
+
+                        //SpecularColor
+                        if (this._idMap.appearance[appID].material.specularColor) {
+                            specularColor = this._idMap.appearance[appID].material.specularColor;
+                        } else {
+                            specularColor = "0 0 0";
+                        }
+
+                        //BackSpecularColor
+                        if (this._idMap.appearance[appID].material.backSpecularColor) {
+                            backSpecularColor = this._idMap.appearance[appID].material.backSpecularColor;
+                        } else {
+                            backSpecularColor = specularColor;
+                        }
+
+                        //Transparency
+                        if (this._idMap.appearance[appID].material.transparency) {
+                            transparency = this._idMap.appearance[appID].material.transparency;
+                        } else {
+                            transparency = "0.0";
+                        }
+
+                        //BackTransparency
+                        if (this._idMap.appearance[appID].material.backTransparency) {
+                            backTransparency = this._idMap.appearance[appID].material.backTransparency;
+                        } else {
+                            backTransparency = transparency;
+                        }
+
+                        rgba_DT +=  " " + x3dom.fields.SFColorRGBA.parse(diffuseColor + " " + transparency).toUint();
+                        rgba_SS +=  " " + x3dom.fields.SFColorRGBA.parse(specularColor + " " + shininess).toUint();
+                        rgba_EA +=  " " + x3dom.fields.SFColorRGBA.parse(emissiveColor + " " + ambientIntensity).toUint();
+
+                        rgba_DT_B += " " + x3dom.fields.SFColorRGBA.parse(backDiffuseColor + " " + backTransparency).toUint();
+                        rgba_SS_B += " " + x3dom.fields.SFColorRGBA.parse(backSpecularColor + " " + backShininess).toUint();
+                        rgba_EA_B += " " + x3dom.fields.SFColorRGBA.parse(backEmissiveColor + " " + backAmbientIntensity).toUint();
+
+                        this._originalColor[i] = rgba_DT;
+
+                        this._materials[i] = new x3dom.MultiMaterial({
+                            "ambientIntensity": ambientIntensity,
+                            "diffuseColor": x3dom.fields.SFColor.parse(diffuseColor),
+                            "emissiveColor": x3dom.fields.SFColor.parse(emissiveColor),
+                            "shininess": shininess,
+                            "specularColor": x3dom.fields.SFColor.parse(specularColor),
+                            "transparency": 1.0 - transparency,
+                            "backAmbientIntensity": backAmbientIntensity,
+                            "backDiffuseColor": x3dom.fields.SFColor.parse(backDiffuseColor),
+                            "backEmissiveColor": x3dom.fields.SFColor.parse(backEmissiveColor),
+                            "backShininess": backShininess,
+                            "backSpecularColor": x3dom.fields.SFColor.parse(backSpecularColor),
+                            "backTransparency": 1.0 - backTransparency
+                        });
                     }
                     else
                     {
-                        colorData += " 255";
+                        rgba_DT += " 255";
+                        rgba_SS += " 255";
+                        rgba_EA += " 255";
+
+                        rgba_DT_B += " 255";
+                        rgba_SS_B += " 255";
+                        rgba_EA_B += " 255";
                     }
                 }
 
-                return colorData;
+                //Combine Front and Back Data
+                diffuseTransparencyData      += rgba_DT + rgba_DT_B;
+                specularShininessData        += rgba_SS + rgba_SS_B;
+                emissiveAmbientIntensityData += rgba_EA + rgba_EA_B;
+
+                return {
+                    "diffuseTransparency": diffuseTransparencyData,
+                    "specularShininess": specularShininessData,
+                    "emissiveAmbientIntensity": emissiveAmbientIntensityData
+                };
             },
 
             createVisibilityData: function ()
@@ -37676,11 +40118,11 @@ x3dom.registerNodeType(
 
             replaceMaterials: function (inlScene)
             {
-                var css, shapeDEF, colorData, visibilityData, appearance;
+                var css, shapeDEF, materialData, visibilityData, appearance;
                 var firstMat = true;
                 if (inlScene && inlScene.hasChildNodes())
                 {
-                    colorData = this.createColorData();
+                    materialData = this.createMaterialData();
                     visibilityData = this.createVisibilityData();
 
                     var shapes = inlScene.getElementsByTagName("Shape");
@@ -37733,7 +40175,17 @@ x3dom.registerNodeType(
                                         var ptDA = document.createElement("PixelTexture");
                                         ptDA.setAttribute("containerField", "multiDiffuseAlphaTexture");
                                         ptDA.setAttribute("id", "MultiMaterial_ColorMap");
-                                        ptDA.setAttribute("image", colorData);
+                                        ptDA.setAttribute("image", materialData.diffuseTransparency);
+
+                                        var ptEA = document.createElement("PixelTexture");
+                                        ptEA.setAttribute("containerField", "multiEmissiveAmbientTexture");
+                                        ptEA.setAttribute("id", "MultiMaterial_EmissiveMap");
+                                        ptEA.setAttribute("image", materialData.emissiveAmbientIntensity);
+
+                                        var ptSS = document.createElement("PixelTexture");
+                                        ptSS.setAttribute("containerField", "multiSpecularShininessTexture");
+                                        ptSS.setAttribute("id", "MultiMaterial_SpecularMap");
+                                        ptSS.setAttribute("image", materialData.specularShininess);
 
                                         var ptV = document.createElement("PixelTexture");
                                         ptV.setAttribute("containerField", "multiVisibilityTexture");
@@ -37741,6 +40193,8 @@ x3dom.registerNodeType(
                                         ptV.setAttribute("image", visibilityData);
 
                                         css.appendChild(ptDA);
+                                        css.appendChild(ptEA);
+                                        css.appendChild(ptSS);
                                         css.appendChild(ptV);
                                     }
                                     else
@@ -37761,7 +40215,17 @@ x3dom.registerNodeType(
                                         var ptDA = document.createElement("PixelTexture");
                                         ptDA.setAttribute("containerField", "multiDiffuseAlphaTexture");
                                         ptDA.setAttribute("id", "MultiMaterial_ColorMap");
-                                        ptDA.setAttribute("image", colorData);
+                                        ptDA.setAttribute("image", materialData.diffuseTransparency);
+
+                                        var ptEA = document.createElement("PixelTexture");
+                                        ptEA.setAttribute("containerField", "multiEmissiveAmbientTexture");
+                                        ptEA.setAttribute("id", "MultiMaterial_EmissiveMap");
+                                        ptEA.setAttribute("image", materialData.emissiveAmbientIntensity);
+
+                                        var ptSS = document.createElement("PixelTexture");
+                                        ptSS.setAttribute("containerField", "multiSpecularShininessTexture");
+                                        ptSS.setAttribute("id", "MultiMaterial_SpecularMap");
+                                        ptSS.setAttribute("image", materialData.specularShininess);
 
                                         var ptV = document.createElement("PixelTexture");
                                         ptV.setAttribute("containerField", "multiVisibilityTexture");
@@ -37769,6 +40233,8 @@ x3dom.registerNodeType(
                                         ptV.setAttribute("image", visibilityData);
 
                                         css.appendChild(ptDA);
+                                        css.appendChild(ptEA);
+                                        css.appendChild(ptSS);
                                         css.appendChild(ptV);
                                     }
                                     else
@@ -37795,7 +40261,17 @@ x3dom.registerNodeType(
                                 var ptDA = document.createElement("PixelTexture");
                                 ptDA.setAttribute("containerField", "multiDiffuseAlphaTexture");
                                 ptDA.setAttribute("id", "MultiMaterial_ColorMap");
-                                ptDA.setAttribute("image", colorData);
+                                ptDA.setAttribute("image", materialData.diffuseTransparency);
+
+                                var ptEA = document.createElement("PixelTexture");
+                                ptEA.setAttribute("containerField", "multiEmissiveAmbientTexture");
+                                ptEA.setAttribute("id", "MultiMaterial_EmissiveMap");
+                                ptEA.setAttribute("image", materialData.emissiveAmbientIntensity);
+
+                                var ptSS = document.createElement("PixelTexture");
+                                ptSS.setAttribute("containerField", "multiSpecularShininessTexture");
+                                ptSS.setAttribute("id", "MultiMaterial_SpecularMap");
+                                ptSS.setAttribute("image", materialData.specularShininess);
 
                                 var ptV = document.createElement("PixelTexture");
                                 ptV.setAttribute("containerField", "multiVisibilityTexture");
@@ -37803,6 +40279,8 @@ x3dom.registerNodeType(
                                 ptV.setAttribute("image", visibilityData);
 
                                 css.appendChild(ptDA);
+                                css.appendChild(ptEA);
+                                css.appendChild(ptSS);
                                 css.appendChild(ptV);
                             }
                             else
@@ -37833,6 +40311,17 @@ x3dom.registerNodeType(
                     return ids;
                 };
 
+                this._xmlNode.getAppearanceIdList = function ()
+                {
+                    var i, ids = [];
+
+                    for (i=0; i<multiPart._idMap.appearance.length; i++) {
+                        ids.push( multiPart._idMap.appearance[i].name );
+                    }
+
+                    return ids;
+                };
+
                 this._xmlNode.getParts = function (selector)
                 {
                     var i, m;
@@ -37851,34 +40340,14 @@ x3dom.registerNodeType(
                     }
 
                     var colorMap = multiPart._inlineNamespace.defMap["MultiMaterial_ColorMap"];
+                    var emissiveMap = multiPart._inlineNamespace.defMap["MultiMaterial_EmissiveMap"];
+                    var specularMap = multiPart._inlineNamespace.defMap["MultiMaterial_SpecularMap"];
                     var visibilityMap = multiPart._inlineNamespace.defMap["MultiMaterial_VisibilityMap"];
 
                     if ( selection.length == 0) {
                         return null;
                     } else {
-                        return new x3dom.Parts(multiPart, selection, colorMap, visibilityMap);
-                    }
-                };
-                
-                this._xmlNode.fitPart = function (id, updateCenterOfRotation)
-                {
-                    var shapeID = multiPart._identifierToPartId[id];
-                
-                    if (shapeID)
-                    {
-                        if (updateCenterOfRotation === undefined) {
-                            updateCenterOfRotation = true;
-                        }
-                        
-                        var min = multiPart._partVolume[shapeID[0]].min;
-                        var max = multiPart._partVolume[shapeID[0]].max;
-
-                        var mat = multiPart.getCurrentTransform();
-
-                        min = mat.multMatrixPnt(min);
-                        max = mat.multMatrixPnt(max);
-                         
-                        multiPart._nameSpace.doc._viewarea.fit(min, max, updateCenterOfRotation);
+                        return new x3dom.Parts(multiPart, selection, colorMap, emissiveMap, specularMap, visibilityMap);
                     }
                 };
             },
@@ -38103,14 +40572,14 @@ x3dom.registerNodeType(
             var trans = (ctx && ctx.autoGen) ? 1 : 0;
 
             /**
-             * Credentials
-             * @var {x3dom.fields.SFBool} withCredentials
+             * Cross Origin Mode
+             * @var {x3dom.fields.SFString} crossOrigin
              * @memberof x3dom.nodeTypes.X3DBackgroundNode
-             * @initvalue false
+             * @initvalue ""
              * @field x3d
              * @instance
              */
-            this.addField_SFBool(ctx, 'withCredentials', false);
+            this.addField_SFString(ctx, 'crossOrigin', '');
 
             /**
              * Color of the ground
@@ -38706,6 +41175,57 @@ x3dom.registerNodeType(
              * @instance
              */
             this.addField_SFFloat(ctx, 'tessellationErrorFactor', -1);
+
+            /**
+             * Flag to enable Screen Space Ambient Occlusion
+             * @var {x3dom.fields.SFBool} SSAO
+             * @memberof x3dom.nodeTypes.Environment
+             * @initvalue "false"
+             * @field x3dom
+             * @instance
+             */
+            this.addField_SFBool(ctx, 'SSAO', false);
+
+            /**
+             * Value that determines the radius in which the SSAO is sampled in world space
+             * @var {x3dom.fields.SFFloat} SSAOradius
+             * @memberof x3dom.nodeTypes.Environment
+             * @initvalue "4"
+             * @field x3dom
+             * @instance
+             */
+            this.addField_SFFloat(ctx, 'SSAOradius',0.7);
+
+            /**
+             * Value that determines the amount of contribution of SSAO (from 0 to 1)
+             * @var {x3dom.fields.SFFloat} SSAOamount
+             * @memberof x3dom.nodeTypes.Environment
+             * @initvalue "1.0"
+             * @field x3dom
+             * @instance
+             */
+            this.addField_SFFloat(ctx, 'SSAOamount',0.3);
+
+            /**
+             * Value that determines the size of the random texture used for sparse sampling of SSAO
+             * @var {x3dom.fields.SFFloat} SSAOrandomTextureSize
+             * @memberof x3dom.nodeTypes.Environment
+             * @initvalue "4"
+             * @field x3dom
+             * @instance
+             */
+            this.addField_SFInt32(ctx, 'SSAOrandomTextureSize',4);
+
+            /**
+             * Value that determines the maximum depth difference for the SSAO blurring pass.
+             * Pixels with higher depth difference to the filer kernel center are not incorporated into the average.
+             * @var {x3dom.fields.SFFloat} SSAOblurDepthTreshold
+             * @memberof x3dom.nodeTypes.Environment
+             * @initvalue "5"
+             * @field x3dom
+             * @instance
+             */
+            this.addField_SFInt32(ctx, 'SSAOblurDepthTreshold',1);
 
             this._validGammaCorrectionTypes = [
                 "none", "fastlinear", "linear"
@@ -41428,14 +43948,14 @@ x3dom.registerNodeType(
             this.addField_SFBool(ctx, 'scale', true);
 
             /**
-             * Credentials.
-             * @var {x3dom.fields.SFBool} withCredentials
+             * Cross Origin Mode
+             * @var {x3dom.fields.SFString} crossOrigin
              * @memberof x3dom.nodeTypes.X3DTextureNode
-             * @initvalue false
-             * @field x3dom
+             * @initvalue ""
+             * @field x3d
              * @instance
              */
-            this.addField_SFBool(ctx, 'withCredentials', false);
+            this.addField_SFString(ctx, 'crossOrigin', '');
 
             /**
              * Sets a TextureProperty node.
@@ -41519,7 +44039,7 @@ x3dom.registerNodeType(
             {
                 if (fieldName == "url" || fieldName ==  "origChannelCount" ||
                     fieldName == "repeatS" || fieldName == "repeatT" ||
-                    fieldName == "scale" || fieldName == "withCredentials")
+                    fieldName == "scale" || fieldName == "crossOrigin")
                 {
                     var that = this;
 
@@ -41892,14 +44412,25 @@ x3dom.registerNodeType(
              */
             this.addField_SFFloat(ctx, 'interpupillaryDistance', 0.064);
 
-            this.hScreenSize = 0.14976;
-            this.vScreenSize = 0.09356;
+            /**
+             * Very experimental field to change between DK1 and DK2.
+             * @var {x3dom.fields.SFFloat} oculusRiftVersion
+             * @memberof x3dom.nodeTypes.RenderedTexture
+             * @initvalue 1
+             * @field x3dom
+             * @instance
+             */
+            this.addField_SFBool(ctx, 'oculusRiftVersion', 1);
+
+            this.hScreenSize = (this._vf.oculusRiftVersion == 1) ? 0.14976 : 0.12576;
+            this.vScreenSize = (this._vf.oculusRiftVersion == 1) ? 0.09356 : 0.07074;
             this.vScreenCenter = this.vScreenSize / 2;
             this.eyeToScreenDistance = 0.041;
             this.lensSeparationDistance = 0.0635;
             this.distortionK = [1.0, 0.22, 0.24, 0.0];
-            //hRes, vRes = 1280 x 800
-            this.lensCenter = 1 - 2 * this.lensSeparationDistance / this.hScreenSize;
+            //hRes, vRes = 1280 x 800  // DK2:  1920 x 1080
+            //this.lensCenter = 1 - 2 * this.lensSeparationDistance / this.hScreenSize;
+            this.lensCenter = 0.151976495726;   // TODO: DK2 ?
 
             x3dom.debug.assert(this._vf.dimensions.length >= 3,
                 "RenderedTexture.dimensions requires at least 3 entries.");
@@ -42256,19 +44787,23 @@ x3dom.registerNodeType(
                 return this._vf.image.comp;
             },
 
-            setPixel: function(x, y, color) {
+            setPixel: function(x, y, color, update) {
+                update = (update == undefined) ? true : update;
+
                 if (this._x3domTexture) {
                     this._x3domTexture.setPixel(x, y, [
                         color.r*255,
                         color.g*255,
                         color.b*255,
-                        color.a*255 ] );
+                        color.a*255 ], update );
                     this._vf.image.setPixel(x, y, color);
                 }
                 else
                 {
                     this._vf.image.setPixel(x, y, color);
-                    this.invalidateGLObject();
+                    if( update ) {
+                        this.invalidateGLObject();
+                    }
                 }
 
             },
@@ -42277,9 +44812,14 @@ x3dom.registerNodeType(
                 return this._vf.image.getPixel(x, y);
             },
 
-            setPixels: function(pixels) {
+            setPixels: function(pixels, update) {
+                update = (update == undefined) ? true : update;
+
                 this._vf.image.setPixels(pixels);
-                this.invalidateGLObject();
+
+                if( update ) {
+                    this.invalidateGLObject();
+                }
             },
 
             getPixels: function() {
@@ -43668,6 +46208,26 @@ x3dom.registerNodeType(
             this.addField_SFNode('multiDiffuseAlphaTexture', x3dom.nodeTypes.X3DTextureNode);
 
             /**
+             * Multi specular shininess texture.
+             * @var {x3dom.fields.SFNode} multiSpecularShininessTexture
+             * @memberof x3dom.nodeTypes.CommonSurfaceShader
+             * @initvalue x3dom.nodeTypes.X3DTextureNode
+             * @field x3dom
+             * @instance
+             */
+            this.addField_SFNode('multiSpecularShininessTexture', x3dom.nodeTypes.X3DTextureNode);
+
+            /**
+             * Multi emissive ambientIntensity texture.
+             * @var {x3dom.fields.SFNode} multiEmmisiveAmbientIntensityTexture
+             * @memberof x3dom.nodeTypes.CommonSurfaceShader
+             * @initvalue x3dom.nodeTypes.X3DTextureNode
+             * @field x3dom
+             * @instance
+             */
+            this.addField_SFNode('multiEmissiveAmbientTexture', x3dom.nodeTypes.X3DTextureNode);
+
+            /**
              * Multi visibility texture.
              * @var {x3dom.fields.SFNode} multiVisibilityTexture
              * @memberof x3dom.nodeTypes.CommonSurfaceShader
@@ -43902,6 +46462,36 @@ x3dom.registerNodeType(
                 }
             },
 
+            getMultiEmissiveAmbientMap: function()
+            {
+                if(this._cf.multiEmissiveAmbientTexture.node) {
+                    if (x3dom.isa(this._cf.multiEmissiveAmbientTexture.node, x3dom.nodeTypes.SurfaceShaderTexture)) {
+                        this._cf.multiEmissiveAmbientTexture.node._cf.texture.node._type = "multiEmissiveAmbientMap";
+                        return this._cf.multiEmissiveAmbientTexture.node._cf.texture.node;
+                    } else {
+                        this._cf.multiEmissiveAmbientTexture.node._type = "multiEmissiveAmbientMap";
+                        return this._cf.multiEmissiveAmbientTexture.node;
+                    }
+                } else {
+                    return null;
+                }
+            },
+
+            getMultiSpecularShininessMap: function()
+            {
+                if(this._cf.multiSpecularShininessTexture.node) {
+                    if (x3dom.isa(this._cf.multiSpecularShininessTexture.node, x3dom.nodeTypes.SurfaceShaderTexture)) {
+                        this._cf.multiSpecularShininessTexture.node._cf.texture.node._type = "multiSpecularShininessMap";
+                        return this._cf.multiSpecularShininessTexture.node._cf.texture.node;
+                    } else {
+                        this._cf.multiSpecularShininessTexture.node._type = "multiSpecularShininessMap";
+                        return this._cf.multiSpecularShininessTexture.node;
+                    }
+                } else {
+                    return null;
+                }
+            },
+
             getMultiVisibilityMap: function()
             {
                 if(this._cf.multiVisibilityTexture.node) {
@@ -43941,6 +46531,12 @@ x3dom.registerNodeType(
 
                 var multiDiffuseAlpha = this.getMultiDiffuseAlphaMap();
                 if(multiDiffuseAlpha) textures.push(multiDiffuseAlpha);
+
+                var multiEmissiveAmbient = this.getMultiEmissiveAmbientMap();
+                if(multiEmissiveAmbient) textures.push(multiEmissiveAmbient);
+
+                var multiSpecularShininess = this.getMultiSpecularShininessMap();
+                if(multiSpecularShininess) textures.push(multiSpecularShininess);
 
                 var multiVisibility = this.getMultiVisibilityMap();
                 if(multiVisibility) textures.push(multiVisibility);
@@ -49923,11 +52519,11 @@ x3dom.registerNodeType(
              * Determines whether offset values from previous drag gestures are remembered / accumulated.
              * @var {x3dom.fields.SFBool} autoOffset
              * @memberof x3dom.nodeTypes.X3DDragSensorNode
-             * @initvalue false
+             * @initvalue true
              * @field x3d
              * @instance
              */
-            this.addField_SFBool(ctx, 'autoOffset', false);
+            this.addField_SFBool(ctx, 'autoOffset', true);
 
             //route-able output fields
             //this.addField_SFVec3f(ctx, 'trackPoint_changed', 0, 0, 0);
@@ -50056,6 +52652,7 @@ x3dom.registerNodeType(
         }
     )
 );
+
 /** @namespace x3dom.nodeTypes */
 /*
  * X3DOM JavaScript Library
@@ -50330,7 +52927,7 @@ x3dom.registerNodeType(
 
                 this._viewArea = viewarea;
 
-                this._currentTranslation = new x3dom.fields.SFVec3f(0.0, 0.0, 0.0);
+                this._currentTranslation = new x3dom.fields.SFVec3f(0.0, 0.0, 0.0).add(this._vf.offset);
 
                 //TODO: handle multi-path nodes
 
@@ -50967,15 +53564,15 @@ x3dom.registerNodeType(
 );
 
 x3dom.versionInfo = {
-    version:  '1.6.1',
-    revision: '979902877438b38183164b102350130392ada7d5',
-    date:     'Thu Jul 24 17:38:21 2014 +0200'
+    version:  '1.6.2',
+    revision: '8f5655cec1951042e852ee9def292c9e0194186b',
+    date:     'Sat Dec 20 00:03:52 2014 +0100'
 };
 
 
 x3dom.versionInfo = {
-    version:  '1.6.1',
-    revision: '979902877438b38183164b102350130392ada7d5',
-    date:     'Thu Jul 24 17:38:21 2014 +0200'
+    version:  '1.6.2',
+    revision: '8f5655cec1951042e852ee9def292c9e0194186b',
+    date:     'Sat Dec 20 00:03:52 2014 +0100'
 };
 
