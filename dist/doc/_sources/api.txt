@@ -13,6 +13,24 @@ Documnetation API allows to dynamically generate documentation
 artifacts embedded derived from the source code (e.g. a list of
 loaded nodes).
 
+.. TODO: experimental
+.. Class Documentation
+.. -------------------
+
+.. .. toctree::
+..    :maxdepth: 1
+
+..    api/_global_
+..    api/Array
+..    api/lang/math
+..    api/x3dom.Cache
+..    api/x3dom.components
+..    api/x3dom.docs
+..    api/x3dom.Mesh
+..    api/x3dom.runtime
+
+
+
 
 Runtime
 -------
@@ -38,6 +56,24 @@ the X3D element they are working on as first parameter::
         }
     };
 
+
+..  js:function:: noBackendFound()
+    
+    This callback is executed once the system initialized and is not ready to 
+    render the first time because there is no backend found. By default this
+    method noop. You can however override it with your own implementation.
+ 
+        x3dom.runtime.noBackendFound = function() {
+            alert("No backend, what a bummer.");
+        }
+
+    It is important to create this override before the document onLoad event has 
+    fired. Therefore putting it directly under the inclusion of ``x3dom.js`` is the 
+    preferred way to ensure overloading of this function.
+
+    Please note that this does not account for a installed, but disabled
+    Flash plugin.
+ 
 
 
 ..  js:function:: ready()
@@ -134,11 +170,11 @@ the X3D element they are working on as first parameter::
 
 ..  js:function:: getViewingRay(x,y)
 
-    :param x: World X position
-    :param y: World Y position
-    :return: Line object
+    :param x: Layer x position
+    :param y: Layer y position
+    :return: Line object, from camera origin through (x, y)
 
-    Returns the width of the canvas element.
+    Returns the viewing ray for a given (x, y) position on the canvas.
 
 
 ..  js:function:: getWidth()
@@ -209,9 +245,22 @@ the X3D element they are working on as first parameter::
 
     :return: URL to image
 
-    Returns a URL to a Base64 encoded png image consisting of
-    the current rendering.
+    Returns a Base64 encoded `data URI <http://tools.ietf.org/html/rfc2397>`_ 
+    containing png image consisting of the current rendering. The resulting 
+    URL will look similar to this::
 
+        data:image/png;base64,iVBORw0KGgo...
+
+    The browser will interpret this as a PNG image and display it.
+    A list of browsers which support data URI can be 
+    `found here <http://en.wikipedia.org/wiki/Data_URI_scheme>`_.
+    
+    The following example illustrates the usage::
+    
+        var url = ...runtime.getScreenshot();
+        var img = document.createElement("img");
+        img.src = url;
+        ...
 
 ..  js:function:: lightMatrix()
 
@@ -273,8 +322,8 @@ the X3D element they are working on as first parameter::
     :param boolean show: true/false to show or hide the debug window
     :returns: The current visibility status of the debug window (true/false)
 
-    Displays or hides the debug window. If the paramter is omitted, the 
-    current visibility satus is returned.
+    Displays or hides the debug window. If the parameter is omitted, the 
+    current visibility status is returned.
 
 
 ..  js:function:: navigationType()

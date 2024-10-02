@@ -15,6 +15,7 @@ of different kinds, but they still feature everything you need to get started.
    firststeps
    styling
    imagesoundmovie
+   shadows
 
 **Content creation**
 
@@ -27,6 +28,7 @@ of different kinds, but they still feature everything you need to get started.
    max_export
    maya_export
    wow_export
+   bvh
    
 **Application prototypes**
 
@@ -35,6 +37,7 @@ of different kinds, but they still feature everything you need to get started.
 
    flash_mashup
    historical_objects
+   culling
 
 
 **Elsewhere**

@@ -6,13 +6,13 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     
-    <title>API &mdash; X3DOM v1.4.0 documentation</title>
+    <title>API &mdash; X3DOM v1.5.0 documentation</title>
     <link rel="stylesheet" href="_static/flasky.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    '',
-        VERSION:     '1.4.0',
+        VERSION:     '1.5.0',
         COLLAPSE_INDEX: false,
         FILE_SUFFIX: '.html',
         HAS_SOURCE:  true
@@ -21,17 +21,17 @@
     <script type="text/javascript" src="_static/jquery.js"></script>
     <script type="text/javascript" src="_static/underscore.js"></script>
     <script type="text/javascript" src="_static/doctools.js"></script>
-    <link rel="top" title="X3DOM v1.4.0 documentation" href="index.html" />
+    <link rel="top" title="X3DOM v1.5.0 documentation" href="index.html" />
     <link rel="next" title="Nodes" href="nodes/index.html" />
     <link rel="prev" title="Troubleshooting" href="troubleshooting.html" />
    
-    <script src="http://x3dom.org/download/dev/x3dom-full.js"></script>
+    <script src="_static/x3dom-full.js"></script>
+    
   
   <link media="only screen and (max-device-width: 480px)" href="_static/small_flask.css" type= "text/css" rel="stylesheet" />
 
   </head>
   <body>
-    <!--<div id="beta_notice"><p><strong>Note: </strong>This documentation is under active development. If you are interested in helping out, <a href="http://sourceforge.net/mailarchive/forum.php?forum_name=x3dom-developers">get in touch</a>.</p></div>-->
   
   
 
@@ -47,7 +47,7 @@
         <li class="right" >
           <a href="troubleshooting.html" title="Troubleshooting"
              accesskey="P">previous</a> |</li>
-        <li><a href="index.html">X3DOM v1.4.0 documentation</a> &raquo;</li> 
+        <li><a href="index.html">X3DOM v1.5.0 documentation</a> &raquo;</li> 
       </ul>
     </div>  
 
@@ -90,6 +90,26 @@ the X3D element they are working on as first parameter:</p>
     }
 };</pre>
 </div>
+<dl class="function">
+<dt id="noBackendFound">
+<tt class="descname">noBackendFound</tt><big>(</big><big>)</big><a class="headerlink" href="#noBackendFound" title="Permalink to this definition">¶</a></dt>
+<dd><p>This callback is executed once the system initialized and is not ready to
+render the first time because there is no backend found. By default this
+method noop. You can however override it with your own implementation.</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>x3dom.runtime.noBackendFound = function() {</dt>
+<dd>alert(&#8220;No backend, what a bummer.&#8221;);</dd>
+</dl>
+<p>}</p>
+</div></blockquote>
+<p>It is important to create this override before the document onLoad event has
+fired. Therefore putting it directly under the inclusion of <tt class="docutils literal"><span class="pre">x3dom.js</span></tt> is the
+preferred way to ensure overloading of this function.</p>
+<p>Please note that this does not account for a installed, but disabled
+Flash plugin.</p>
+</dd></dl>
+
 <dl class="function">
 <dt id="ready">
 <tt class="descname">ready</tt><big>(</big><big>)</big><a class="headerlink" href="#ready" title="Permalink to this definition">¶</a></dt>
@@ -231,17 +251,17 @@ bindable.setAttribute('set_bind', 'false');</pre>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field"><th class="field-name">Arguments:</th><td class="field-body"><ul class="first simple">
-<li><strong>x</strong> &#8211; World X position</li>
-<li><strong>y</strong> &#8211; World Y position</li>
+<li><strong>x</strong> &#8211; Layer x position</li>
+<li><strong>y</strong> &#8211; Layer y position</li>
 </ul>
 </td>
 </tr>
-<tr class="field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">Line object</p>
+<tr class="field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">Line object, from camera origin through (x, y)</p>
 </td>
 </tr>
 </tbody>
 </table>
-<p>Returns the width of the canvas element.</p>
+<p>Returns the viewing ray for a given (x, y) position on the canvas.</p>
 </dd></dl>
 
 <dl class="function">
@@ -380,8 +400,20 @@ scene is rendered in.</p>
 </tr>
 </tbody>
 </table>
-<p>Returns a URL to a Base64 encoded png image consisting of
-the current rendering.</p>
+<p>Returns a Base64 encoded <a class="reference external" href="http://tools.ietf.org/html/rfc2397">data URI</a>
+containing png image consisting of the current rendering. The resulting
+URL will look similar to this:</p>
+<div class="highlight-python"><pre>data:image/png;base64,iVBORw0KGgo...</pre>
+</div>
+<p>The browser will interpret this as a PNG image and display it.
+A list of browsers which support data URI can be
+<a class="reference external" href="http://en.wikipedia.org/wiki/Data_URI_scheme">found here</a>.</p>
+<p>The following example illustrates the usage:</p>
+<div class="highlight-python"><pre>var url = ...runtime.getScreenshot();
+var img = document.createElement("img");
+img.src = url;
+...</pre>
+</div>
 </dd></dl>
 
 <dl class="function">
@@ -517,8 +549,8 @@ node is given <tt class="docutils literal"><span class="pre">null</span></tt> is
 </tr>
 </tbody>
 </table>
-<p>Displays or hides the debug window. If the paramter is omitted, the
-current visibility satus is returned.</p>
+<p>Displays or hides the debug window. If the parameter is omitted, the
+current visibility status is returned.</p>
 </dd></dl>
 
 <dl class="function">
@@ -860,7 +892,7 @@ and sorted alphabetically.</p>
       <div class="clearer"></div>
     </div>
   <div class="footer">
-    &copy; Copyright 2012, Fraunhofer IGD/VCST.
+    &copy; Copyright 2013, Fraunhofer IGD/VCST.
     Created using <a href="http://sphinx.pocoo.org/">Sphinx</a>.
   </div>
   

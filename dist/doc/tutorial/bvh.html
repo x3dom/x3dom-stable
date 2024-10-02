@@ -1,0 +1,176 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>The BVHRefiner component - Refining and Loading hierarchical data dynamically &mdash; X3DOM v1.5.0 documentation</title>
+    <link rel="stylesheet" href="../_static/flasky.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '1.5.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <link rel="top" title="X3DOM v1.5.0 documentation" href="../index.html" />
+    <link rel="up" title="Tutorial" href="index.html" />
+    <link rel="next" title="Flash + AR / X3DOM Mashup" href="flash_mashup.html" />
+    <link rel="prev" title="World of Warcraft Models to X3DOM" href="wow_export.html" />
+   
+    <script src="../_static/x3dom-full.js"></script>
+    
+  
+  <link media="only screen and (max-device-width: 480px)" href="../_static/small_flask.css" type= "text/css" rel="stylesheet" />
+
+  </head>
+  <body>
+  
+  
+
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="flash_mashup.html" title="Flash + AR / X3DOM Mashup"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="wow_export.html" title="World of Warcraft Models to X3DOM"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../index.html">X3DOM v1.5.0 documentation</a> &raquo;</li>
+          <li><a href="index.html" accesskey="U">Tutorial</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="the-bvhrefiner-component-refining-and-loading-hierarchical-data-dynamically">
+<span id="bvh"></span><h1>The BVHRefiner component - Refining and Loading hierarchical data dynamically<a class="headerlink" href="#the-bvhrefiner-component-refining-and-loading-hierarchical-data-dynamically" title="Permalink to this headline">¶</a></h1>
+<p>The BVHRefiner is a component that refines and loads hierarchical data dynamically during runtime. Two different dataset structures can be used (WMTS, TREE) that are described later.</p>
+<div class="section" id="d-example-of-puget-sound-rendered-with-a-wmts-conform-dataset">
+<h2>3D-Example of Puget Sound rendered with a WMTS conform dataset<a class="headerlink" href="#d-example-of-puget-sound-rendered-with-a-wmts-conform-dataset" title="Permalink to this headline">¶</a></h2>
+<div align="center" class="align-center"><img alt="../_images/puget_sound.jpg" class="align-center" src="../_images/puget_sound.jpg" /></div>
+<div class="highlight-xml"><div class="highlight"><pre><span class="nt">&lt;BVHRefiner</span> <span class="na">maxDepth=</span><span class="s">&#39;5&#39;</span>
+            <span class="na">minDepth=</span><span class="s">&#39;2&#39;</span>
+            <span class="na">interactionDepth=</span><span class="s">&#39;4&#39;</span>
+            <span class="na">subdivision=</span><span class="s">&#39;128 128&#39;</span>
+            <span class="na">size=</span><span class="s">&#39;4096 4096&#39;</span>
+            <span class="na">factor=</span><span class="s">&#39;10&#39;</span>
+            <span class="na">maxElevation=</span><span class="s">&#39;410&#39;</span>
+            <span class="na">elevationUrl=</span><span class="s">&quot;Puget Sound WMTS/elevation&quot;</span>
+            <span class="na">textureUrl=</span><span class="s">&quot;Puget Sound WMTS/satellite&quot;</span>
+            <span class="na">normalUrl=</span><span class="s">&quot;Puget Sound WMTS/normal&quot;</span>
+            <span class="na">elevationFormat=</span><span class="s">&#39;png&#39;</span>
+            <span class="na">textureFormat=</span><span class="s">&#39;png&#39;</span>
+            <span class="na">normalFormat=</span><span class="s">&#39;png&#39;</span>
+            <span class="na">mode=</span><span class="s">&quot;3d&quot;</span>
+            <span class="na">submode=</span><span class="s">&quot;wmts&quot;</span><span class="nt">&gt;</span>
+<span class="nt">&lt;/BVHRefiner&gt;</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="parameter-descriptions">
+<h2>Parameter descriptions<a class="headerlink" href="#parameter-descriptions" title="Permalink to this headline">¶</a></h2>
+<p>The following table lists the parameters currently supported:</p>
+</div>
+<div class="section" id="currently-supported-dataset-formats">
+<h2>Currently supported dataset formats<a class="headerlink" href="#currently-supported-dataset-formats" title="Permalink to this headline">¶</a></h2>
+<p>We support two different types of datasets. The first is based on WMTS specification and the second version is a folder based file arrangement. Both, the usage of WMTS and TREE for this BVHRefiner node are specified in the following subsections.</p>
+<div class="section" id="wmts">
+<h3>WMTS<a class="headerlink" href="#wmts" title="Permalink to this headline">¶</a></h3>
+<p>In WMTS (<a class="reference external" href="http://www.opengeospatial.org/standards/wmts/">more information</a>) a multidimensional dataset of a terrain can be integrated very easy. For every level of detail a new matrix of tiles is required. Every level has its own folder. So if you want to get five different levels of detail in your application, five folders must exist, numbered from 0 to 4. The detail from level to level grows up by a factor of four. Into the folders for the levels, subfolders that describe the columns of the matrix have to be inserted. On level 0 you only have one column, represented through the folder with the name 0. In the next level you have two columns named 0 and 1, growing up by a factor of two from level to level. In the subfolders you place the images that represent the tiles data. There must be as much images as subfolders. On level 0 you only have one image that represents the whole terrain data. On level one exist two subfolders. Every subfolder has to include two images, on the next level four per subfolder and so on. The following figure (figure 1) shows the addressing-scheme:</p>
+<a class="reference internal image-reference" href="../_images/wmts.png"><div align="center" class="align-center"><img alt="../_images/wmts.png" class="align-center" src="../_images/wmts.png" style="width: 640.0px; height: 340.0px;" /></div>
+</a>
+</div>
+<div class="section" id="tree">
+<h3>TREE<a class="headerlink" href="#tree" title="Permalink to this headline">¶</a></h3>
+<p>The TREE addressing-scheme is as easy as the WMTS addressing scheme. Every level in the tree defines a level of detail of the terrain. On level 0 we have an image (1.png) that represents the terrain in the worst quality. It has a folder that has its number as name (1). In this folder we find four images where all four images together represent the whole terrain. The resolution grows up every level by a factor of four. Every image has its folder that always includes four images with the next finer resolution quality. If an image has no folder, the final resolution quality has reached. The position of the images for a finer resolution is as follows:</p>
+<ul class="simple">
+<li>1.png: top left</li>
+<li>2.png: bottom left</li>
+<li>3.png: top right</li>
+<li>4.png: bottom right</li>
+</ul>
+<a class="reference internal image-reference" href="../_images/tree.png"><div align="center" class="align-center"><img alt="../_images/tree.png" class="align-center" src="../_images/tree.png" style="width: 640.0px; height: 340.0px;" /></div>
+</a>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper"><!-- 
+<p class="logo"><a href="../index.html">
+  <img class="logo" src="../_static/x3dom-logo-small.png" alt="Logo"/>
+</a></p>
+-->
+  <h3><a href="../index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">The BVHRefiner component - Refining and Loading hierarchical data dynamically</a><ul>
+<li><a class="reference internal" href="#d-example-of-puget-sound-rendered-with-a-wmts-conform-dataset">3D-Example of Puget Sound rendered with a WMTS conform dataset</a></li>
+<li><a class="reference internal" href="#parameter-descriptions">Parameter descriptions</a></li>
+<li><a class="reference internal" href="#currently-supported-dataset-formats">Currently supported dataset formats</a><ul>
+<li><a class="reference internal" href="#wmts">WMTS</a></li>
+<li><a class="reference internal" href="#tree">TREE</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Tutorial</a><ul>
+      <li>Previous: <a href="wow_export.html" title="previous chapter">World of Warcraft Models to X3DOM</a></li>
+      <li>Next: <a href="flash_mashup.html" title="next chapter">Flash + AR / X3DOM Mashup</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+  <div class="footer">
+    &copy; Copyright 2013, Fraunhofer IGD/VCST.
+    Created using <a href="http://sphinx.pocoo.org/">Sphinx</a>.
+  </div>
+  
+<style>
+    .internal-node-list ul,
+    .internal-node-list, li {
+        margin:0;
+        padding:0;
+    }
+</style>
+  </body>
+</html>

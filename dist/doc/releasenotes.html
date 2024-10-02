@@ -6,13 +6,13 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     
-    <title>Release notes &mdash; X3DOM v1.4.0 documentation</title>
+    <title>Release notes &mdash; X3DOM v1.5.0 documentation</title>
     <link rel="stylesheet" href="_static/flasky.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    '',
-        VERSION:     '1.4.0',
+        VERSION:     '1.5.0',
         COLLAPSE_INDEX: false,
         FILE_SUFFIX: '.html',
         HAS_SOURCE:  true
@@ -21,17 +21,17 @@
     <script type="text/javascript" src="_static/jquery.js"></script>
     <script type="text/javascript" src="_static/underscore.js"></script>
     <script type="text/javascript" src="_static/doctools.js"></script>
-    <link rel="top" title="X3DOM v1.4.0 documentation" href="index.html" />
+    <link rel="top" title="X3DOM v1.5.0 documentation" href="index.html" />
     <link rel="next" title="License" href="license.html" />
     <link rel="prev" title="Resources" href="notes/resources.html" />
    
-    <script src="http://x3dom.org/download/dev/x3dom-full.js"></script>
+    <script src="_static/x3dom-full.js"></script>
+    
   
   <link media="only screen and (max-device-width: 480px)" href="_static/small_flask.css" type= "text/css" rel="stylesheet" />
 
   </head>
   <body>
-    <!--<div id="beta_notice"><p><strong>Note: </strong>This documentation is under active development. If you are interested in helping out, <a href="http://sourceforge.net/mailarchive/forum.php?forum_name=x3dom-developers">get in touch</a>.</p></div>-->
   
   
 
@@ -47,7 +47,7 @@
         <li class="right" >
           <a href="notes/resources.html" title="Resources"
              accesskey="P">previous</a> |</li>
-        <li><a href="index.html">X3DOM v1.4.0 documentation</a> &raquo;</li> 
+        <li><a href="index.html">X3DOM v1.5.0 documentation</a> &raquo;</li> 
       </ul>
     </div>  
 
@@ -58,6 +58,76 @@
             
   <div class="section" id="release-notes">
 <span id="releasenotes"></span><h1>Release notes<a class="headerlink" href="#release-notes" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="version-1-5">
+<h2>Version 1.5<a class="headerlink" href="#version-1-5" title="Permalink to this headline">¶</a></h2>
+<p>We are proud to announce the release of X3DOM 1.5. This most recent
+installment of our popular Declarative3D polyfill shines with lots of
+new features and a wagon load full of bugfixes.</p>
+<p>With version 1.5, X3DOM also overcomes some limits of the scenegraph
+structure by using new internal structures for culling and fast
+rendering, decoupled from the frontend graph inside the DOM, which,
+however, still remains intact as usual.</p>
+<div class="section" id="new-features">
+<h3>New Features<a class="headerlink" href="#new-features" title="Permalink to this headline">¶</a></h3>
+<ul>
+<li><p class="first">Generally improved traversal and rendering performance with a new
+transformation and volume caching infrastructure</p>
+</li>
+<li><p class="first">Culling techniques for large model rendering (some of them still
+experimental) - check the <a class="reference external" href="http://www.youtube.com/watch?v=2Nd4af3iHdM">video</a>, or see the <a class="reference external" href="http://x3dom.org/docs/dev/tutorial/culling.html">tutorial</a></p>
+</li>
+<li><dl class="first docutils">
+<dt>Improved experimental binary geometry container and encoding</dt>
+<dd><ul class="first last simple">
+<li>BinaryGeometry with more compact encoding that only uses 7 Bytes per
+triangle (see <a class="reference external" href="http://x3dom.org/x3dom/example/x3dom_buddhaBG.html">example</a>) and works nicely on mobile devices</li>
+<li>POPGeometry for progressive streaming and LOD - see the paper and project
+page <a class="reference external" href="http://x3dom.org/pop/">here</a>, or directly check some <a class="reference external" href="http://examples.x3dom.org/pop-pg13/happy.html">examples</a></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><p class="first">Experimental BVH Refiner node, for rendering of large, regular data sets
+with dynamic LOD (see <a class="reference external" href="http://examples.x3dom.org/BVHRefiner/BVHRefiner.html">example</a>)</p>
+</li>
+<li><p class="first">Shadow support for large scenes and all lights types (see <a class="reference external" href="http://x3dom.org/docs/dev/tutorial/shadows.html">tutorial</a> for more
+information or click <a class="reference external" href="http://x3dom.org/x3dom/example/x3dom_animatedLights.xhtml">here</a> or for a <a class="reference external" href="http://examples.x3dom.org/binaryGeo/oilrig_demo/index.html">demo</a>)</p>
+</li>
+<li><p class="first">CADGeometry component (not part of the HTML profile)</p>
+</li>
+<li><p class="first">Extrusion (and many more geometric 3D primitives in additional
+Geometry3DExt component, also not part of the HTML profile)</p>
+</li>
+<li><p class="first">Convenience object &#8216;Moveable&#8217; for <a class="reference external" href="http://x3dom.org/x3dom/example/x3dom_uiEvents.html">object manipulation</a></p>
+</li>
+<li><dl class="first docutils">
+<dt>Additional X3D component plugins (not part of the HTML profile and x3dom.js package)</dt>
+<dd><ul class="first last simple">
+<li>CADGeometry component</li>
+<li>Geometry3D component (e.g. Extrusion, missing level 4 nodes)</li>
+</ul>
+</dd>
+</dl>
+</li>
+</ul>
+</div>
+<div class="section" id="fixes-and-improvements">
+<h3>Fixes and Improvements<a class="headerlink" href="#fixes-and-improvements" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>Many internal <a class="reference external" href="https://github.com/x3dom/x3dom/issues?milestone=&amp;page=1&amp;state=closed">improvements and bugfixes</a></li>
+<li>Route removal implemented</li>
+<li>Improved picking functionality to enhance trade-off between precision
+and number of possible ids</li>
+<li>Fullscreen convenience method <tt class="docutils literal"><span class="pre">x3dom.toggleFullScreen()</span></tt></li>
+<li>RenderedTexture extensions for rendering normal buffer or stereo
+(currently only for Oculus Rift)</li>
+</ul>
+<p>For a detailed list of changes refer to the <a class="reference external" href="http://x3dom.org/download/1.5/CHANGELOG">CHANGELOG</a> file.</p>
+<p>Grab the frozen 1.5.0 version here:</p>
+<blockquote>
+<div><a class="reference external" href="http://x3dom.org/download/1.5/">http://x3dom.org/download/1.5/</a></div></blockquote>
+</div>
+</div>
 <div class="section" id="version-1-4">
 <h2>Version 1.4<a class="headerlink" href="#version-1-4" title="Permalink to this headline">¶</a></h2>
 <p>Welcome to X3DOM 1.4!</p>
@@ -270,6 +340,11 @@ no longer work together with recent browser versions.</p>
   <h3><a href="index.html">Table Of Contents</a></h3>
   <ul>
 <li><a class="reference internal" href="#">Release notes</a><ul>
+<li><a class="reference internal" href="#version-1-5">Version 1.5</a><ul>
+<li><a class="reference internal" href="#new-features">New Features</a></li>
+<li><a class="reference internal" href="#fixes-and-improvements">Fixes and Improvements</a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#version-1-4">Version 1.4</a><ul>
 <li><a class="reference internal" href="#new-in-1-4">New in 1.4</a></li>
 <li><a class="reference internal" href="#enhancements-and-fixes">Enhancements and Fixes</a></li>
@@ -307,7 +382,7 @@ no longer work together with recent browser versions.</p>
       <div class="clearer"></div>
     </div>
   <div class="footer">
-    &copy; Copyright 2012, Fraunhofer IGD/VCST.
+    &copy; Copyright 2013, Fraunhofer IGD/VCST.
     Created using <a href="http://sphinx.pocoo.org/">Sphinx</a>.
   </div>
   
