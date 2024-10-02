@@ -1,0 +1,321 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>API &mdash; X3DOM v1.3dev documentation</title>
+    <link rel="stylesheet" href="_static/flasky.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '1.3dev',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="X3DOM v1.3dev documentation" href="index.html" />
+    <link rel="next" title="Nodes" href="nodes/index.html" />
+    <link rel="prev" title="Troubleshooting" href="troubleshooting.html" />
+   
+  
+  <link media="only screen and (max-device-width: 480px)" href="_static/small_flask.css" type= "text/css" rel="stylesheet" />
+
+  </head>
+  <body>
+    <div id="beta_notice"><p><strong>Note: </strong>This documentation is under active development. If you are interested in helping out, <a href="http://sourceforge.net/mailarchive/forum.php?forum_name=x3dom-developers">get in touch</a>.</p></div>
+  
+  
+
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="nodes/index.html" title="Nodes"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="troubleshooting.html" title="Troubleshooting"
+             accesskey="P">previous</a> |</li>
+        <li><a href="index.html">X3DOM v1.3dev documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="api">
+<span id="runtime-api"></span><h1>API<a class="headerlink" href="#api" title="Permalink to this headline">¶</a></h1>
+<p>The X3DOM runtime API provides proxy object to programmatically read
+and modify runtime parameters. The runtime proxy is attached to each
+X3D element and can be used in the following manner:</p>
+<div class="highlight-python"><pre>var e = document.getElementById('the_x3delement');
+e.runtime.showAll();
+e.runtime.resetView();
+...</pre>
+</div>
+<p>Some methods, like the <tt class="docutils literal"><span class="pre">x3dom.ready()</span></tt> function need to be called
+before the proxy object can be initialized. You can still override
+these functions globally. In order to provide you with the means to
+scope your actions to a specific X3D element, the methods receive
+the X3D element they are working on as first parameter:</p>
+<div class="highlight-python"><pre>x3dom.ready = function(element) {
+    if (element == target_element) {
+        // do something
+    }
+};</pre>
+</div>
+<div class="section" id="runtime">
+<h2>Runtime<a class="headerlink" href="#runtime" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="ready">
+<tt class="descname">ready</tt><big>(</big><big>)</big><a class="headerlink" href="#ready" title="Permalink to this definition">¶</a></dt>
+<dd><p>This method is called once the system initialized and is ready to
+render the first time. It is therefore possible to execute custom
+action by overriding this method in your code:</p>
+<div class="highlight-python"><pre>x3dom.runtime.ready = function() {
+    alert("About to render something the first time");
+};</pre>
+</div>
+<p>It is important to create this override before the document onLoad event
+has fired. Therefore putting it directly under the inclusion of
+<tt class="docutils literal"><span class="pre">x3dom.js</span></tt> is the preferred way to ensure overloading of this function.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="enterFrame">
+<tt class="descname">enterFrame</tt><big>(</big><big>)</big><a class="headerlink" href="#enterFrame" title="Permalink to this definition">¶</a></dt>
+<dd><p>This method is called just before the next frame is rendered. It is
+therefore possible to execute custom actions by overriding this
+method in your code:</p>
+<div class="highlight-python"><pre>var element = document.getElementById('my_element');
+element.runtime.enterFrame = function() {
+    alert('hello custom enter frame');
+};</pre>
+</div>
+<p>During initialization, just after <tt class="docutils literal"><span class="pre">ready()</span></tt> executed and before the very
+first frame is rendered, only the global override of this method works.</p>
+<p>If you need to execute code before the first frame renders, it is
+therefore best to use the <tt class="docutils literal"><span class="pre">ready()</span></tt> function instead.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="getActiveBindable">
+<tt class="descname">getActiveBindable</tt><big>(</big><em>typeName</em><big>)</big><a class="headerlink" href="#getActiveBindable" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field"><th class="field-name">Arguments:</th><td class="field-body"><ul class="first simple">
+<li><strong>typeName</strong> (<em>string</em>) &#8211; A valid Bindable node (e.g. Viewpoint, Background,</li>
+</ul>
+</td>
+</tr>
+<tr class="field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">Active dom element</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>This method returns the currently active bindable DOM element of the given
+type.</p>
+<p>For example:</p>
+<div class="highlight-python"><pre>var element, bindable;
+element = doucment.getElementById('the_x3delement');
+bindable = element.runtime.getActiveBindable('background');
+bindable.setAttribute('set_bind', 'false');</pre>
+</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="nextView">
+<tt class="descname">nextView</tt><big>(</big><big>)</big><a class="headerlink" href="#nextView" title="Permalink to this definition">¶</a></dt>
+<dd><p>Navigates to the next viewpoint.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="prevView">
+<tt class="descname">prevView</tt><big>(</big><big>)</big><a class="headerlink" href="#prevView" title="Permalink to this definition">¶</a></dt>
+<dd><p>Navigates to the previous viewpoint.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="resetView">
+<tt class="descname">resetView</tt><big>(</big><big>)</big><a class="headerlink" href="#resetView" title="Permalink to this definition">¶</a></dt>
+<dd><p>Navigates to the initial viewpoint.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="uprightView">
+<tt class="descname">uprightView</tt><big>(</big><big>)</big><a class="headerlink" href="#uprightView" title="Permalink to this definition">¶</a></dt>
+<dd><p>Navigates to upright view.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="showAll">
+<tt class="descname">showAll</tt><big>(</big><big>)</big><a class="headerlink" href="#showAll" title="Permalink to this definition">¶</a></dt>
+<dd><p>Zooms so that all objects are visible.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="debug">
+<tt class="descname">debug</tt><big>(</big><em>show</em><big>)</big><a class="headerlink" href="#debug" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field"><th class="field-name">Arguments:</th><td class="field-body"><ul class="first simple">
+<li><strong>show</strong> (<em>boolean</em>) &#8211; true/false to show or hide the debug window</li>
+</ul>
+</td>
+</tr>
+<tr class="field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">The current visibility status of the debug window (true/false)</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>Displays or hides the debug window. If the paramter is omitted, the
+current visibility satus is returned.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="navigationType">
+<tt class="descname">navigationType</tt><big>(</big><big>)</big><a class="headerlink" href="#navigationType" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field"><th class="field-name">Returns:</th><td class="field-body">A string representing the active navigation type.</td>
+</tr>
+</tbody>
+</table>
+<p>A readout of the currently active navigation type.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="examine">
+<tt class="descname">examine</tt><big>(</big><big>)</big><a class="headerlink" href="#examine" title="Permalink to this definition">¶</a></dt>
+<dd><p>Switches to examine mode.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="lookAt">
+<tt class="descname">lookAt</tt><big>(</big><big>)</big><a class="headerlink" href="#lookAt" title="Permalink to this definition">¶</a></dt>
+<dd><p>Switches to lookAt mode.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="lookAround">
+<tt class="descname">lookAround</tt><big>(</big><big>)</big><a class="headerlink" href="#lookAround" title="Permalink to this definition">¶</a></dt>
+<dd><p>Switches to lookAround mode.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="walk">
+<tt class="descname">walk</tt><big>(</big><big>)</big><a class="headerlink" href="#walk" title="Permalink to this definition">¶</a></dt>
+<dd><p>Switches to walk mode.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="speed">
+<tt class="descname">speed</tt><big>(</big><em>newSpeed</em><big>)</big><a class="headerlink" href="#speed" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field"><th class="field-name">Arguments:</th><td class="field-body"><ul class="first simple">
+<li><strong>newSpeed</strong> (<em>float</em>) &#8211; The new speed value (optional)</li>
+</ul>
+</td>
+</tr>
+<tr class="field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">The current speed value</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>Get the current speed value. If parameter is given the new speed value is
+set accordingly.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="statistics">
+<tt class="descname">statistics</tt><big>(</big><em>mode</em><big>)</big><a class="headerlink" href="#statistics" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field"><th class="field-name">Arguments:</th><td class="field-body"><ul class="first simple">
+<li><strong>mode</strong> (<em>boolean</em>) &#8211; true/false to enable or disable the stats info</li>
+</ul>
+</td>
+</tr>
+<tr class="field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">The current visibility of the stats info (true/false)</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>Get or set the visibility of the statistics information. If parameter is
+omitted, this method returns the visibility status as boolean.</p>
+</dd></dl>
+
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper"><!-- 
+<p class="logo"><a href="index.html">
+  <img class="logo" src="_static/x3dom-logo-small.png" alt="Logo"/>
+</a></p>
+-->
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">API</a><ul>
+<li><a class="reference internal" href="#runtime">Runtime</a></li>
+</ul>
+</li>
+</ul>
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="troubleshooting.html" title="previous chapter">Troubleshooting</a></li>
+      <li>Next: <a href="nodes/index.html" title="next chapter">Nodes</a></li>
+  </ul></li>
+</ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+  <div class="footer">
+    &copy; Copyright 2011, Fraunhofer IGD/VCST.
+    Created using <a href="http://sphinx.pocoo.org/">Sphinx</a>.
+  </div>
+  
+  </body>
+</html>

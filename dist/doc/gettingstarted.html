@@ -1,0 +1,199 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Getting started &mdash; X3DOM v1.3dev documentation</title>
+    <link rel="stylesheet" href="_static/flasky.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '1.3dev',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="X3DOM v1.3dev documentation" href="index.html" />
+    <link rel="next" title="Tutorial" href="tutorial/index.html" />
+    <link rel="prev" title="Welcome to X3DOM" href="index.html" />
+   
+  
+  <link media="only screen and (max-device-width: 480px)" href="_static/small_flask.css" type= "text/css" rel="stylesheet" />
+
+  </head>
+  <body>
+    <div id="beta_notice"><p><strong>Note: </strong>This documentation is under active development. If you are interested in helping out, <a href="http://sourceforge.net/mailarchive/forum.php?forum_name=x3dom-developers">get in touch</a>.</p></div>
+  
+  
+
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="tutorial/index.html" title="Tutorial"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="Welcome to X3DOM"
+             accesskey="P">previous</a> |</li>
+        <li><a href="index.html">X3DOM v1.3dev documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="getting-started">
+<span id="gettingstarted"></span><h1>Getting started<a class="headerlink" href="#getting-started" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="downloading-x3dom">
+<h2>Downloading X3DOM<a class="headerlink" href="#downloading-x3dom" title="Permalink to this headline">¶</a></h2>
+<p>The recommended way of using X3DOM in your application is downloading a
+released version to your local machine or server. The code of a released
+version should be usable in all modern browsers.</p>
+<p>X3DOM itself depends on no external libraries. All you need in order to make
+it work are the following files:</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="26%" />
+<col width="74%" />
+</colgroup>
+<tbody valign="top">
+<tr><td><tt class="docutils literal"><span class="pre">x3dom-v1.2.js</span></tt></td>
+<td>The minified X3DOM library in a given version</td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">x3dom-v1.2.css</span></tt></td>
+<td>Stylesheets for X3DOM, you need to include this file
+in your webpage in order for X3DOM to display.
+However you can also take it as template to
+adapt your own stylesheet.</td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">x3dom-1.2.swf</span></tt></td>
+<td>The Flash 11 integration, for browsers not supporting
+native X3DOM or WebGL.</td>
+</tr>
+</tbody>
+</table>
+<p>You can <a class="reference external" href="http://x3dom.org/download/">download the files from the X3DOM server</a>
+and put them on your harddisk or your webserver. The file naming follows
+the pattern: <tt class="docutils literal"><span class="pre">x3dom-vMAIOR.MINOR.js</span></tt>.</p>
+</div>
+<div class="section" id="development-builds">
+<h2>Development builds<a class="headerlink" href="#development-builds" title="Permalink to this headline">¶</a></h2>
+<p>If you are adventurous and want to work with the latest development build of
+X3DOM <a class="reference external" href="http://x3dom.org/download/">download the latest builds from the X3DOM server</a>.
+Just use the files ending in no version number:</p>
+<ul class="simple">
+<li><a class="reference external" href="http://x3dom.org/download/x3dom.js">x3dom.js</a></li>
+<li><a class="reference external" href="http://x3dom.org/download/x3dom.css">x3dom.css</a></li>
+<li><a class="reference external" href="http://x3dom.org/download/x3dom.swf">x3dom.swf</a></li>
+</ul>
+<p><strong>WARNING:</strong> Do <strong>NOT</strong> use the development builds in a production system. It is
+not thoroughly tested. It is not stable and will probably break things. If in
+doubt, use the current release.</p>
+</div>
+<div class="section" id="build-from-revision-control">
+<h2>Build from revision control<a class="headerlink" href="#build-from-revision-control" title="Permalink to this headline">¶</a></h2>
+<p><strong>Note:</strong> The following is for advanced developers. If you wish to use a rather
+recent version of X3DOM and do not want to tinker with Python, just
+use the development build.</p>
+<p>All source code to X3DOM is kept under the Git revision control and you can
+<a class="reference external" href="http://github.com/x3dom/x3dom/">browse the repository</a> online. There is a
+download link available for any file or directory, if you only nee a portion
+of the X3DOM code.</p>
+<p>If you have access to Git, you can get a copy of the repository here:</p>
+<div class="highlight-python"><pre>git clone https://github.com/x3dom/x3dom.git</pre>
+</div>
+<p>You can also check out a specific release from GitHub:</p>
+<div class="highlight-python"><pre>git clone https://github.com/x3dom/x3dom.git
+git checkout &lt;version&gt;
+e.g. git checkout 1.2.0</pre>
+</div>
+<p>If you want to build your own copy of X3DOM from the Git repository, you
+need to build it from the sources.</p>
+<div class="section" id="build-requirements">
+<h3>Build requirements<a class="headerlink" href="#build-requirements" title="Permalink to this headline">¶</a></h3>
+<p>X3DOM currently requires the following components to be installed on your
+computer:</p>
+<ul class="simple">
+<li><a class="reference external" href="http://python.org">Python</a>: The Python programming language is
+available for all major platforms</li>
+<li><a class="reference external" href="http://sphinx.pocoo.org/">Sphinx</a>: A documentation tool, you will
+need this in order to build the documentation. Sphinx is a Python
+package and can be installed by running <tt class="docutils literal"><span class="pre">easy_install</span> <span class="pre">sphinx</span></tt>.</li>
+<li><a class="reference external" href="http://pypi.python.org/pypi/argparse">argparse</a>: For Python 2.6 or earlier.</li>
+</ul>
+<p>Once you have all prerequisites installed, you can build X3DOM:</p>
+<div class="highlight-python"><pre>python manage.py --build</pre>
+</div>
+<p>The resulting build will be written to the <tt class="docutils literal"><span class="pre">dist/</span></tt> directory.</p>
+<p>Fore more detailed information on working with the source, please see
+the <a class="reference external" href="http://github.com/x3dom/x3dom/wiki">developer wiki</a>.</p>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper"><!-- 
+<p class="logo"><a href="index.html">
+  <img class="logo" src="_static/x3dom-logo-small.png" alt="Logo"/>
+</a></p>
+-->
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Getting started</a><ul>
+<li><a class="reference internal" href="#downloading-x3dom">Downloading X3DOM</a></li>
+<li><a class="reference internal" href="#development-builds">Development builds</a></li>
+<li><a class="reference internal" href="#build-from-revision-control">Build from revision control</a><ul>
+<li><a class="reference internal" href="#build-requirements">Build requirements</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="index.html" title="previous chapter">Welcome to X3DOM</a></li>
+      <li>Next: <a href="tutorial/index.html" title="next chapter">Tutorial</a></li>
+  </ul></li>
+</ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+  <div class="footer">
+    &copy; Copyright 2011, Fraunhofer IGD/VCST.
+    Created using <a href="http://sphinx.pocoo.org/">Sphinx</a>.
+  </div>
+  
+  </body>
+</html>
