@@ -1,4 +1,4 @@
-/** X3DOM Runtime, http://www.x3dom.org/ 1.6.2 - 8f5655cec1951042e852ee9def292c9e0194186b - Sat Dec 20 00:03:52 2014 +0100 */
+/** X3DOM Runtime, http://www.x3dom.org/ 1.7.0 - f33e92d248a2f25d52fa63ede8ffee570c8a6304 - Wed Jun 17 09:49:25 2015 +0200 */
 x3dom.registerNodeType("Snout","Geometry3DExt",defineClass(x3dom.nodeTypes.X3DSpatialGeometryNode,function(ctx){x3dom.nodeTypes.Snout.superClass.call(this,ctx);this.addField_SFFloat(ctx,'dbottom',1.0);this.addField_SFFloat(ctx,'dtop',0.5);this.addField_SFFloat(ctx,'height',1.0);this.addField_SFFloat(ctx,'xoff',0.25);this.addField_SFFloat(ctx,'yoff',0.25);this.addField_SFBool(ctx,'bottom',true);this.addField_SFBool(ctx,'top',true);this.addField_SFFloat(ctx,'subdivision',32);this.rebuildGeometry();},{rebuildGeometry:function()
 {this._mesh._positions[0]=[];this._mesh._normals[0]=[];this._mesh._texCoords[0]=[];this._mesh._indices[0]=[];var bottomRadius=this._vf.dbottom/2,height=this._vf.height;var topRadius=this._vf.dtop/2,sides=this._vf.subdivision;var beta,x,z;var delta=2.0*Math.PI/sides;var incl=(bottomRadius-topRadius)/height;var nlen=1.0/Math.sqrt(1.0+incl*incl);var j=0,k=0;var h,base;if(height>0){var px=0,pz=0;for(j=0,k=0;j<=sides;j++){beta=j*delta;x=Math.sin(beta);z=-Math.cos(beta);px=x*topRadius+this._vf.xoff;pz=z*topRadius+this._vf.yoff;this._mesh._positions[0].push(px,height/2,pz);this._mesh._normals[0].push(x/nlen,incl/nlen,z/nlen);this._mesh._texCoords[0].push(1.0-j/sides,1);this._mesh._positions[0].push(x*bottomRadius,-height/2,z*bottomRadius);this._mesh._normals[0].push(x/nlen,incl/nlen,z/nlen);this._mesh._texCoords[0].push(1.0-j/sides,0);if(j>0){this._mesh._indices[0].push(k);this._mesh._indices[0].push(k+2);this._mesh._indices[0].push(k+1);this._mesh._indices[0].push(k+1);this._mesh._indices[0].push(k+2);this._mesh._indices[0].push(k+3);k+=2;}}}
 if(bottomRadius>0&&this._vf.bottom){base=this._mesh._positions[0].length/3;for(j=sides-1;j>=0;j--){beta=j*delta;x=bottomRadius*Math.sin(beta);z=-bottomRadius*Math.cos(beta);this._mesh._positions[0].push(x,-height/2,z);this._mesh._normals[0].push(0,-1,0);this._mesh._texCoords[0].push(x/bottomRadius/2+0.5,z/bottomRadius/2+0.5);}
@@ -131,12 +131,12 @@ var numTexComponents=2;var texCoordNode=this._cf.texCoord.node;if(x3dom.isa(texC
 texCoordNode=texCoordNode._cf.texCoord.nodes[0];}
 if(texCoordNode){if(texCoordNode._vf.point){texCoords=texCoordNode._vf.point;if(x3dom.isa(texCoordNode,x3dom.nodeTypes.TextureCoordinate3D)){numTexComponents=3;}}}
 var numColComponents=3;if(this._cf.color.node){colors=this._cf.color.node._vf.color;if(x3dom.isa(this._cf.color.node,x3dom.nodeTypes.ColorRGBA)){numColComponents=4;}}
-var c=0;for(y=0;y<=suby;y++)
+var c=0;var faceCnt=0;for(y=0;y<=suby;y++)
 {for(x=0;x<=subx;x++)
-{this._mesh._positions[0].push(x*this._vf.xSpacing);this._mesh._positions[0].push(h[c]);this._mesh._positions[0].push(y*this._vf.zSpacing);if(normals){this._mesh._normals[0].push(normals[c].x);this._mesh._normals[0].push(normals[c].y);this._mesh._normals[0].push(normals[c].z);}
+{this._mesh._positions[0].push(x*this._vf.xSpacing);this._mesh._positions[0].push(h[c]);this._mesh._positions[0].push(y*this._vf.zSpacing);if(normals){if(this._vf.normalPerVertex){this._mesh._normals[0].push(normals[c].x);this._mesh._normals[0].push(normals[c].y);this._mesh._normals[0].push(normals[c].z);}}
 if(texCoords){this._mesh._texCoords[0].push(texCoords[c].x);this._mesh._texCoords[0].push(texCoords[c].y);if(numTexComponents===3){this._mesh._texCoords[0].push(texCoords[c].z);}}
 else{this._mesh._texCoords[0].push(x/subx);this._mesh._texCoords[0].push(y/suby);}
-if(colors){this._mesh._colors[0].push(colors[c].r);this._mesh._colors[0].push(colors[c].g);this._mesh._colors[0].push(colors[c].b);if(numColComponents===4){this._mesh._colors[0].push(colors[c].a);}}
+if(colors){if(this._vf.colorPerVertex){this._mesh._colors[0].push(colors[c].r);this._mesh._colors[0].push(colors[c].g);this._mesh._colors[0].push(colors[c].b);if(numColComponents===4){this._mesh._colors[0].push(colors[c].a);}}}
 c++;}}
 for(y=1;y<=suby;y++){for(x=0;x<subx;x++){this._mesh._indices[0].push((y-1)*(subx+1)+x);this._mesh._indices[0].push(y*(subx+1)+x);this._mesh._indices[0].push((y-1)*(subx+1)+x+1);this._mesh._indices[0].push(y*(subx+1)+x);this._mesh._indices[0].push(y*(subx+1)+x+1);this._mesh._indices[0].push((y-1)*(subx+1)+x+1);}}
 if(!normals)
