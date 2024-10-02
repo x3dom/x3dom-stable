@@ -1,4 +1,4 @@
-/** X3DOM Runtime, http://www.x3dom.org/ 1.7.1 - 27d2b19b572f365b32d12cd9883e4bf894e60cef - Tue Jan 5 13:25:24 2016 +0100 */
+/** X3DOM Runtime, http://www.x3dom.org/ 1.7.2 - 61a235203deb34329fe615cbbf21314db6ebf49f - Mon Dec 19 19:17:05 2016 +0100 */
 x3dom.registerNodeType("IndexedQuadSet","CADGeometry",defineClass(x3dom.nodeTypes.X3DComposedGeometryNode,function(ctx){x3dom.nodeTypes.IndexedQuadSet.superClass.call(this,ctx);this.addField_MFInt32(ctx,'index',[]);},{nodeChanged:function()
 {var time0=new Date().getTime();this.handleAttribs();var colPerVert=this._vf.colorPerVertex;var normPerVert=this._vf.normalPerVertex;var indexes=this._vf.index;var hasNormal=false,hasTexCoord=false,hasColor=false;var positions,normals,texCoords,colors;var coordNode=this._cf.coord.node;x3dom.debug.assert(coordNode);positions=coordNode._vf.point;var normalNode=this._cf.normal.node;if(normalNode){hasNormal=true;normals=normalNode._vf.vector;}
 else{hasNormal=false;}
